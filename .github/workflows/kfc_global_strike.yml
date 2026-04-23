@@ -1,0 +1,27 @@
+name: 24-7 KFC Global Revenue Engine
+on:
+  schedule:
+    - cron: '0 * * * *' # Executes exactly every 60 minutes, 24/7
+  workflow_dispatch: # Allows you to trigger a strike from your phone anytime
+
+jobs:
+  medical-strike:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install requests google-api-python-client
+
+      - name: Execute Mass Medical Strike
+        env:
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: python3 kfc_sales_engine/outbound_agent.py
