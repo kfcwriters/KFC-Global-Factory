@@ -24,4 +24,4 @@ jobs:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
-        run: python3 kfc_sales_engine/outbound_agent.py
+        run: kfc_global_strike.yml
