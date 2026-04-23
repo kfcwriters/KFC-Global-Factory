@@ -1,4 +1,4 @@
-name: 24-7 KFC Global Revenue Engine
+name: 24-7 KFC Global Synthetic Factory
 on:
   schedule:
     - cron: '0 * * * *'
@@ -16,8 +16,11 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Force Install Tools
-        run: pip install requests google-api-python-client
+      - name: Install Video Studio Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg imagemagick
+          pip install moviepy gTTS requests
 
       - name: Execute Full Autonomy Strike
         env:
