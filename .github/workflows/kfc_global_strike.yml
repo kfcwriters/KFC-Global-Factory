@@ -1,8 +1,8 @@
 name: 24-7 KFC Global Revenue Engine
 on:
   schedule:
-    - cron: '0 * * * *' # Executes exactly every 60 minutes, 24/7
-  workflow_dispatch: # Allows you to trigger a strike from your phone anytime
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   medical-strike:
@@ -15,11 +15,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
-     - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests google-api-python-client
 
       - name: Execute Mass Medical Strike
         env:
