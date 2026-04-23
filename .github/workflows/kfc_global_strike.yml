@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: '3.9'
 
+      - name: Install Dependencies
+        run: pip install requests google-api-python-client
+
       - name: Execute Mass Medical Strike
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
