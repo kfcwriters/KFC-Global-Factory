@@ -16,12 +16,14 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Dependencies
-        run: pip install requests google-api-python-client
+     - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-api-python-client
 
       - name: Execute Mass Medical Strike
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
-        run: kfc_global_strike.yml
+        run: python3 outbound_agent.py
