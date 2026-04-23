@@ -3,22 +3,21 @@ import requests
 
 def run_strike():
     token = os.getenv('TELEGRAM_TOKEN')
-    chat_id = "1060905337" # Your verified ID
+    chat_id = "1060905337" 
     
-    print("🚀 KFC GLOBAL FACTORY: Initiating 24/7 Strike...")
+    print("🚀 KFC LAB AGENT: Initiating Diagnostic Strike...")
     
-    msg = "🚀 KFC FACTORY ONLINE: System is now running 24/7. First medical strike complete."
+    msg = "✅ FACTORY STATUS: 24/7 Autonomy Confirmed.\n\nBiochemistry Topics: Glyco-proteomics & Six Sigma Quality.\nYouTube channel: UCufYNDYq7orIFkkDh57xRow"
     
-    # Send to Telegram
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {"chat_id": chat_id, "text": msg}
-    
-    response = requests.post(url, json=payload)
-    
-    if response.status_code == 200:
-        print("✅ Telegram Handshake Successful!")
-    else:
-        print(f"❌ Telegram Error: {response.status_code} - {response.text}")
+    try:
+        response = requests.post(url, json={"chat_id": chat_id, "text": msg})
+        if response.status_code == 200:
+            print("📲 Telegram Handshake: SUCCESSFUL.")
+        else:
+            print(f"❌ Telegram Handshake: FAILED. Error: {response.text}")
+    except Exception as e:
+        print(f"❌ System Error: {str(e)}")
 
 if __name__ == "__main__":
     run_strike()
