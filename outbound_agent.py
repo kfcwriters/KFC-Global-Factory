@@ -8,58 +8,63 @@ def execute_global_factory():
     # 🔑 Credentials & System Access
     tg_token = os.getenv('TELEGRAM_TOKEN')
     gmail_pass = os.getenv('GMAIL_PASSWORD')
-    # 🎥 Media Agent Hired: Shotstack Production Key
+    # 🎥 Media Agent: Shotstack Production Key
     SHOTSTACK_KEY = "ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" 
     
     my_email = "kfcwriters@gmail.com"
     chat_id = "1060905337"
 
-    # 🔬 DEPARTMENT 1: Research & Global Medical Vault
-    # Multi-field coverage: Surgery, Pharma, Biochemistry, Education
+    # 🔬 THE GLOBAL MEDICAL VAULT (PhD Focus)
     vault = [
-        {"title": "ZBP1: mRNA Sentinel in Nephrology", "focus": "Diabetic Kidney Injury Tracking", "yt_tags": "Nephrology, PhD, Biomarkers"},
-        {"title": "Surgical Case Reports: Precision Narratives", "focus": "High-impact narrative drafting for surgeons", "yt_tags": "Surgery, MedicalWriting, CaseReport"},
-        {"title": "Regulatory Writing for Clinical Trials", "focus": "FDA/EMA Phase I-III Compliance", "yt_tags": "ClinicalTrials, Pharma, FDA"},
-        {"title": "Myonectin & Metabolic Signaling", "focus": "CTRP15 and Lipid Metabolism in T2D", "yt_tags": "Biochemistry, PhD, Diabetes"},
-        {"title": "Medical Education Curriculum Design", "focus": "MBBS & MLT automated assessment tools", "yt_tags": "MedicalEducation, MBBS, Education"}
+        {"title": "ZBP1: mRNA Sentinel in Nephrology", "focus": "Diabetic Kidney Injury Tracking"},
+        {"title": "Surgical Case Reports: Precision Narratives", "focus": "High-impact narrative drafting for surgeons"},
+        {"title": "Regulatory Writing for Clinical Trials", "focus": "FDA/EMA Phase I-III Compliance"},
+        {"title": "Myonectin & Metabolic Signaling", "focus": "CTRP15 and Lipid Metabolism in T2D"},
+        {"title": "Medical Education Curriculum Design", "focus": "MBBS & MLT automated assessment tools"}
     ]
     strike = random.choice(vault)
     print(f"🚀 CEO: Initiating Global Strike on {strike['title']}")
 
-    # 🔭 DEPARTMENT 2: The Lead Hunter (Search Interception)
-    leads = ["freelancers@kwglobal.com", "careers@trilogywriting.com", "info@cactusglobal.com", "editorial@elsevier.com"]
+    # 📧 THE OUTREACH PREDATOR (Restored High-Authority Material)
+    recipients = ["freelancers@kwglobal.com", "careers@trilogywriting.com", "info@cactusglobal.com", "editorial@elsevier.com"]
     emails_sent = 0
 
-    # 📧 DEPARTMENT 3: The Outreach Predator (Gmail)
     if gmail_pass:
         try:
             with smtplib.SMTP('smtp.gmail.com', 587) as server:
                 server.starttls()
                 server.login(my_email, gmail_pass)
-                for recipient in leads:
+                for recipient in recipients:
                     msg = EmailMessage()
-                    msg['Subject'] = f"PhD-Level Clinical Writing Support: {strike['title']}"
+                    msg['Subject'] = f"PhD-Level Clinical Writing & Thesis Support: {strike['title']}"
                     msg['From'] = my_email
                     msg['To'] = recipient
                     
+                    # 🎓 THE RESTORED POWER PITCH
                     body = (
-                        f"Dear Lead,\n\nI am a PhD Clinical Scientist providing specialized support for {strike['title']}.\n"
-                        f"Field Focus: {strike['focus']}\n\n"
-                        "I assist surgeons, researchers, and candidates in transforming clinical data into high-impact publications.\n\n"
-                        "Best Regards,\nKFC Lab - Chief Research Specialist"
+                        "Dear Editorial Lead / Research Director,\n\n"
+                        "I am a Clinical Scientist and PhD Researcher providing specialized medical writing and publication support across the clinical spectrum.\n\n"
+                        "Our Services Include:\n"
+                        "✅ CLINICAL: Surgical Case Reports, Trial Protocols, and Meta-Analyses.\n"
+                        "✅ ACADEMIC: PhD Thesis drafting and MBBS/MLT Curriculum Design.\n"
+                        "✅ REGULATORY: Pharma compliance and Biochemistry protocols.\n"
+                        "✅ QUALITY: Six Sigma implementation in Laboratory Management.\n\n"
+                        f"Current Field Highlight: {strike['title']}\n"
+                        f"Specialization: {strike['focus']}\n\n"
+                        "I am available to assist your editorial team or doctoral candidates in producing high-impact, peer-reviewed content that meets 2026 standards.\n\n"
+                        "Best Regards,\n"
+                        "KFC Lab - Chief Research Specialist\n"
+                        "YouTube: @KFCwritersbot"
                     )
                     msg.set_content(body)
                     server.send_message(msg)
                     emails_sent += 1
-            print(f"📧 Outreach: {emails_sent} specialized emails sent.")
-        except Exception as e: print(f"❌ Outreach Error: {e}")
+            print(f"📧 Global Outreach: {emails_sent} specialized emails sent.")
+        except Exception as e: print(f"❌ Email Error: {e}")
 
-    # 🎥 DEPARTMENT 4: The Media Agent (Shotstack Cloud Rendering)
-    media_status = "⚠️ Media Engine Failure"
+    # 🎥 MEDIA AGENT (Shotstack 720P Render)
+    media_status = "⚠️ Engine Failure"
     try:
-        print(f"🎬 MEDIA AGENT: Ordering 720P Vertical Video for {strike['title']}...")
-        
-        # 720P Vertical (9:16) for YouTube Shorts
         payload = {
             "timeline": {
                 "tracks": [{
@@ -75,29 +80,21 @@ def execute_global_factory():
             },
             "output": {"format": "mp4", "resolution": "hd720"}
         }
-        
         headers = {"x-api-key": SHOTSTACK_KEY, "Content-Type": "application/json"}
         response = requests.post("https://api.shotstack.io/edit/v1/render", json=payload, headers=headers)
-        
-        if response.status_code == 201:
-            render_id = response.json().get('response', {}).get('id', 'N/A')
-            media_status = f"✅ 720P Render Started (ID: {render_id})"
-        else:
-            media_status = f"❌ API Error: {response.status_code}"
+        media_status = f"✅ Render Started (ID: {response.json().get('response', {}).get('id', 'N/A')})" if response.status_code == 201 else f"❌ API Error: {response.status_code}"
     except Exception as e: media_status = f"❌ Media Crash: {e}"
 
-    # 📲 DEPARTMENT 5: Commander Reporting (Telegram)
+    # 📲 COMMANDER REPORT
     if tg_token:
         report = (
-            f"✅ 24/7 GLOBAL FACTORY: FULL STRIKE\n\n"
+            f"✅ 24/7 GLOBAL STRIKE COMPLETE\n\n"
             f"🎯 TOPIC: {strike['title']}\n"
-            f"🔬 FOCUS: {strike['focus']}\n"
-            f"📧 OUTREACH: {emails_sent} Global Pitches Sent.\n"
+            f"📧 OUTREACH: {emails_sent} Full-Authority Pitches Sent.\n"
             f"🎥 MEDIA AGENT: {media_status}\n"
-            "📊 STATUS: PhD Authority Active."
+            "📊 STATUS: Total Medical Authority Active."
         )
         requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", json={"chat_id": chat_id, "text": report})
-        print("📲 Telegram: Report delivered.")
 
 if __name__ == "__main__":
     execute_global_factory()
