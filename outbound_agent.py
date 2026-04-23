@@ -2,29 +2,27 @@ import os
 import requests
 
 def run_strike():
-    # 🏛️ Pulling your secure keys from the GitHub Vault
     token = os.getenv('TELEGRAM_TOKEN')
     chat_id = "1060905337" 
     
-    print("🚀 KFC LAB AGENT: Executing Live Medical Strike...")
+    print("🚀 KFC LAB AGENT: Connecting to 24/7 Global Factory...")
     
-    # 🎯 Content engineered for your Clinical Biochemistry focus
     msg = (
-        "✅ 24/7 FACTORY LIVE\n\n"
-        "🎯 Research: Serum Glyco-proteome & Diabetic Nephropathy\n"
-        "📊 Quality: Six Sigma FMEA Metrics\n"
-        "🎥 YouTube: High-CPM Scripts ready for UCufYNDYq7orIFkkDh57xRow\n"
-        "📡 Status: Global Autonomy Active"
+        "✅ FACTORY ONLINE: 24/7 Autonomy Confirmed.\n\n"
+        "🎯 Ph.D. Focus: Serum Glyco-proteome\n"
+        "🔬 Quality: Six Sigma FMEA Metrics\n"
+        "🎥 YouTube: UCufYNDYq7orIFkkDh57xRow\n"
+        "📡 Status: Global Strikes Active."
     )
     
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     
     try:
-        response = requests.post(url, json={"chat_id": chat_id, "text": msg})
+        response = requests.post(url, json={"chat_id": chat_id, "text": msg}, timeout=10)
         if response.status_code == 200:
-            print("📲 Telegram Handshake: SUCCESSFUL.")
+            print("📲 Telegram PING: SUCCESSFUL.")
         else:
-            print(f"❌ Telegram Error: {response.status_code} - {response.text}")
+            print(f"❌ Telegram Error: {response.text}")
     except Exception as e:
         print(f"❌ Connection Error: {str(e)}")
 
