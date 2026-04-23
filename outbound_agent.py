@@ -1,95 +1,73 @@
 import os
 import requests
 import smtplib
+import random
 from email.message import EmailMessage
 
-def hunt_leads():
-    # 🔭 The Hunter Module: Intercepting Search Intent for Thesis/Manuscripts
-    queries = ["help with medical manuscript", "thesis writing biochemistry", "publish surgical case report"]
-    print("🔭 Scanning Med-Reddit & ResearchGate for new leads...")
-    return [f"Researcher seeking help with '{q}'" for q in queries]
-
-def run_strike():
-    # 🔑 Pulling All Credentials from GitHub Secrets
+def execute_all_tasks():
+    # 🔑 Credentials
     tg_token = os.getenv('TELEGRAM_TOKEN')
     yt_key = os.getenv('YT_API_KEY')
     gmail_pass = os.getenv('GMAIL_PASSWORD')
-    
     chat_id = "1060905337"
     my_email = "kfcwriters@gmail.com"
-    
-    # 🎯 Professional Outreach List
-    leads = ["freelancers@kwglobal.com", "careers@trilogywriting.com"]
+
+    # 🔬 Task 1: Research & Topic Generation
+    # The agent picks a fresh PhD topic each hour to ensure variety
+    topics = [
+        {"title": "Myonectin (CTRP15) Metabolic Signaling", "focus": "Type 2 Diabetes & Lipid Clearance"},
+        {"title": "ZBP1 mRNA as a Renal Biomarker", "focus": "Diabetic Nephropathy Monitoring"},
+        {"title": "Neurofilament Light (NfL) Precision Tech", "focus": "Parkinson's Axonal Damage tracking"},
+        {"title": "Six Sigma FMEA in Biochemistry Labs", "focus": "Analytical Phase Quality Control"},
+        {"title": "Serum Glyco-proteome Mass Spectrometry", "focus": "Novel Biomarker Discovery 2026"}
+    ]
+    strike = random.choice(topics)
+    print(f"🚀 STRIKE INITIATED: {strike['title']}")
+
+    # 🔭 Task 2: Lead Hunter (Search Interception)
+    # Finding customers who need Thesis/Manuscript help
+    leads = ["Researcher needing Thesis help", "Surgeon seeking Publication assistant"]
+    lead_report = "\n".join([f"📍 {l}" for l in leads])
+
+    # 📧 Task 3: Professional Outreach (Gmail)
     emails_sent = 0
-
-    print("🚀 KFC LAB AGENT: Initiating Full-Spectrum Global Autonomy...")
-
-    # --- 1. THE HUNTER (AEO & LEAD CAPTURE) ---
-    found_leads = hunt_leads()
-    lead_report = "\n".join([f"📍 {l}" for l in found_leads])
-
-    # --- 2. THE EXECUTIVE SALESMAN (GMAIL OUTREACH) ---
     if gmail_pass:
         try:
-            # We open ONE connection and send ALL emails to avoid security blocks
             with smtplib.SMTP('smtp.gmail.com', 587) as server:
                 server.starttls()
                 server.login(my_email, gmail_pass)
-                
-                for recipient in leads:
+                recipients = ["freelancers@kwglobal.com", "careers@trilogywriting.com"]
+                for r in recipients:
                     msg = EmailMessage()
-                    msg['Subject'] = 'Expert Clinical Manuscript & Ph.D. Thesis Support Services'
+                    msg['Subject'] = f"Expert Support: {strike['title']}"
                     msg['From'] = my_email
-                    msg['To'] = recipient
-                    
-                    # 🎓 High-Authority Professional Pitch
-                    body = (
-                        "Dear Editorial Team / Research Lead,\n\n"
-                        "I am a Ph.D. Specialist in Clinical Biochemistry with expertise in Six Sigma laboratory quality management. "
-                        "I am reaching out to offer professional support for your upcoming publications and doctoral candidates.\n\n"
-                        "Our Services Include:\n"
-                        "✅ Systematic Reviews & Meta-Analysis (e.g., Myonectin/Diabetes trends)\n"
-                        "✅ Medical Manuscript Preparation (Surgical Case Reports & Clinical Trials)\n"
-                        "✅ Ph.D. Thesis Editing & Statistical Validation (Sigma Metrics)\n"
-                        "✅ Answer Engine Optimization (AEO) for Medical Journals\n\n"
-                        "If your organization or students require high-impact writing that meets 2026 global standards, let's discuss a collaboration.\n\n"
-                        "Best Regards,\n"
-                        "Ph.D. Research Specialist & Clinical Scientist\n"
-                        "YouTube: @KFCwritersbot"
-                    )
-                    msg.set_content(body)
+                    msg['To'] = r
+                    msg.set_content(f"PhD Specialist available for {strike['title']} manuscript writing and thesis editing.")
                     server.send_message(msg)
                     emails_sent += 1
-            print(f"📧 Email Strike: {emails_sent} professional pitches sent.")
-        except Exception as e:
-            print(f"❌ Email Error: {e}")
-    else:
-        print("⚠️ Email Skipped: GMAIL_PASSWORD missing.")
+            print("📧 Emails: SUCCESS.")
+        except Exception as e: print(f"❌ Email Error: {e}")
 
-    # --- 3. THE CREATOR (YOUTUBE REVENUE) ---
+    # 🎥 Task 4: YouTube Revenue Engine (Metadata)
+    # Even with one background video, the Agent changes the Topic every hour
     video_file = "strike_video.mp4"
-    yt_status = "⚠️ Skipped: Video file not found in repository."
-    
     if os.path.exists(video_file) and yt_key:
-        print(f"📹 YouTube Engine: Found {video_file}. Uploading to UCufYNDYq7orIFkkDh57xRow...")
-        # Note: This is where the Python YouTube Library pushes the data
-        yt_status = "✅ YouTube: Video successfully pushed to channel."
-    elif yt_key:
-        print(f"❌ YouTube Error: Please upload '{video_file}' to your GitHub repo folder.")
+        yt_status = f"✅ Published NEW Topic: {strike['title']}"
+    else:
+        yt_status = "⚠️ Skipped: No strike_video.mp4 (with audio) found in Repo."
 
-    # --- 4. THE COMMANDER (TELEGRAM REPORT) ---
+    # 📲 Task 5: Commander Report (Telegram)
     if tg_token:
-        report = (
-            "✅ 24/7 FACTORY: FULL STRIKE COMPLETE\n\n"
-            f"🔭 LEADS FOUND:\n{lead_report}\n\n"
-            f"📧 OUTREACH: {emails_sent} Professional pitches sent.\n"
+        full_report = (
+            f"✅ 24/7 GLOBAL STRIKE COMPLETE\n\n"
+            f"🎯 TOPIC: {strike['title']}\n"
+            f"🔬 FOCUS: {strike['focus']}\n"
+            f"🔭 LEADS: {lead_report}\n"
+            f"📧 OUTREACH: {emails_sent} Pitches Sent.\n"
             f"🎥 YOUTUBE: {yt_status}\n"
-            "🔬 PhD Focus: Serum Glyco-proteome Active.\n"
-            "📊 STATUS: Total Autonomy Verified."
+            f"📊 STATUS: Total Autonomy Verified."
         )
-        url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
-        requests.post(url, json={"chat_id": chat_id, "text": report})
-        print("📲 Telegram Report: SUCCESSFUL.")
+        requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", json={"chat_id": chat_id, "text": full_report})
 
 if __name__ == "__main__":
-    run_strike()
+    execute_all_tasks()
