@@ -2,22 +2,23 @@ import os
 import requests
 
 def run_strike():
-    # 🏛️ Pulling the keys from the GitHub Vault
     token = os.getenv('TELEGRAM_TOKEN')
     chat_id = "1060905337" # Your verified ID
     
     print("🚀 KFC GLOBAL FACTORY: Initiating 24/7 Strike...")
     
-    message = "✅ 24/7 GLOBAL FACTORY ONLINE\n\n🎯 Target: All Medical Sciences\n📧 Status: 50 Strikes Sent\n📡 System: Autonomy Active"
+    msg = "🚀 KFC FACTORY ONLINE: System is now running 24/7. First medical strike complete."
     
-    # 🚀 The Handshake
-    url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
-    response = requests.get(url)
+    # Send to Telegram
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": msg}
+    
+    response = requests.post(url, json=payload)
     
     if response.status_code == 200:
-        print("📲 Telegram PING: Success!")
+        print("✅ Telegram Handshake Successful!")
     else:
-        print(f"❌ Telegram PING: Failed. Error: {response.text}")
+        print(f"❌ Telegram Error: {response.status_code} - {response.text}")
 
 if __name__ == "__main__":
     run_strike()
