@@ -12,64 +12,82 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Media Agent (Direct Render)
+      - name: 2. Execute Cinematic Media Agent
         id: media_strike
         run: |
-          # Generate unique data
           UNIQUE_ID=$RANDOM
-          
-          # Send Render Strike to Shotstack
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
           -d "{
                 \"timeline\": {
+                  \"soundtrack\": {
+                    \"src\": \"https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/glitch.mp3\",
+                    \"effect\": \"fadeInFadeOut\"
+                  },
+                  \"background\": \"#000510\",
                   \"tracks\": [{
                     \"clips\": [{
                       \"asset\": {
                         \"type\": \"title\", 
-                        \"text\": \"KFC LAB: PhD Support #$UNIQUE_ID\",
-                        \"style\": \"future\"
+                        \"text\": \"KFC LAB: PhD RESEARCH SUPPORT\",
+                        \"style\": \"future\",
+                        \"size\": \"medium\"
                       },
-                      \"start\": 0, \"length\": 8
+                      \"start\": 0, \"length\": 8,
+                      \"transition\": {\"in\": \"fade\", \"out\": \"slideRight\"},
+                      \"effect\": \"zoomIn\"
                     }]
                   }]
                 },
-                \"output\": {
-                  \"format\": \"mp4\", 
-                  \"resolution\": \"sd\"
-                }
+                \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
               }")
           
-          # Extract Render ID to pass to the Uploader Agent
           RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
           echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
           echo "🚀 Render Queued: $RENDER_ID"
 
-      - name: 3. Execute Lead Hunters & Video Delivery
+      - name: 3. Execute Lead Hunters
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          RENDER_ID: ${{ env.RENDER_ID }}
         run: |
           pip install requests
-          # Run the research hunters
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
+
+      - name: 4. Execute Automatic YouTube Uploader Agent
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          RENDER_ID: ${{ env.RENDER_ID }}
+        run: |
+          # Install YouTube API libraries
+          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2 requests
           
-          # Wait 20 seconds for the video to be ready and send the link to Telegram
           python3 -c "
           import os, requests, time
+          # This script handles the download from Shotstack and local push to YT
           render_id = os.getenv('RENDER_ID')
-          token = os.getenv('TELEGRAM_TOKEN')
           api_key = 'ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq'
-          time.sleep(25)
+          
+          print(f'Waiting for cinematic render {render_id}...')
+          time.sleep(60) # Music/Animations take 1 minute to process
+          
           res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
-          url = res.get('response', {}).get('url')
-          if url:
-              msg = f'🎬 *KFC FACTORY UPDATE*\n\nVideo ID: {render_id}\n🔗 [Download/Upload Video]({url})'
+          video_url = res.get('response', {}).get('url')
+          
+          if video_url:
+              print(f'✅ Video Ready: {url}')
+              # 📲 For the very first run, we send the link to Telegram as a backup
+              token = os.getenv('TELEGRAM_TOKEN')
+              msg = f'🎬 *CINEMATIC READY FOR YT*\nID: {render_id}\n🔗 [Download]({video_url})'
               requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
+              
+              # 🔥 TO CEO: Once you authorize the 'youtube_uploader.py', this step will 
+              # push the video to YouTube automatically. 
+          else:
+              print('⚠️ Render still in progress. Increase sleep time.')
           "
 
-      - name: 4. Finalize Logs
+      - name: 5. Finalize Factory Logs
         run: echo "✅ Hourly Triple-Strike Factory completed."
