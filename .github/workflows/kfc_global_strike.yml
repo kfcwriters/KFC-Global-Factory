@@ -53,7 +53,7 @@ jobs:
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
 
-      - name: 4. Execute Video Delivery Agent (2-Minute Wait)
+      - name: 4. Execute Video Delivery Agent (5-Minute Deep Wait)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           RENDER_ID: ${{ env.RENDER_ID }}
@@ -64,16 +64,31 @@ jobs:
           api_key = 'ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq'
           token = os.getenv('TELEGRAM_TOKEN')
           
-          print(f'🛰️ Waiting for video {render_id}...')
-          time.sleep(90) # Enough time for music to process
+          print(f'🛰️ Monitoring Render: {render_id}')
           
-          res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
-          url = res.get('response', {}).get('url')
+          # Check every 60 seconds, up to 5 times (5 minutes total)
+          for attempt in range(5):
+              print(f'Attempt {attempt+1}: Waiting 60 seconds...')
+              time.sleep(60)
+              
+              res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
+              status = res.get('response', {}).get('status')
+              url = res.get('response', {}).get('url')
+              
+              print(f'📊 Current Status: {status}')
+              
+              if status == 'completed' and url:
+                  msg = f'🎬 *KFC CINEMATIC READY*\n\nRender complete with music and visuals.\n🔗 [Download/Upload Video]({url})'
+                  requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
+                  print('✅ Link successfully delivered to Telegram.')
+                  exit(0)
+              
+              if status == 'failed':
+                  print('❌ Render failed on Shotstack servers.')
+                  exit(1)
           
-          if url:
-              msg = f'🎬 *KFC CINEMATIC READY*\n🔗 [Download/Upload Video]({url})'
-              requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
-              print('✅ Delivered.')
-          else:
-              print('⚠️ Video still processing. Check Telegram shortly.')
+          print('⚠️ Timeout: Video not ready after 5 minutes.')
           "
+
+      - name: 5. Finalize Factory Logs
+        run: echo "✅ Hourly Factory Strike Completed."
