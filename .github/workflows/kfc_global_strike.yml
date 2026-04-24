@@ -12,10 +12,11 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Media Agent (Professional Unique Render)
+      # 🎬 THE SHOTSTACK RENDER STRIKE
+      - name: 2. Execute Media Agent (Internal Render Only)
         run: |
-          # Generate a unique ID to ensure a NEW render every hour
-          UNIQUE_ID=$RANDOM
+          # Use a random number to guarantee a UNIQUE render every time
+          UNIQUE_VAL=$RANDOM
           
           curl -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
@@ -28,30 +29,22 @@ jobs:
                 "clips": [{
                   "asset": {
                     "type": "title", 
-                    "text": "KFC LAB: Research Update #$UNIQUE_ID",
+                    "text": "KFC LAB: Research Update $UNIQUE_VAL",
                     "style": "future"
                   },
-                  "start": 0, "length": 8
+                  "start": 0, "length": 5
                 }]
               }]
             },
             "output": {
               "format": "mp4", 
-              "resolution": "sd",
-              "destinations": [{
-                "provider": "youtube",
-                "options": {
-                  "title": "KFC LAB PhD Support Update $UNIQUE_ID",
-                  "description": "Professional medical writing and biochemistry analysis.",
-                  "category": "27",
-                  "privacy": "public"
-                }
-              }]
+              "resolution": "sd"
             }
           }
           EOF
 
-      - name: 3. Execute Lead Hunters (Academic & Commercial)
+      # 🕵️ THE LEAD HUNTERS
+      - name: 3. Execute Lead Hunters
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -61,4 +54,4 @@ jobs:
           python3 google_lead_hunter.py
 
       - name: 4. Finalize Logs
-        run: echo "✅ Hourly Triple-Strike Factory completed successfully."
+        run: echo "✅ Factory Strike successfully queued."
