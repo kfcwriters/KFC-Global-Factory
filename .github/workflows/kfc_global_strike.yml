@@ -3,37 +3,61 @@ name: 24-7 KFC Global Synthetic Factory
 on:
   workflow_dispatch:
   schedule:
+    # Runs at 5 minutes past every hour
     - cron: '5 * * * *'
 
 jobs:
   medical-strike:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout
+      - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Force Render Strike
+      - name: 2. Execute Media Agent (Professional Render)
+        # This uses the CURL method which we now know is 100% reliable
         run: |
           curl -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
           -d '{
                 "timeline": {
+                  "background": "#000000",
                   "tracks": [{
                     "clips": [{
-                      "asset": {"type": "title", "text": "KFC LAB SUCCESS"},
-                      "start": 0, "length": 5
+                      "asset": {
+                        "type": "title", 
+                        "text": "KFC LAB: PhD & Clinical Research Support",
+                        "style": "future"
+                      },
+                      "start": 0, "length": 8
                     }]
                   }]
                 },
-                "output": {"format": "mp4", "resolution": "sd"}
+                "output": {
+                  "format": "mp4", 
+                  "resolution": "sd",
+                  "destinations": [{
+                    "provider": "youtube",
+                    "options": {
+                      "title": "KFC LAB: Professional Research & Medical Writing 2026",
+                      "description": "Expert PhD-level support for Clinical Trials, Biochemistry, and Laboratory Management. Contact: kfcwriters@gmail.com",
+                      "category": "27",
+                      "privacy": "public"
+                    }
+                  }]
+                }
               }'
 
-      - name: 3. Run Hunters
+      - name: 3. Execute Lead Hunters (Academic & Commercial)
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
           pip install requests
+          echo "🕵️ Starting PubMed Hunter..."
           python3 outreach_specialist.py
+          echo "🕵️ Starting Google Lead Hunter..."
           python3 google_lead_hunter.py
+
+      - name: 4. Finalize Logs
+        run: echo "✅ Hourly Triple-Strike Factory completed successfully."
