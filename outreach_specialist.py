@@ -1,23 +1,23 @@
 import os
 
 def send_outreach(email_list):
-    # CEO HARD RULE: No generic info or admin emails allowed.
-    final_leads = []
-    forbidden = ["info", "admin", "office", "support", "contact", "sales"]
+    # 🛡️ THE IRON GATE: List of words that trigger an immediate block
+    trash_words = ["info", "admin", "office", "support", "contact", "sales", "help", "enquiry"]
     
+    clean_list = []
     for email in email_list:
-        clean_email = email.lower().strip()
-        # Rule 1: Must not contain forbidden words
-        if any(word in clean_email for word in forbidden):
-            print(f"🛡️ Blocking generic email: {clean_email}")
+        addr = email.lower().strip()
+        # Rule: If the part before the @ contains any trash words, DELETE IT.
+        prefix = addr.split('@')[0]
+        if any(word in prefix for word in trash_words):
+            print(f"🗑️ Trash Lead Blocked: {addr}")
             continue
-        # Rule 2: Must be a professional domain
-        if "@" in clean_email and "." in clean_email:
-            final_leads.append(clean_email)
+        
+        clean_list.append(addr)
 
-    if not final_leads:
-        print("✅ Filter Success: 0 generic emails passed. Factory safe.")
+    if not clean_list:
+        print("✅ CEO PROTECTION: No high-quality leads found this hour. Standing by.")
         return
 
-    print(f"📧 Sending PhD pitch to {len(final_leads)} high-quality clinical leads.")
-    # Proceed with your Gmail sending logic here...
+    print(f"📧 TARGET ACQUIRED: Sending to {len(clean_list)} real clinical researchers.")
+    # Add your SMTP/Gmail sending logic here
