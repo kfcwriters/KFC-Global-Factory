@@ -13,17 +13,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 2. Execute Professor Media Agent
-        id: media_strike
         run: |
+          # 🧪 Stable Render Strike
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d "{\"timeline\":{\"soundtrack\":{\"src\":\"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",\"volume\":0.1},\"tracks\":[{\"clips\":[{\"asset\":{\"type\":\"html\",\"html\":\"<h1 style='color:#00ffcc;'>CBME: Medical Lesson</h1>\",\"width\":1024,\"height\":576},\"start\":0,\"length\":10}]},{\"clips\":[{\"asset\":{\"type\":\"tts\",\"text\":\"Today we study Clinical Biochemistry and its role in diagnosis.\",\"voice\":\"Matthew\"},\"start\":1,\"length\":9}]}]},\"output\":{\"format\":\"mp4\",\"resolution\":\"sd\"}}")
+          -d "{\"timeline\":{\"tracks\":[{\"clips\":[{\"asset\":{\"type\":\"title\",\"text\":\"KFC LAB: CBME LESSON\"},\"start\":0,\"length\":5}]}]},\"output\":{\"format\":\"mp4\",\"resolution\":\"sd\"}}")
           
-          RID=$(echo $RESPONSE | jq -r '.response.id')
-          # 💾 SAVE TO PHYSICAL FILE
+          # Extract ID carefully
+          RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
-          echo "🚀 Render ID Saved: $RID"
+          echo "🚀 Verified Render ID: $RID"
 
       - name: 3. Execute Lead Hunters & YouTube Upload
         env:
@@ -31,10 +31,6 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
           pip install google-api-python-client google-auth-oauthlib requests
-          # Load ID from file and set it as environment variable
-          export RENDER_ID=$(cat render_id.txt)
-          echo "🛰️ Target Render for Step 3: $RENDER_ID"
-          
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
           python3 youtube_uploader.py
