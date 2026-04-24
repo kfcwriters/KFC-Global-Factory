@@ -3,34 +3,39 @@ import requests
 import random
 
 def run_media_production():
-    # 🔑 Credentials from GitHub Secrets
-    SHOTSTACK_KEY = "ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq"
+    # 🔑 SECURE ACCESS: Pulling directly from your GitHub Secrets
+    # This ensures your 'Credits' on the dashboard are actually used.
+    SHOTSTACK_KEY = os.getenv('SHOTSTACK_KEY')
     tg_token = os.getenv('TELEGRAM_TOKEN')
     chat_id = "1060905337"
 
-    # 🔬 Select a Trending Clinical Field for the Video
-    # We match this to the topics the Hunter is using
-    fields = [
+    if not SHOTSTACK_KEY:
+        print("❌ ERROR: SHOTSTACK_KEY not found in Environment. Check GitHub Secrets.")
+        return
+
+    # 🔬 TOPIC ROTATION: Matching the PhD authority of your brand
+    topics = [
         {"title": "Advanced Oncology Research 2026", "desc": "Next-gen biomarker tracking and precision therapy."},
         {"title": "Cardiovascular Clinical Updates", "desc": "New protocols in cardiology manuscript drafting."},
         {"title": "Biochemistry & Metabolic Signaling", "desc": "PhD-level analysis of cellular pathways."},
         {"title": "Surgical Narrative Excellence", "desc": "Transforming complex cases into Scopus-indexed papers."}
     ]
-    strike = random.choice(fields)
+    strike = random.choice(topics)
 
-    print(f"🎬 STUDIO: Making 1080p Video for {strike['title']}...")
+    print(f"🎬 STUDIO: Initiating 1080p Render for {strike['title']}...")
 
-    # 🎥 The Work Order for the Media Agent (1080p + Auto-Upload)
+    # 🎥 PRODUCTION ORDER: 720p HD + Direct YouTube Upload
     payload = {
         "timeline": {
+            "background": "#000000",
             "tracks": [{
                 "clips": [{
                     "asset": {
                         "type": "html",
                         "html": f"<div style='color:white; font-family:Arial; text-align:center;'><h1>{strike['title']}</h1><p>{strike['desc']}</p></div>",
-                        "css": "div { margin-top: 450px; padding: 40px; background: rgba(0,0,0,0.7); border-radius: 15px; }"
+                        "css": "div { margin-top: 450px; padding: 40px; background: rgba(0,0,0,0.8); border-radius: 20px; border: 2px solid #00d4ff; }"
                     },
-                    "start": 0, "length": 15
+                    "start": 0, "length": 10
                 }]
             }]
         },
@@ -41,9 +46,9 @@ def run_media_production():
                 {
                     "provider": "youtube",
                     "options": {
-                        "title": f"{strike['title']} - PhD Research Support",
-                        "description": f"Specialized medical writing and publication support for {strike['desc']}. Contact kfcwriters@gmail.com",
-                        "category": "27", # Education
+                        "title": f"{strike['title']} | KFC Lab PhD Support",
+                        "description": f"Expert medical writing for {strike['desc']}. Contact: kfcwriters@gmail.com",
+                        "category": "27",
                         "privacy": "public"
                     }
                 }
@@ -51,23 +56,9 @@ def run_media_production():
         }
     }
 
-    headers = {"x-api-key": SHOTSTACK_KEY, "Content-Type": "application/json"}
+    headers = {
+        "x-api-key": SHOTSTACK_KEY,
+        "Content-Type": "application/json"
+    }
     
-    try:
-        response = requests.post("https://api.shotstack.io/edit/v1/render", json=payload, headers=headers)
-        
-        if response.status_code == 201:
-            render_id = response.json().get('response', {}).get('id', 'N/A')
-            status_msg = f"✅ VIDEO SUCCESS: 1080p Render & Upload Started.\nID: {render_id}"
-        else:
-            status_msg = f"❌ VIDEO ERROR: Shotstack returned {response.status_code}"
-            
-    except Exception as e:
-        status_msg = f"❌ VIDEO CRASH: {e}"
-
-    # 📲 Report to Telegram
-    if tg_token:
-        requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", json={"chat_id": chat_id, "text": status_msg})
-
-if __name__ == "__main__":
-    run_media_production()
+    try
