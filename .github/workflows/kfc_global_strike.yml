@@ -12,12 +12,14 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Media Agent (Hosted Render Strike)
+      - name: 2. Execute Media Agent (Direct Render)
+        id: media_strike
         run: |
-          # Unique ID to prevent de-duplication
+          # Generate unique data
           UNIQUE_ID=$RANDOM
           
-          curl -X POST https://api.shotstack.io/edit/v1/render \
+          # Send Render Strike to Shotstack
+          RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
           -d "{
@@ -26,10 +28,10 @@ jobs:
                     \"clips\": [{
                       \"asset\": {
                         \"type\": \"title\", 
-                        \"text\": \"KFC LAB PhD Support #$UNIQUE_ID\",
+                        \"text\": \"KFC LAB: PhD Support #$UNIQUE_ID\",
                         \"style\": \"future\"
                       },
-                      \"start\": 0, \"length\": 10
+                      \"start\": 0, \"length\": 8
                     }]
                   }]
                 },
@@ -37,16 +39,37 @@ jobs:
                   \"format\": \"mp4\", 
                   \"resolution\": \"sd\"
                 }
-              }"
+              }")
+          
+          # Extract Render ID to pass to the Uploader Agent
+          RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
+          echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
+          echo "🚀 Render Queued: $RENDER_ID"
 
-      - name: 3. Execute Lead Hunters
+      - name: 3. Execute Lead Hunters & Video Delivery
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          RENDER_ID: ${{ env.RENDER_ID }}
         run: |
           pip install requests
+          # Run the research hunters
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
+          
+          # Wait 20 seconds for the video to be ready and send the link to Telegram
+          python3 -c "
+          import os, requests, time
+          render_id = os.getenv('RENDER_ID')
+          token = os.getenv('TELEGRAM_TOKEN')
+          api_key = 'ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq'
+          time.sleep(25)
+          res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
+          url = res.get('response', {}).get('url')
+          if url:
+              msg = f'🎬 *KFC FACTORY UPDATE*\n\nVideo ID: {render_id}\n🔗 [Download/Upload Video]({url})'
+              requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
+          "
 
       - name: 4. Finalize Logs
-        run: echo "✅ Factory Strike successfully queued. Check 'My Renders' for the video link."
+        run: echo "✅ Hourly Triple-Strike Factory completed."
