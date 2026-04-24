@@ -12,78 +12,32 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Professor Media Agent (Voice + Teaching)
+      - name: 2. Execute CBME Professor Agent
         id: media_strike
         run: |
-          UNIQUE_ID=$RANDOM
-          # 🎓 CLINICAL SCRIPT: Define the teaching content here
-          TEACHING_TEXT="Welcome to KFC Lab. Today we analyze the role of Sigma Metrics in Laboratory Quality Management to reduce analytical errors."
+          TOPICS=("Gout Metabolism" "Jaundice Types" "Renal Function" "Vitamin C Deficiency")
+          SCRIPTS=("Gout is caused by hyper-uricemia leading to urate crystal deposition in joints." "Jaundice is the yellowing of skin due to bilirubin buildup from heme breakdown." "Renal function is assessed by glomerular filtration rate and serum creatinine levels." "Vitamin C is essential for collagen synthesis; its deficiency leads to scurvy.")
+          INDEX=$((RANDOM % 4))
           
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
           -d "{
                 \"timeline\": {
-                  \"soundtrack\": {
-                    \"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",
-                    \"volume\": 0.2
-                  },
+                  \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
                   \"tracks\": [
-                    {
-                      \"clips\": [{
-                        \"asset\": {
-                          \"type\": \"html\",
-                          \"html\": \"<p style='color: #ffffff; font-size: 40px; text-align: center;'><b>KFC LAB RESEARCH</b><br><br>Topic: Sigma Metrics in Clinical Chemistry</p>\",
-                          \"css\": \"p { font-family: 'Montserrat', sans-serif; }\",
-                          \"width\": 800, \"height\": 400
-                        },
-                        \"start\": 0, \"length\": 10
-                      }]
-                    },
-                    {
-                      \"clips\": [{
-                        \"asset\": {
-                          \"type\": \"tts\",
-                          \"text\": \"$TEACHING_TEXT\",
-                          \"voice\": \"Matthew\"
-                        },
-                        \"start\": 0, \"length\": 10
-                      }]
-                    }
+                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<h1 style='color:#00ffcc;'>CBME: ${TOPICS[$INDEX]}</h1>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 10}]},
+                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"${SCRIPTS[$INDEX]}\", \"voice\": \"Matthew\"}, \"start\": 0, \"length\": 10}]}
                   ]
                 },
                 \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
               }")
-          
-          RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
-          echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
-          echo "🚀 Teaching Render Queued: $RENDER_ID"
+          echo "RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')" >> $GITHUB_ENV
 
-      - name: 3. Execute Lead Hunters
+      - name: 3. Execute Automatic YouTube Upload
         env:
-          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        run: |
-          pip install requests
-          python3 outreach_specialist.py
-          python3 google_lead_hunter.py
-
-      - name: 4. Execute Video Delivery Agent (Smart Retry)
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           RENDER_ID: ${{ env.RENDER_ID }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
-          python3 -c "
-          import os, requests, time
-          render_id = os.getenv('RENDER_ID')
-          api_key = 'ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq'
-          token = os.getenv('TELEGRAM_TOKEN')
-          for attempt in range(10):
-              time.sleep(30)
-              res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
-              status = res.get('response', {}).get('status')
-              url = res.get('response', {}).get('url')
-              if status == 'completed' and url:
-                  requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': f'🎓 *KFC TEACHING VIDEO READY*\n🔗 [Watch/Download]({url})', 'parse_mode': 'Markdown'})
-                  break
-          "
+          pip install google-api-python-client google-auth-oauthlib requests
+          python3 youtube_uploader.py
