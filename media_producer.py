@@ -1,9 +1,5 @@
 import os
-import requests
-
-def run_media_production():
-    # Use the key you provided directly to be safe
-    key = "ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq"
+imr4vwtbM6GLAwn2Ei3Hq"
     
     # 🚨 THE SECRET: Using the 'stage' endpoint is often more stable for trial keys
     url = "https://api.shotstack.io/v1/render"
