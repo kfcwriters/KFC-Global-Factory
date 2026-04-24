@@ -3,7 +3,6 @@ name: 24-7 KFC Global Synthetic Factory
 on:
   workflow_dispatch:
   schedule:
-    # Runs at 5 minutes past every hour
     - cron: '5 * * * *'
 
 jobs:
@@ -15,40 +14,42 @@ jobs:
 
       - name: 2. Execute Media Agent (Professional Unique Render)
         run: |
-          # Create a unique time tag so every video is NEW
-          TIMESTAMP=$(date +'%H:%M')
+          # Generate a unique ID to ensure a NEW render every hour
+          UNIQUE_ID=$RANDOM
           
           curl -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d "{
-                \"timeline\": {
-                  \"background\": \"#000000\",
-                  \"tracks\": [{
-                    \"clips\": [{
-                      \"asset\": {
-                        \"type\": \"title\", 
-                        \"text\": \"KFC LAB: Clinical Update $TIMESTAMP\",
-                        \"style\": \"future\"
-                      },
-                      \"start\": 0, \"length\": 8
-                    }]
-                  }]
-                },
-                \"output\": {
-                  \"format\": \"mp4\", 
-                  \"resolution\": \"sd\",
-                  \"destinations\": [{
-                    \"provider\": \"youtube\",
-                    \"options\": {
-                      \"title\": \"KFC LAB: Research Update [$TIMESTAMP]\",
-                      \"description\": \"Expert PhD-level support for Clinical Trials and Biochemistry. Contact: kfcwriters@gmail.com\",
-                      \"category\": \"27\",
-                      \"privacy\": \"public\"
-                    }
-                  }]
+          -d @- <<EOF
+          {
+            "timeline": {
+              "background": "#000000",
+              "tracks": [{
+                "clips": [{
+                  "asset": {
+                    "type": "title", 
+                    "text": "KFC LAB: Research Update #$UNIQUE_ID",
+                    "style": "future"
+                  },
+                  "start": 0, "length": 8
+                }]
+              }]
+            },
+            "output": {
+              "format": "mp4", 
+              "resolution": "sd",
+              "destinations": [{
+                "provider": "youtube",
+                "options": {
+                  "title": "KFC LAB PhD Support Update $UNIQUE_ID",
+                  "description": "Professional medical writing and biochemistry analysis.",
+                  "category": "27",
+                  "privacy": "public"
                 }
-              }"
+              }]
+            }
+          }
+          EOF
 
       - name: 3. Execute Lead Hunters (Academic & Commercial)
         env:
@@ -56,9 +57,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
           pip install requests
-          echo "🕵️ Starting PubMed Hunter..."
           python3 outreach_specialist.py
-          echo "🕵️ Starting Google Lead Hunter..."
           python3 google_lead_hunter.py
 
       - name: 4. Finalize Logs
