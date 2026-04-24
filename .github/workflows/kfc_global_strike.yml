@@ -15,16 +15,12 @@ jobs:
 
       - name: 2. Execute Medical Professor Agent
         id: media_strike
+        continue-on-error: true # Ensures hunting continues even if Shotstack is down
         run: |
-          # 📚 High-Yield Medical Topic Database
-          TOPICS=("Anatomy of Cranial Nerves" "Pharmacology of Antibiotics" "Pathology of Inflammation" "Surgical Hemostasis")
-          SCRIPTS=("There are twelve pairs of cranial nerves that emerge directly from the brain and brainstem." "Antibiotics are drugs used to treat bacterial infections by inhibiting growth or destroying cell walls." "Inflammation is the body's immune response to irritants, characterized by heat, pain, and swelling." "Surgical hemostasis is the process of stopping bleeding during surgery using clamps or sutures.")
+          # 🎙️ Professor Matthew: Clinical Research Script
+          TOPIC="Excellence in Medical Manuscript Writing"
+          SCRIPT="Academic publishing requires precision. KFC Lab provides PhD level support for original research and case reports."
           
-          INDEX=$((RANDOM % 4))
-          SELECTED_TOPIC=${TOPICS[$INDEX]}
-          SELECTED_SCRIPT=${SCRIPTS[$INDEX]}
-
-          # Render Command (Light but with Audio)
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
@@ -32,14 +28,14 @@ jobs:
                 \"timeline\": {
                   \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
                   \"tracks\": [
-                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<h1 style='color:#00ffcc;'>$SELECTED_TOPIC</h1>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 10}]},
-                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"$SELECTED_SCRIPT\", \"voice\": \"Matthew\"}, \"start\": 1, \"length\": 9}]}
+                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<h1 style='color:#00ffcc; text-align:center;'>$TOPIC</h1>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 10}]},
+                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"$SCRIPT\", \"voice\": \"Matthew\"}, \"start\": 1, \"length\": 9}]}
                   ]
                 },
                 \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
               }")
           
-          # 💾 Physical Handshake: Save ID for Step 3
+          # 💾 Physical Handshake for the Uploader
           RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
           echo "🚀 Verified Render ID: $RID"
@@ -49,16 +45,16 @@ jobs:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
-          # Install necessary libraries
+          # Install Academic API libraries
           pip install google-api-python-client google-auth-oauthlib requests
           
-          # 🚀 1. Start Author Hunting (ResearchGate, PubMed, Scopus)
-          # This will use the new Gmail/Yahoo author logic
+          # 🚀 1. Start Deep Academic Hunting (Scopus/ResearchGate/PubMed)
+          # This triggers your google_lead_hunter.py to find REAL authors
           python3 google_lead_hunter.py
           
-          # 🛰️ 2. Load Render ID and attempt YouTube Upload
-          # It will wait 10 minutes for the video to finish
+          # 🛰️ 2. Attempt YouTube Upload (Waits 10 minutes)
+          # If Render was 'failed', the script will automatically skip upload
           python3 youtube_uploader.py
 
       - name: 4. Factory Cleanup
-        run: echo "✅ Hourly Strike Successfully Completed."
+        run: echo "✅ Hourly Academic Strike Completed."
