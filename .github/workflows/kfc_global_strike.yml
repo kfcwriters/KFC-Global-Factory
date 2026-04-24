@@ -1,6 +1,21 @@
-- name: 2. Execute Media Agent (Professional Unique Render)
+name: 24-7 KFC Global Synthetic Factory
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs at 5 minutes past every hour
+    - cron: '5 * * * *'
+
+jobs:
+  medical-strike:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Checkout Institutional Code
+        uses: actions/checkout@v4
+
+      - name: 2. Execute Media Agent (Professional Unique Render)
         run: |
-          # We create a unique timestamp so Shotstack sees this as a BRAND NEW video
+          # Create a unique time tag so every video is NEW
           TIMESTAMP=$(date +'%H:%M')
           
           curl -X POST https://api.shotstack.io/edit/v1/render \
@@ -26,11 +41,25 @@
                   \"destinations\": [{
                     \"provider\": \"youtube\",
                     \"options\": {
-                      \"title\": \"KFC LAB: Research Support [$TIMESTAMP]\",
-                      \"description\": \"Professional medical writing and biochemistry analysis. Contact: kfcwriters@gmail.com\",
+                      \"title\": \"KFC LAB: Research Update [$TIMESTAMP]\",
+                      \"description\": \"Expert PhD-level support for Clinical Trials and Biochemistry. Contact: kfcwriters@gmail.com\",
                       \"category\": \"27\",
                       \"privacy\": \"public\"
                     }
                   }]
                 }
               }"
+
+      - name: 3. Execute Lead Hunters (Academic & Commercial)
+        env:
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          pip install requests
+          echo "🕵️ Starting PubMed Hunter..."
+          python3 outreach_specialist.py
+          echo "🕵️ Starting Google Lead Hunter..."
+          python3 google_lead_hunter.py
+
+      - name: 4. Finalize Logs
+        run: echo "✅ Hourly Triple-Strike Factory completed successfully."
