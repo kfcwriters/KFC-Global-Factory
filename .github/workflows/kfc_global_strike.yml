@@ -12,38 +12,33 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      # 🎬 THE SHOTSTACK RENDER STRIKE
-      - name: 2. Execute Media Agent (Internal Render Only)
+      - name: 2. Execute Media Agent (Hosted Render Strike)
         run: |
-          # Use a random number to guarantee a UNIQUE render every time
-          UNIQUE_VAL=$RANDOM
+          # Unique ID to prevent de-duplication
+          UNIQUE_ID=$RANDOM
           
           curl -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d @- <<EOF
-          {
-            "timeline": {
-              "background": "#000000",
-              "tracks": [{
-                "clips": [{
-                  "asset": {
-                    "type": "title", 
-                    "text": "KFC LAB: Research Update $UNIQUE_VAL",
-                    "style": "future"
-                  },
-                  "start": 0, "length": 5
-                }]
-              }]
-            },
-            "output": {
-              "format": "mp4", 
-              "resolution": "sd"
-            }
-          }
-          EOF
+          -d "{
+                \"timeline\": {
+                  \"tracks\": [{
+                    \"clips\": [{
+                      \"asset\": {
+                        \"type\": \"title\", 
+                        \"text\": \"KFC LAB PhD Support #$UNIQUE_ID\",
+                        \"style\": \"future\"
+                      },
+                      \"start\": 0, \"length\": 10
+                    }]
+                  }]
+                },
+                \"output\": {
+                  \"format\": \"mp4\", 
+                  \"resolution\": \"sd\"
+                }
+              }"
 
-      # 🕵️ THE LEAD HUNTERS
       - name: 3. Execute Lead Hunters
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
@@ -54,4 +49,4 @@ jobs:
           python3 google_lead_hunter.py
 
       - name: 4. Finalize Logs
-        run: echo "✅ Factory Strike successfully queued."
+        run: echo "✅ Factory Strike successfully queued. Check 'My Renders' for the video link."
