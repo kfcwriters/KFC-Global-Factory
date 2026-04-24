@@ -1,22 +1,32 @@
 import os
+import time
 import requests
 
-def upload_to_youtube(video_url, title):
-    # This uses a standard webhook or YouTube's direct API
-    # Since we are in 'Synthetic Factory' mode, we will use your Telegram 
-    # to send you the direct download link for manual one-click upload 
-    # until the API handshake is finalized.
+def run_delivery():
+    render_id = os.getenv('RENDER_ID')
+    api_key = "ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq"
     
-    tg_token = os.getenv('TELEGRAM_TOKEN')
-    chat_id = "1060905337"
-    
-    msg = f"🎬 NEW VIDEO READY FOR YOUTUBE\n\nTopic: {title}\n🔗 Download Link: {video_url}\n\nCEO Action: Download and post to KFC WRITERS Channel."
-    
-    if tg_token:
-        requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", json={"chat_id": chat_id, "text": msg})
-        print("📲 Telegram notified with video link.")
+    if not render_id:
+        print("❌ No Render ID found.")
+        return
 
-# This is called by your main factory
+    # 🕒 Wait for Shotstack to finish (approx 30 seconds)
+    time.sleep(30)
+    
+    status_url = f"https://api.shotstack.io/edit/v1/render/{render_id}"
+    response = requests.get(status_url, headers={"x-api-key": api_key}).json()
+    
+    video_url = response.get('response', {}).get('url')
+    
+    if video_url:
+        print(f"✅ Video is Ready: {video_url}")
+        # 🚀 Here we add the YouTube Upload Logic or Telegram Notification
+        # For now, let's send it to your Telegram so you can check it.
+        token = os.getenv('TELEGRAM_TOKEN')
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
+                      json={"chat_id": "1060905337", "text": f"🎬 Video Ready for KFC WRITERS:\n{video_url}"})
+    else:
+        print("⏳ Video still rendering...")
+
 if __name__ == "__main__":
-    # Logic to get the latest render link from Shotstack
-    print("🚀 Youtube Uploader Agent Active.")
+    run_delivery()
