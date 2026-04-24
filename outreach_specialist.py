@@ -1,23 +1,31 @@
 import os
 
 def send_outreach(email_list):
-    # 🛡️ THE IRON GATE: List of words that trigger an immediate block
-    trash_words = ["info", "admin", "office", "support", "contact", "sales", "help", "enquiry"]
+    # 🛡️ THE SMART BARRIER
+    # Block generic roles, but ALLOW individual names on any provider.
+    generic_roles = ["info", "admin", "office", "support", "contact", "sales", "help", "enquiry", "webmaster"]
     
-    clean_list = []
+    verified_authors = []
     for email in email_list:
         addr = email.lower().strip()
-        # Rule: If the part before the @ contains any trash words, DELETE IT.
         prefix = addr.split('@')[0]
-        if any(word in prefix for word in trash_words):
-            print(f"🗑️ Trash Lead Blocked: {addr}")
+        
+        # ❌ BLOCK if the prefix is JUST a generic word (like info@)
+        # ✅ ALLOW if the prefix looks like a name (even on gmail/yahoo)
+        if any(prefix == role for role in generic_roles):
+            print(f"🗑️ Blocking generic role: {addr}")
             continue
         
-        clean_list.append(addr)
+        # Additional check: block things like info24@ or admin_test@
+        if any(addr.startswith(role) for role in generic_roles):
+             print(f"🗑️ Blocking suspected spam prefix: {addr}")
+             continue
 
-    if not clean_list:
-        print("✅ CEO PROTECTION: No high-quality leads found this hour. Standing by.")
+        verified_authors.append(addr)
+
+    if not verified_authors:
+        print("✅ CEO PROTECTION: Only generic roles found. Standing by.")
         return
 
-    print(f"📧 TARGET ACQUIRED: Sending to {len(clean_list)} real clinical researchers.")
-    # Add your SMTP/Gmail sending logic here
+    print(f"📧 TARGETS LOCKED: Sending PhD pitch to {len(verified_authors)} individual researchers (Personal & Institutional).")
+    # ... Gmail/SMTP logic ...
