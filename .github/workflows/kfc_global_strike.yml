@@ -2,9 +2,9 @@ name: 24-7 KFC Global Synthetic Factory
 
 on:
   schedule:
-    # Runs at 5 minutes past every hour to avoid GitHub traffic jams
+    # Runs at 5 minutes past every hour
     - cron: '5 * * * *'
-  workflow_dispatch: # Allows you to run it manually for testing
+  workflow_dispatch: # Allows manual trigger for testing
 
 jobs:
   medical-strike:
@@ -19,24 +19,24 @@ jobs:
           python-version: '3.10'
 
       - name: 3. Install Global Dependencies
+        # THIS IS THE CRITICAL FIX: Without this, the script crashes (Exit Code 1)
         run: pip install requests
 
       - name: 4. Execute Triple Autonomy Strike
         env:
-          # These must match the names in your GitHub Secrets exactly
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          # We hardcode the production key for the Media Agent to ensure 1080p delivery
-          SHOTSTACK_KEY: "ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq"
+          # Pulls the secure key you just added to your secrets
+          SHOTSTACK_KEY: ${{ secrets.SHOTSTACK_KEY }}
         run: |
-          echo "🚀 Starting Agent 1: PubMed Hunter..."
+          echo "🚀 Executing Agent 1: PubMed Hunter..."
           python3 outreach_specialist.py
           
-          echo "🚀 Starting Agent 2: Media Producer..."
+          echo "🚀 Executing Agent 2: Media Producer..."
           python3 media_producer.py
           
-          echo "🚀 Starting Agent 3: Google Lead Hunter..."
+          echo "🚀 Executing Agent 3: Google Lead Hunter..."
           python3 google_lead_hunter.py
 
       - name: 5. Finalize Global Logs
-        run: echo "✅ All 3 Agents successfully completed their hourly strike."
+        run: echo "✅ Factory Strike successfully completed."
