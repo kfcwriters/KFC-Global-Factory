@@ -15,55 +15,22 @@ jobs:
 
       - name: 2. Execute Medical Professor Agent
         id: media_strike
-        continue-on-error: true # Ensures hunting proceeds if Shotstack is down
+        continue-on-error: true
         run: |
-          # 🎙️ Professor Matthew Topic Picker
-          TOPICS=("Clinical Pathology & Sigma Metrics" "Pharmacology of Diabetic Drugs" "Surgical Oncology Principles")
-          SCRIPTS=("Sigma metrics provide a universal benchmark for analytical quality management in clinical labs." "The pharmacology of diabetic medications focuses on insulin sensitivity and glucose transport." "Surgical oncology focuses on the surgical management of tumors and malignant tissues.")
-          
-          INDEX=$((RANDOM % 3))
-          SELECTED_TOPIC=${TOPICS[$INDEX]}
-          SELECTED_SCRIPT=${SCRIPTS[$INDEX]}
-
+          # Simplified Render to save API quota
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d "{
-                \"timeline\": {
-                  \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
-                  \"tracks\": [
-                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<h1 style='color:#00ffcc; text-align:center;'>$SELECTED_TOPIC</h1>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 10}]},
-                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"$SELECTED_SCRIPT\", \"voice\": \"Matthew\"}, \"start\": 1, \"length\": 9}]}
-                  ]
-                },
-                \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
-              }")
+          -d "{\"timeline\":{\"tracks\":[{\"clips\":[{\"asset\":{\"type\":\"title\",\"text\":\"KFC MEDICAL\"},\"start\":0,\"length\":5}]}]},\"output\":{\"format\":\"mp4\",\"resolution\":\"sd\"}}")
           
-          # 💾 Physical Handshake
           RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
-          echo "🚀 Verified Render ID: $RID"
-          
-          # 🚨 Telegram Fallback Notification
-          if [ "$RID" = "failed" ]; then
-            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
-            -d chat_id="1060905337" -d text="⚠️ Factory Alert: Shotstack limit reached. Skipping video, but Lead Hunting is ACTIVE."
-          fi
 
-      - name: 3. Execute Lead Hunters & YouTube Upload
+      - name: 3. Execute Lead Hunters & YT Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
           pip install google-api-python-client google-auth-oauthlib requests
-          
-          # 🚀 1. Start Academic Hunter (Scopus/ResearchGate/PubMed)
-          # Finds REAL authors on Gmail/Yahoo
           python3 google_lead_hunter.py
-          
-          # 🛰️ 2. Attempt YouTube Upload
-          # If RID is 'failed', script will skip and finish successfully
           python3 youtube_uploader.py
-
-      - name: 4. Factory Cleanup
-        run: echo "✅ Hourly Medical Strike Completed."
