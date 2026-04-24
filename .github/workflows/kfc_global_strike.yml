@@ -8,62 +8,26 @@ on:
 jobs:
   medical-strike:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Multi-Disciplinary Professor (Audio + Animation)
+      - name: 2. Execute Medical Professor Agent
         run: |
-          # 📚 Multi-Disciplinary Knowledge Base
-          SUBJECTS=("PATHOLOGY" "PHARMACOLOGY" "SURGERY" "ANATOMY")
-          TOPICS=("Neoplasia" "Pharmacokinetics" "Acute Abdomen" "Cranial Nerves")
-          SCRIPTS=("Neoplasia is the uncontrolled, abnormal growth of cells or tissues in the body, which can be benign or malignant." "Pharmacokinetics is the study of how the body affects a drug, covering absorption, distribution, metabolism, and excretion." "Acute abdomen refers to sudden, severe abdominal pain that may require urgent surgical intervention." "There are twelve pairs of cranial nerves that emerge directly from the brain and brainstem to relay information.")
+          # 📚 Broad Medical Topic
+          TOPIC="Clinical Pathology and Manuscript Excellence"
+          SCRIPT="Welcome. Today we discuss the importance of precise clinical documentation in medical research and publication."
           
-          INDEX=$((RANDOM % 4))
-          SUB=${SUBJECTS[$INDEX]}
-          TOP=${TOPICS[$INDEX]}
-          SCR=${SCRIPTS[$INDEX]}
-
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d "{
-                \"timeline\": {
-                  \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
-                  \"tracks\": [
-                    {
-                      \"clips\": [{
-                        \"asset\": {
-                          \"type\": \"html\",
-                          \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:50px;'>$SUB</h1><h2 style='font-size:40px; color:#ffffff;'>$TOP</h2></div>\",
-                          \"width\": 1024, \"height\": 576
-                        },
-                        \"start\": 0, \"length\": 12,
-                        \"effect\": \"zoomIn\",
-                        \"transition\": {\"in\": \"fade\", \"out\": \"slideRight\"}
-                      }]
-                    },
-                    {
-                      \"clips\": [{
-                        \"asset\": {
-                          \"type\": \"tts\",
-                          \"text\": \"Welcome students. Today in $SUB we explore $TOP. $SCR\",
-                          \"voice\": \"Matthew\"
-                        },
-                        \"start\": 1, \"length\": 11
-                      }]
-                    }
-                  ]
-                },
-                \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
-              }")
+          -d "{\"timeline\":{\"soundtrack\":{\"src\":\"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",\"volume\":0.1},\"tracks\":[{\"clips\":[{\"asset\":{\"type\":\"html\",\"html\":\"<h1 style='color:#00ffcc;'>$TOPIC</h1>\",\"width\":1024,\"height\":576},\"start\":0,\"length\":8}]},{\"clips\":[{\"asset\":{\"type\":\"tts\",\"text\":\"$SCRIPT\",\"voice\":\"Matthew\"},\"start\":1,\"length\":7}]}]},\"output\":{\"format\":\"mp4\",\"resolution\":\"sd\"}}")
           
           RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
-          echo "🚀 Render Started ($SUB): $RID"
+          echo "🚀 Verified Render ID: $RID"
 
-      - name: 3. Execute Lead Hunters & YT Upload
+      - name: 3. Execute Global Author Hunter & YouTube Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
