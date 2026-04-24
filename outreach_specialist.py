@@ -1,51 +1,43 @@
 import os
 import smtplib
-import time
 from email.message import EmailMessage
 
 def send_outreach(email_list):
-    # 🛡️ THE IRON BARRIER
-    forbidden = ["info", "admin", "office", "support", "contact", "sales", "help"]
+    if not email_list:
+        print("❌ Outreach Aborted: No valid authors found this hour.")
+        return
+
+    # 📝 THE PROFESSIONAL PhD PITCH
+    subject = "PhD-Level Support: Specialized Medical Manuscript & Publication Assistance"
     
     for addr in email_list:
-        clean_addr = addr.lower().strip()
-        if any(word in clean_addr for word in forbidden):
-            continue
-            
         try:
             msg = EmailMessage()
-            msg['Subject'] = "PhD-Level Collaboration: Medical Manuscript & Sigma Metrics Support"
-            msg['From'] = "kfcwriters@gmail.com"
-            msg['To'] = clean_addr
-            
-            # High-Authority Professional Body
-            body = f"""Dear Researcher,
+            body = f"""Dear Dr. Researcher,
 
-I am a Clinical Scientist and PhD Researcher specializing in Clinical Biochemistry and Analytical Quality Management. 
+I am a Clinical Scientist and PhD Researcher specializing in clinical biochemistry and laboratory quality management. 
 
-I am reaching out to offer specialized support for your upcoming medical manuscripts. Our division provides expert assistance in:
+I am reaching out to offer specialized support for your medical research publications. Our team provides expert assistance in:
+✅ Systematic Reviews & Meta-Analysis (e.g., Myonectin and Diabetic Complications)
+✅ Sigma Metrics & Analytical Quality Management for Labs
+✅ Manuscript Drafting & Scopus/PubMed Submission
+✅ Case Report Narrative Professionalism
 
-✅ Systematic Reviews & Meta-Analysis (e.g., Myonectin and T2DM complications)
-✅ Sigma Metrics & Risk-Based Quality Management for Clinical Labs
-✅ High-Impact Journal Submission (Scopus, PubMed, ScienceDirect)
-✅ Professional Clinical Narrative Drafting
-
-We ensure your research meets the highest international standards for rapid peer-review acceptance.
+We help researchers maintain the highest international standards of clinical documentation for rapid journal acceptance.
 
 Best Regards,
 KFC Lab - Clinical Research Division
-Lead PhD Consultant"""
+Chief PhD Consultant"""
 
             msg.set_content(body)
+            msg['Subject'] = subject
+            msg['From'] = "kfcwriters@gmail.com"
+            msg['To'] = addr
             
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
                 smtp.login("kfcwriters@gmail.com", os.getenv('GMAIL_PASSWORD'))
                 smtp.send_message(msg)
-            print(f"✅ DELIVERED: PhD Pitch sent to {clean_addr}")
-            
-            # Anti-Spam Pause
-            time.sleep(2) 
+            print(f"✅ DELIVERED: Original Author Pitch sent to {addr}")
             
         except Exception as e:
-            print(f"⚠️ Mailbox Error for {clean_addr}: {e}")
-            continue
+            print(f"⚠️ Delivery failure for {addr}: {e}")
