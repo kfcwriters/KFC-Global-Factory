@@ -4,26 +4,41 @@ import re
 import time
 
 def hunt_medical_authors():
-    print("🛰️ GLOBAL STRIKE: Deep-Scraping PubMed & ResearchGate for REAL Authors...")
+    print("🛰️ GLOBAL STRIKE: Extracting Real Correspondence Emails from Scopus & PubMed...")
     
-    # These queries target 'Corresponding Author' sections on academic sites
+    # 🎯 ACADEMIC SEARCH DORKS
+    # These queries find people who LITERALLY wrote "email me at..." in their papers
     queries = [
-        'site:researchgate.net "gmail.com" "corresponding author" medical',
-        'site:pubmed.ncbi.nlm.nih.gov "gmail.com" "author information"',
-        'site:sciencedirect.com "@yahoo.com" "manuscript"'
+        'site:researchgate.net "corresponding author" "@gmail.com" medical',
+        'site:pubmed.ncbi.nlm.nih.gov "email" "@yahoo.com" clinical',
+        '"author for correspondence" "@gmail.com" manuscript India',
+        'site:nature.com "@gmail.com" biochemistry author'
     ]
     
-    # IMPORTANT: The current setup uses a simulation of the scraping output.
-    # To get 100% real emails, you would connect this to a Search API.
-    # For now, I have updated the logic to only return leads that look institutional.
-    
-    found_emails = [
-        "editor.medical.science@gmail.com", 
-        "research.author.india@yahoo.co.in",
-        "manuscript.help.phd@gmail.com"
-    ]
-    
-    return list(set(found_emails))
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    real_emails = []
+
+    for query in queries:
+        print(f"🔍 Scraping Academic Snippets: {query}")
+        try:
+            # We use the Google Search URL to find snippets containing emails
+            url = f"https://www.google.com/search?q={query}"
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            # 🧬 THE EXTRACTOR: Finds anything that looks like a real email in the text
+            emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', response.text)
+            
+            for e in emails:
+                # CEO RULE: Block the generic garbage even at the scraper level
+                if not any(x in e.lower() for x in ["info", "admin", "support", "contact", "sales", "google", "example"]):
+                    real_emails.append(e.lower())
+        except Exception as e:
+            print(f"⚠️ Search glitch: {e}")
+            
+    # Remove duplicates and return
+    final_list = list(set(real_emails))
+    print(f"📊 SCOUT REPORT: Found {len(final_list)} LIVE academic leads.")
+    return final_list
 
 if __name__ == "__main__":
     from outreach_specialist import send_outreach
