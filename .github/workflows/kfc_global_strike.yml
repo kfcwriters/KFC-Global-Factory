@@ -15,53 +15,33 @@ jobs:
       - name: 2. Execute Professor Media Agent
         id: media_strike
         run: |
-          # 📚 CBME Topic Selection
-          TOPICS=("Renal Calculi" "Glycated Hemoglobin" "Gout and Uric Acid" "Diabetes Mellitus Type 2")
-          # 🎙️ Narration Scripts
-          SCRIPTS=("Renal calculi are solid masses made of crystals. Most stones are calcium oxalate." "H-B-A-1-C, or glycated hemoglobin, reflects average blood sugar levels over three months." "Gout is a form of arthritis caused by high uric acid deposition in joints." "Type 2 diabetes is a chronic condition where the body does not use insulin properly.")
+          # 📚 High-Yield Topic Picker
+          TOPICS=("Bilirubin Metabolism" "Ketone Bodies" "Phenylketonuria" "Renal Calculi")
+          SCRIPTS=("Bilirubin is the end product of heme catabolism. Jaundice occurs when serum levels exceed 2 milligrams per deciliter." "Ketone bodies like a-ce-to-a-ce-tate are produced in the liver during starvation or uncontrolled diabetes." "Phenyl-ke-to-nu-ria is an inborn error of metabolism caused by a deficiency of the enzyme phenyl-ala-nine hydroxylase." "Renal calculi are crystal aggregates. Calcium oxalate is the most common component.")
           
           INDEX=$((RANDOM % 4))
           SELECTED_TOPIC=${TOPICS[$INDEX]}
           SELECTED_SCRIPT=${SCRIPTS[$INDEX]}
 
+          # Render Command
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
           -d "{
                 \"timeline\": {
-                  \"soundtrack\": {
-                    \"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",
-                    \"volume\": 0.1
-                  },
+                  \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
                   \"tracks\": [
-                    {
-                      \"clips\": [{
-                        \"asset\": {
-                          \"type\": \"html\",
-                          \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:60px;'>CBME BIOCHEMISTRY</h1><h2 style='font-size:50px;'>$SELECTED_TOPIC</h2></div>\",
-                          \"width\": 1024, \"height\": 576
-                        },
-                        \"start\": 0, \"length\": 12
-                      }]
-                    },
-                    {
-                      \"clips\": [{
-                        \"asset\": {
-                          \"type\": \"tts\",
-                          \"text\": \"Welcome students. Today's high-yield topic is $SELECTED_TOPIC. $SELECTED_SCRIPT\",
-                          \"voice\": \"Matthew\"
-                        },
-                        \"start\": 1, \"length\": 11
-                      }]
-                    }
+                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:60px;'>CBME BIOCHEMISTRY</h1><h2 style='font-size:50px;'>$SELECTED_TOPIC</h2></div>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 12}]},
+                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"Welcome students. Let us discuss $SELECTED_TOPIC. $SELECTED_SCRIPT\", \"voice\": \"Matthew\"}, \"start\": 1, \"length\": 11}]}
                   ]
                 },
                 \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
               }")
           
-          RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
-          echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
-          echo "🚀 Render Queued: $RENDER_ID"
+          # FIX: Force export the RENDER_ID to the GITHUB_ENV
+          RID=$(echo $RESPONSE | jq -r '.response.id')
+          echo "RENDER_ID=$RID" >> $GITHUB_ENV
+          echo "🚀 Render Started with ID: $RID"
 
       - name: 3. Execute Lead Hunters & Automatic YouTube Upload
         env:
@@ -70,8 +50,8 @@ jobs:
           RENDER_ID: ${{ env.RENDER_ID }}
         run: |
           pip install google-api-python-client google-auth-oauthlib requests
-          # 1. Start hunting while video renders
+          # 1. Hunt leads (now with Anti-Info filter)
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
-          # 2. Wait and Upload to YouTube
+          # 2. Wait 10 minutes and upload video
           python3 youtube_uploader.py
