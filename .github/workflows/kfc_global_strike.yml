@@ -25,18 +25,15 @@ jobs:
                     \"src\": \"https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/glitch.mp3\",
                     \"effect\": \"fadeInFadeOut\"
                   },
-                  \"background\": \"#000510\",
+                  \"background\": \"#000000\",
                   \"tracks\": [{
                     \"clips\": [{
                       \"asset\": {
                         \"type\": \"title\", 
-                        \"text\": \"KFC LAB: PhD RESEARCH SUPPORT\",
-                        \"style\": \"future\",
-                        \"size\": \"medium\"
+                        \"text\": \"KFC LAB: PhD RESEARCH SUPPORT #$UNIQUE_ID\",
+                        \"style\": \"future\"
                       },
-                      \"start\": 0, \"length\": 8,
-                      \"transition\": {\"in\": \"fade\", \"out\": \"slideRight\"},
-                      \"effect\": \"zoomIn\"
+                      \"start\": 0, \"length\": 6
                     }]
                   }]
                 },
@@ -56,38 +53,27 @@ jobs:
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
 
-      - name: 4. Execute Automatic YouTube Uploader Agent
+      - name: 4. Execute Video Delivery Agent (2-Minute Wait)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           RENDER_ID: ${{ env.RENDER_ID }}
         run: |
-          # Install YouTube API libraries
-          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2 requests
-          
           python3 -c "
           import os, requests, time
-          # This script handles the download from Shotstack and local push to YT
           render_id = os.getenv('RENDER_ID')
           api_key = 'ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq'
+          token = os.getenv('TELEGRAM_TOKEN')
           
-          print(f'Waiting for cinematic render {render_id}...')
-          time.sleep(60) # Music/Animations take 1 minute to process
+          print(f'🛰️ Waiting for video {render_id}...')
+          time.sleep(90) # Enough time for music to process
           
           res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
-          video_url = res.get('response', {}).get('url')
+          url = res.get('response', {}).get('url')
           
-          if video_url:
-              print(f'✅ Video Ready: {url}')
-              # 📲 For the very first run, we send the link to Telegram as a backup
-              token = os.getenv('TELEGRAM_TOKEN')
-              msg = f'🎬 *CINEMATIC READY FOR YT*\nID: {render_id}\n🔗 [Download]({video_url})'
+          if url:
+              msg = f'🎬 *KFC CINEMATIC READY*\n🔗 [Download/Upload Video]({url})'
               requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
-              
-              # 🔥 TO CEO: Once you authorize the 'youtube_uploader.py', this step will 
-              # push the video to YouTube automatically. 
+              print('✅ Delivered.')
           else:
-              print('⚠️ Render still in progress. Increase sleep time.')
+              print('⚠️ Video still processing. Check Telegram shortly.')
           "
-
-      - name: 5. Finalize Factory Logs
-        run: echo "✅ Hourly Triple-Strike Factory completed."
