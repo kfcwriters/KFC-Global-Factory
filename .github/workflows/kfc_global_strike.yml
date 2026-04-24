@@ -12,24 +12,52 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute CBME Professor Render
+      - name: 2. Execute Professor Media Agent
         id: media_strike
         run: |
+          # 📚 CBME Topic Selection
+          TOPICS=("Renal Calculi" "Glycated Hemoglobin" "Gout and Uric Acid" "Diabetes Mellitus Type 2")
+          # 🎙️ Narration Scripts
+          SCRIPTS=("Renal calculi, or kidney stones, are solid masses made of crystals. Most stones are calcium ox-a-late." "G-L-C-A-1-C, or glycated hemoglobin, reflects average blood sugar levels over the past three months." "Gout is a form of arthritis characterized by severe pain and redness in joints, caused by high uric acid." "Type 2 diabetes is a chronic condition where the body does not use insulin properly, leading to high blood sugar.")
+          
+          INDEX=$((RANDOM % 4))
+          SELECTED_TOPIC=${TOPICS[$INDEX]}
+          SELECTED_SCRIPT=${SCRIPTS[$INDEX]}
+
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d "{\"timeline\":{\"soundtrack\":{\"src\":\"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",\"volume\":0.1},\"tracks\":[{\"clips\":[{\"asset\":{\"type\":\"html\",\"html\":\"<h1 style='color:#00ffcc;'>CBME Lesson</h1>\",\"width\":1024,\"height\":576},\"start\":0,\"length\":10}]}]},\"output\":{\"format\":\"mp4\",\"resolution\":\"sd\"}}")
-          echo "RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')" >> $GITHUB_ENV
-
-      - name: 3. Execute Lead Hunters & Automatic YouTube Upload
-        env:
-          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          RENDER_ID: ${{ env.RENDER_ID }}
-        run: |
-          pip install google-api-python-client google-auth-oauthlib requests
-          # 1. Hunt Leads while video renders
-          python3 outreach_specialist.py
-          python3 google_lead_hunter.py
-          # 2. Upload video
-          python3 youtube_uploader.py
+          -d "{
+                \"timeline\": {
+                  \"soundtrack\": {
+                    \"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",
+                    \"volume\": 0.1
+                  },
+                  \"tracks\": [
+                    {
+                      \"clips\": [{
+                        \"asset\": {
+                          \"type\": \"html\",
+                          \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:60px;'>CBME BIOCHEMISTRY</h1><h2 style='font-size:50px;'>$SELECTED_TOPIC</h2></div>\",
+                          \"width\": 1024, \"height\": 576
+                        },
+                        \"start\": 0, \"length\": 12
+                      }]
+                    },
+                    {
+                      \"clips\": [{
+                        \"asset\": {
+                          \"type\": \"tts\",
+                          \"text\": \"Welcome students. Today's lecture is on $SELECTED_TOPIC. $SELECTED_SCRIPT\",
+                          \"voice\": \"Matthew\"
+                        },
+                        \"start\": 1, \"length\": 11
+                      }]
+                    }
+                  ]
+                },
+                \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
+              }")
+          
+          RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
+          echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
