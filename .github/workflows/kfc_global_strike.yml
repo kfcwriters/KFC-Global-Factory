@@ -18,7 +18,7 @@ jobs:
           # 📚 CBME Topic Selection
           TOPICS=("Renal Calculi" "Glycated Hemoglobin" "Gout and Uric Acid" "Diabetes Mellitus Type 2")
           # 🎙️ Narration Scripts
-          SCRIPTS=("Renal calculi, or kidney stones, are solid masses made of crystals. Most stones are calcium ox-a-late." "G-L-C-A-1-C, or glycated hemoglobin, reflects average blood sugar levels over the past three months." "Gout is a form of arthritis characterized by severe pain and redness in joints, caused by high uric acid." "Type 2 diabetes is a chronic condition where the body does not use insulin properly, leading to high blood sugar.")
+          SCRIPTS=("Renal calculi are solid masses made of crystals. Most stones are calcium oxalate." "H-B-A-1-C, or glycated hemoglobin, reflects average blood sugar levels over three months." "Gout is a form of arthritis caused by high uric acid deposition in joints." "Type 2 diabetes is a chronic condition where the body does not use insulin properly.")
           
           INDEX=$((RANDOM % 4))
           SELECTED_TOPIC=${TOPICS[$INDEX]}
@@ -48,7 +48,7 @@ jobs:
                       \"clips\": [{
                         \"asset\": {
                           \"type\": \"tts\",
-                          \"text\": \"Welcome students. Today's lecture is on $SELECTED_TOPIC. $SELECTED_SCRIPT\",
+                          \"text\": \"Welcome students. Today's high-yield topic is $SELECTED_TOPIC. $SELECTED_SCRIPT\",
                           \"voice\": \"Matthew\"
                         },
                         \"start\": 1, \"length\": 11
@@ -61,3 +61,17 @@ jobs:
           
           RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
           echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
+          echo "🚀 Render Queued: $RENDER_ID"
+
+      - name: 3. Execute Lead Hunters & Automatic YouTube Upload
+        env:
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          RENDER_ID: ${{ env.RENDER_ID }}
+        run: |
+          pip install google-api-python-client google-auth-oauthlib requests
+          # 1. Start hunting while video renders
+          python3 outreach_specialist.py
+          python3 google_lead_hunter.py
+          # 2. Wait and Upload to YouTube
+          python3 youtube_uploader.py
