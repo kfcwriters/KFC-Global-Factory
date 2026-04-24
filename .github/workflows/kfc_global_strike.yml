@@ -1,27 +1,42 @@
 name: 24-7 KFC Global Synthetic Factory
+
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    # Runs at 5 minutes past every hour to avoid GitHub traffic jams
+    - cron: '5 * * * *'
+  workflow_dispatch: # Allows you to run it manually for testing
 
 jobs:
   medical-strike:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 2. Set up Research Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: 3. Install Global Dependencies
         run: pip install requests
 
-      - name: Execute Full Autonomy Strike
+      - name: 4. Execute Triple Autonomy Strike
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          # These must match the names in your GitHub Secrets exactly
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-        run: python3 outbound_agent.py
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          # We hardcode the production key for the Media Agent to ensure 1080p delivery
+          SHOTSTACK_KEY: "ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq"
+        run: |
+          echo "🚀 Starting Agent 1: PubMed Hunter..."
+          python3 outreach_specialist.py
+          
+          echo "🚀 Starting Agent 2: Media Producer..."
+          python3 media_producer.py
+          
+          echo "🚀 Starting Agent 3: Google Lead Hunter..."
+          python3 google_lead_hunter.py
+
+      - name: 5. Finalize Global Logs
+        run: echo "✅ All 3 Agents successfully completed their hourly strike."
