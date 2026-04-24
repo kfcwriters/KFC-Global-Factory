@@ -13,18 +13,18 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Multi-Disciplinary Professor (Audio + Animation)
+      - name: 2. Execute Medical Professor Agent
+        id: media_strike
         run: |
-          # 📚 Database for Global Medical Students & Researchers
-          SUBJECTS=("PATHOLOGY" "PHARMACOLOGY" "SURGERY" "MEDICINE")
-          TOPICS=("Cellular Adaptation" "Drug Half-Life" "Surgical Hemostasis" "Acute Coronary Syndrome")
-          SCRIPTS=("Cellular adaptation refers to changes made by a cell in response to adverse environmental changes, including hypertrophy and atrophy." "The half-life of a drug is the time taken for its plasma concentration to reduce by fifty percent." "Surgical hemostasis is the process of stopping bleeding during an operation using physical or chemical means." "Acute coronary syndrome is a term used for any condition brought on by a sudden reduction or blockage of blood flow to the heart.")
+          # 📚 High-Yield Medical Topic Database
+          TOPICS=("Anatomy of Cranial Nerves" "Pharmacology of Antibiotics" "Pathology of Inflammation" "Surgical Hemostasis")
+          SCRIPTS=("There are twelve pairs of cranial nerves that emerge directly from the brain and brainstem." "Antibiotics are drugs used to treat bacterial infections by inhibiting growth or destroying cell walls." "Inflammation is the body's immune response to irritants, characterized by heat, pain, and swelling." "Surgical hemostasis is the process of stopping bleeding during surgery using clamps or sutures.")
           
           INDEX=$((RANDOM % 4))
-          SUB=${SUBJECTS[$INDEX]}
-          TOP=${TOPICS[$INDEX]}
-          SCR=${SCRIPTS[$INDEX]}
+          SELECTED_TOPIC=${TOPICS[$INDEX]}
+          SELECTED_SCRIPT=${SCRIPTS[$INDEX]}
 
+          # Render Command (Light but with Audio)
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
@@ -32,23 +32,33 @@ jobs:
                 \"timeline\": {
                   \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
                   \"tracks\": [
-                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:50px;'>$SUB</h1><h2 style='font-size:40px; color:#ffffff;'>$TOP</h2></div>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 12, \"effect\": \"zoomIn\", \"transition\": {\"in\": \"fade\", \"out\": \"slideRight\"}}]},
-                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"Welcome students. In $SUB we focus on $TOP. $SCR\", \"voice\": \"Matthew\"}, \"start\": 1, \"length\": 11}]}
+                    {\"clips\": [{\"asset\": {\"type\": \"html\", \"html\": \"<h1 style='color:#00ffcc;'>$SELECTED_TOPIC</h1>\", \"width\": 1024, \"height\": 576}, \"start\": 0, \"length\": 10}]},
+                    {\"clips\": [{\"asset\": {\"type\": \"tts\", \"text\": \"$SELECTED_SCRIPT\", \"voice\": \"Matthew\"}, \"start\": 1, \"length\": 9}]}
                   ]
                 },
                 \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
               }")
           
+          # 💾 Physical Handshake: Save ID for Step 3
           RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
-          echo "🚀 Verified Render ID ($SUB): $RID"
+          echo "🚀 Verified Render ID: $RID"
 
-      - name: 3. Execute Lead Hunters & YT Upload
+      - name: 3. Execute Lead Hunters & YouTube Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
+          # Install necessary libraries
           pip install google-api-python-client google-auth-oauthlib requests
-          python3 outreach_specialist.py
+          
+          # 🚀 1. Start Author Hunting (ResearchGate, PubMed, Scopus)
+          # This will use the new Gmail/Yahoo author logic
           python3 google_lead_hunter.py
+          
+          # 🛰️ 2. Load Render ID and attempt YouTube Upload
+          # It will wait 10 minutes for the video to finish
           python3 youtube_uploader.py
+
+      - name: 4. Factory Cleanup
+        run: echo "✅ Hourly Strike Successfully Completed."
