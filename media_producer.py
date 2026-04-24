@@ -3,28 +3,19 @@ import requests
 import random
 
 def run_media_production():
-    # 🔑 SECURE ACCESS: Pulling directly from your GitHub Secrets
-    # This ensures your 'Credits' on the dashboard are actually used.
+    # 🔑 Pulling from Secrets
     SHOTSTACK_KEY = os.getenv('SHOTSTACK_KEY')
     tg_token = os.getenv('TELEGRAM_TOKEN')
     chat_id = "1060905337"
 
     if not SHOTSTACK_KEY:
-        print("❌ ERROR: SHOTSTACK_KEY not found in Environment. Check GitHub Secrets.")
+        print("❌ API Key Missing")
         return
 
-    # 🔬 TOPIC ROTATION: Matching the PhD authority of your brand
-    topics = [
-        {"title": "Advanced Oncology Research 2026", "desc": "Next-gen biomarker tracking and precision therapy."},
-        {"title": "Cardiovascular Clinical Updates", "desc": "New protocols in cardiology manuscript drafting."},
-        {"title": "Biochemistry & Metabolic Signaling", "desc": "PhD-level analysis of cellular pathways."},
-        {"title": "Surgical Narrative Excellence", "desc": "Transforming complex cases into Scopus-indexed papers."}
-    ]
-    strike = random.choice(topics)
+    # 🔬 Topic Selection
+    strike = {"title": "Clinical Research 2026", "desc": "PhD-level medical writing and support."}
 
-    print(f"🎬 STUDIO: Initiating 1080p Render for {strike['title']}...")
-
-    # 🎥 PRODUCTION ORDER: 720p HD + Direct YouTube Upload
+    # 🎥 720p Production Order
     payload = {
         "timeline": {
             "background": "#000000",
@@ -32,33 +23,29 @@ def run_media_production():
                 "clips": [{
                     "asset": {
                         "type": "html",
-                        "html": f"<div style='color:white; font-family:Arial; text-align:center;'><h1>{strike['title']}</h1><p>{strike['desc']}</p></div>",
-                        "css": "div { margin-top: 450px; padding: 40px; background: rgba(0,0,0,0.8); border-radius: 20px; border: 2px solid #00d4ff; }"
+                        "html": f"<div style='color:white; text-align:center;'><h1>{strike['title']}</h1><p>{strike['desc']}</p></div>",
+                        "css": "div { margin-top: 300px; font-family: sans-serif; }"
                     },
-                    "start": 0, "length": 10
+                    "start": 0, "length": 5
                 }]
             }]
         },
         "output": {
             "format": "mp4",
-            "resolution": "hd1080",
-            "destinations": [
-                {
-                    "provider": "youtube",
-                    "options": {
-                        "title": f"{strike['title']} | KFC Lab PhD Support",
-                        "description": f"Expert medical writing for {strike['desc']}. Contact: kfcwriters@gmail.com",
-                        "category": "27",
-                        "privacy": "public"
-                    }
-                }
-            ]
+            "resolution": "sd", # Using SD/720p for faster processing
+            "destinations": [{"provider": "youtube", "options": {"title": strike['title'], "category": "27", "privacy": "public"}}]
         }
     }
 
-    headers = {
-        "x-api-key": SHOTSTACK_KEY,
-        "Content-Type": "application/json"
-    }
+    headers = {"x-api-key": SHOTSTACK_KEY, "Content-Type": "application/json"}
     
-    try
+    try:
+        response = requests.post("https://api.shotstack.io/edit/v1/render", json=payload, headers=headers)
+        print(f"Status: {response.status_code}")
+        if response.status_code == 201:
+            print("✅ Render Started Successfully!")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+if __name__ == "__main__":
+    run_media_production()
