@@ -1,26 +1,23 @@
 import os
 
 def send_outreach(email_list):
-    # CEO RULE: Strictly block generic 'info' and 'admin' accounts
-    blacklist = ["info", "admin", "office", "contact", "support", "sales", "help", "mail"]
+    # CEO HARD RULE: No generic info or admin emails allowed.
+    final_leads = []
+    forbidden = ["info", "admin", "office", "support", "contact", "sales"]
     
-    verified_leads = []
     for email in email_list:
-        prefix = email.split('@')[0].lower()
-        
-        # Check if the email starts with any blacklisted word
-        if any(prefix.startswith(word) for word in blacklist):
-            print(f"🛡️ Filtering out generic lead: {email}")
+        clean_email = email.lower().strip()
+        # Rule 1: Must not contain forbidden words
+        if any(word in clean_email for word in forbidden):
+            print(f"🛡️ Blocking generic email: {clean_email}")
             continue
-            
-        # Only allow professional looking emails
-        if "@" in email and "." in email.split("@")[1]:
-            verified_leads.append(email)
+        # Rule 2: Must be a professional domain
+        if "@" in clean_email and "." in clean_email:
+            final_leads.append(clean_email)
 
-    if not verified_leads:
-        print("✅ Filter Success: No generic 'info' emails found. Skipping send to protect reputation.")
+    if not final_leads:
+        print("✅ Filter Success: 0 generic emails passed. Factory safe.")
         return
 
-    # Only send to the high-quality leads remaining
-    print(f"📧 Sending PhD pitch to {len(verified_leads)} high-quality clinical leads...")
-    # ... rest of your send logic here
+    print(f"📧 Sending PhD pitch to {len(final_leads)} high-quality clinical leads.")
+    # Proceed with your Gmail sending logic here...
