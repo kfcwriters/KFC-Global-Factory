@@ -13,15 +13,14 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Multi-Disciplinary Professor
+      - name: 2. Execute Multi-Disciplinary Professor (Audio + Animation)
         run: |
-          # 📚 Multi-Disciplinary Database
-          SUBJECTS=("ANATOMY" "PHYSIOLOGY" "PHARMACOLOGY" "PATHOLOGY" "SURGERY" "MEDICINE")
-          TOPICS=("Circle of Willis" "Cardiac Output" "Mechanism of Warfarin" "Inflammation Phases" "Appendicitis Signs" "Myocardial Infarction")
-          SCRIPTS=("The Circle of Willis is a circulatory anastomosis at the base of the brain, supplying blood to the cerebrum." "Cardiac output is the volume of blood being pumped by the heart per minute. It equals heart rate times stroke volume." "Warfarin acts as a vitamin K antagonist, inhibiting the synthesis of clotting factors 2, 7, 9, and 10." "Acute inflammation involves vasodilation, increased capillary permeability, and leukocyte migration to the site of injury." "Classic signs of appendicitis include periumbilical pain that shifts to the right lower quadrant, often with nausea." "Myocardial infarction, or heart attack, occurs when blood flow to the heart muscle is blocked, causing tissue death.")
+          # 📚 Multi-Disciplinary Knowledge Base
+          SUBJECTS=("PATHOLOGY" "PHARMACOLOGY" "SURGERY" "ANATOMY")
+          TOPICS=("Neoplasia" "Pharmacokinetics" "Acute Abdomen" "Cranial Nerves")
+          SCRIPTS=("Neoplasia is the uncontrolled, abnormal growth of cells or tissues in the body, which can be benign or malignant." "Pharmacokinetics is the study of how the body affects a drug, covering absorption, distribution, metabolism, and excretion." "Acute abdomen refers to sudden, severe abdominal pain that may require urgent surgical intervention." "There are twelve pairs of cranial nerves that emerge directly from the brain and brainstem to relay information.")
           
-          # 🎲 Randomly Pick Subject & Topic
-          INDEX=$((RANDOM % 6))
+          INDEX=$((RANDOM % 4))
           SUB=${SUBJECTS[$INDEX]}
           TOP=${TOPICS[$INDEX]}
           SCR=${SCRIPTS[$INDEX]}
@@ -37,7 +36,7 @@ jobs:
                       \"clips\": [{
                         \"asset\": {
                           \"type\": \"html\",
-                          \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:45px;'>$SUB</h1><h2 style='font-size:40px; color:#ffffff;'>$TOP</h2><p>KFC Global Medical Series</p></div>\",
+                          \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:50px;'>$SUB</h1><h2 style='font-size:40px; color:#ffffff;'>$TOP</h2></div>\",
                           \"width\": 1024, \"height\": 576
                         },
                         \"start\": 0, \"length\": 12,
@@ -49,7 +48,7 @@ jobs:
                       \"clips\": [{
                         \"asset\": {
                           \"type\": \"tts\",
-                          \"text\": \"Welcome to the KFC Global Medical Series. Today in $SUB, we discuss $TOP. $SCR\",
+                          \"text\": \"Welcome students. Today in $SUB we explore $TOP. $SCR\",
                           \"voice\": \"Matthew\"
                         },
                         \"start\": 1, \"length\": 11
@@ -62,9 +61,9 @@ jobs:
           
           RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
-          echo "🚀 Verified Render ID ($SUB): $RID"
+          echo "🚀 Render Started ($SUB): $RID"
 
-      - name: 3. Execute Global Author Hunter & YT Upload
+      - name: 3. Execute Lead Hunters & YT Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
