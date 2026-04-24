@@ -12,11 +12,13 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Cinematic Media Agent
+      - name: 2. Execute Professor Media Agent (Voice + Teaching)
         id: media_strike
         run: |
           UNIQUE_ID=$RANDOM
-          # Using a guaranteed Shotstack music asset to prevent 'Failed' status
+          # 🎓 CLINICAL SCRIPT: Define the teaching content here
+          TEACHING_TEXT="Welcome to KFC Lab. Today we analyze the role of Sigma Metrics in Laboratory Quality Management to reduce analytical errors."
+          
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
@@ -24,26 +26,38 @@ jobs:
                 \"timeline\": {
                   \"soundtrack\": {
                     \"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",
-                    \"effect\": \"fadeInFadeOut\"
+                    \"volume\": 0.2
                   },
-                  \"background\": \"#000000\",
-                  \"tracks\": [{
-                    \"clips\": [{
-                      \"asset\": {
-                        \"type\": \"title\", 
-                        \"text\": \"KFC LAB: PhD RESEARCH SUPPORT #$UNIQUE_ID\",
-                        \"style\": \"future\"
-                      },
-                      \"start\": 0, \"length\": 8
-                    }]
-                  }]
+                  \"tracks\": [
+                    {
+                      \"clips\": [{
+                        \"asset\": {
+                          \"type\": \"html\",
+                          \"html\": \"<p style='color: #ffffff; font-size: 40px; text-align: center;'><b>KFC LAB RESEARCH</b><br><br>Topic: Sigma Metrics in Clinical Chemistry</p>\",
+                          \"css\": \"p { font-family: 'Montserrat', sans-serif; }\",
+                          \"width\": 800, \"height\": 400
+                        },
+                        \"start\": 0, \"length\": 10
+                      }]
+                    },
+                    {
+                      \"clips\": [{
+                        \"asset\": {
+                          \"type\": \"tts\",
+                          \"text\": \"$TEACHING_TEXT\",
+                          \"voice\": \"Matthew\"
+                        },
+                        \"start\": 0, \"length\": 10
+                      }]
+                    }
+                  ]
                 },
                 \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
               }")
           
           RENDER_ID=$(echo $RESPONSE | jq -r '.response.id')
           echo "RENDER_ID=$RENDER_ID" >> $GITHUB_ENV
-          echo "🚀 Render Queued: $RENDER_ID"
+          echo "🚀 Teaching Render Queued: $RENDER_ID"
 
       - name: 3. Execute Lead Hunters
         env:
@@ -54,7 +68,7 @@ jobs:
           python3 outreach_specialist.py
           python3 google_lead_hunter.py
 
-      - name: 4. Execute Video Delivery Agent (5-Minute Deep Wait)
+      - name: 4. Execute Video Delivery Agent (Smart Retry)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           RENDER_ID: ${{ env.RENDER_ID }}
@@ -64,29 +78,12 @@ jobs:
           render_id = os.getenv('RENDER_ID')
           api_key = 'ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq'
           token = os.getenv('TELEGRAM_TOKEN')
-          
-          print(f'🛰️ Monitoring Render: {render_id}')
-          
-          for attempt in range(6): # 6 attempts = 6 minutes total
-              print(f'Attempt {attempt+1}: Checking status...')
+          for attempt in range(10):
+              time.sleep(30)
               res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
               status = res.get('response', {}).get('status')
               url = res.get('response', {}).get('url')
-              
-              print(f'📊 Current Status: {status}')
-              
               if status == 'completed' and url:
-                  msg = f'🎬 *KFC CINEMATIC READY*\n\nRender complete with music.\n🔗 [Download/Upload Video]({url})'
-                  requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
-                  print('✅ Delivered to Telegram.')
-                  exit(0)
-              
-              if status == 'failed':
-                  print('❌ Render failed on Shotstack.')
-                  exit(1)
-              
-              time.sleep(60)
+                  requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': f'🎓 *KFC TEACHING VIDEO READY*\n🔗 [Watch/Download]({url})', 'parse_mode': 'Markdown'})
+                  break
           "
-
-      - name: 5. Finalize Factory Logs
-        run: echo "✅ Hourly Factory Strike Successfully Completed."
