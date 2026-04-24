@@ -16,13 +16,14 @@ jobs:
         id: media_strike
         run: |
           UNIQUE_ID=$RANDOM
+          # Using a guaranteed Shotstack music asset to prevent 'Failed' status
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
           -d "{
                 \"timeline\": {
                   \"soundtrack\": {
-                    \"src\": \"https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/glitch.mp3\",
+                    \"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\",
                     \"effect\": \"fadeInFadeOut\"
                   },
                   \"background\": \"#000000\",
@@ -33,7 +34,7 @@ jobs:
                         \"text\": \"KFC LAB: PhD RESEARCH SUPPORT #$UNIQUE_ID\",
                         \"style\": \"future\"
                       },
-                      \"start\": 0, \"length\": 6
+                      \"start\": 0, \"length\": 8
                     }]
                   }]
                 },
@@ -66,11 +67,8 @@ jobs:
           
           print(f'🛰️ Monitoring Render: {render_id}')
           
-          # Check every 60 seconds, up to 5 times (5 minutes total)
-          for attempt in range(5):
-              print(f'Attempt {attempt+1}: Waiting 60 seconds...')
-              time.sleep(60)
-              
+          for attempt in range(6): # 6 attempts = 6 minutes total
+              print(f'Attempt {attempt+1}: Checking status...')
               res = requests.get(f'https://api.shotstack.io/edit/v1/render/{render_id}', headers={'x-api-key': api_key}).json()
               status = res.get('response', {}).get('status')
               url = res.get('response', {}).get('url')
@@ -78,17 +76,17 @@ jobs:
               print(f'📊 Current Status: {status}')
               
               if status == 'completed' and url:
-                  msg = f'🎬 *KFC CINEMATIC READY*\n\nRender complete with music and visuals.\n🔗 [Download/Upload Video]({url})'
+                  msg = f'🎬 *KFC CINEMATIC READY*\n\nRender complete with music.\n🔗 [Download/Upload Video]({url})'
                   requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={'chat_id': '1060905337', 'text': msg, 'parse_mode': 'Markdown'})
-                  print('✅ Link successfully delivered to Telegram.')
+                  print('✅ Delivered to Telegram.')
                   exit(0)
               
               if status == 'failed':
-                  print('❌ Render failed on Shotstack servers.')
+                  print('❌ Render failed on Shotstack.')
                   exit(1)
-          
-          print('⚠️ Timeout: Video not ready after 5 minutes.')
+              
+              time.sleep(60)
           "
 
       - name: 5. Finalize Factory Logs
-        run: echo "✅ Hourly Factory Strike Completed."
+        run: echo "✅ Hourly Factory Strike Successfully Completed."
