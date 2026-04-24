@@ -8,24 +8,63 @@ on:
 jobs:
   medical-strike:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Professor Media Agent
+      - name: 2. Execute Multi-Disciplinary Professor
         run: |
-          # 🧪 Stable Render Strike
+          # 📚 Multi-Disciplinary Database
+          SUBJECTS=("ANATOMY" "PHYSIOLOGY" "PHARMACOLOGY" "PATHOLOGY" "SURGERY" "MEDICINE")
+          TOPICS=("Circle of Willis" "Cardiac Output" "Mechanism of Warfarin" "Inflammation Phases" "Appendicitis Signs" "Myocardial Infarction")
+          SCRIPTS=("The Circle of Willis is a circulatory anastomosis at the base of the brain, supplying blood to the cerebrum." "Cardiac output is the volume of blood being pumped by the heart per minute. It equals heart rate times stroke volume." "Warfarin acts as a vitamin K antagonist, inhibiting the synthesis of clotting factors 2, 7, 9, and 10." "Acute inflammation involves vasodilation, increased capillary permeability, and leukocyte migration to the site of injury." "Classic signs of appendicitis include periumbilical pain that shifts to the right lower quadrant, often with nausea." "Myocardial infarction, or heart attack, occurs when blood flow to the heart muscle is blocked, causing tissue death.")
+          
+          # 🎲 Randomly Pick Subject & Topic
+          INDEX=$((RANDOM % 6))
+          SUB=${SUBJECTS[$INDEX]}
+          TOP=${TOPICS[$INDEX]}
+          SCR=${SCRIPTS[$INDEX]}
+
           RESPONSE=$(curl -s -X POST https://api.shotstack.io/edit/v1/render \
           -H "x-api-key: ExZhq8U3rOIRgdUQDeIbar4vwtbM6GLAwn2Ei3Hq" \
           -H "Content-Type: application/json" \
-          -d "{\"timeline\":{\"tracks\":[{\"clips\":[{\"asset\":{\"type\":\"title\",\"text\":\"KFC LAB: CBME LESSON\"},\"start\":0,\"length\":5}]}]},\"output\":{\"format\":\"mp4\",\"resolution\":\"sd\"}}")
+          -d "{
+                \"timeline\": {
+                  \"soundtrack\": {\"src\": \"https://shotstack-assets.s3-ap-southeast-2.amazonaws.com/music/disco.mp3\", \"volume\": 0.1},
+                  \"tracks\": [
+                    {
+                      \"clips\": [{
+                        \"asset\": {
+                          \"type\": \"html\",
+                          \"html\": \"<div style='color:#00ffcc; text-align:center; font-family:Arial;'><h1 style='font-size:45px;'>$SUB</h1><h2 style='font-size:40px; color:#ffffff;'>$TOP</h2><p>KFC Global Medical Series</p></div>\",
+                          \"width\": 1024, \"height\": 576
+                        },
+                        \"start\": 0, \"length\": 12,
+                        \"effect\": \"zoomIn\",
+                        \"transition\": {\"in\": \"fade\", \"out\": \"slideRight\"}
+                      }]
+                    },
+                    {
+                      \"clips\": [{
+                        \"asset\": {
+                          \"type\": \"tts\",
+                          \"text\": \"Welcome to the KFC Global Medical Series. Today in $SUB, we discuss $TOP. $SCR\",
+                          \"voice\": \"Matthew\"
+                        },
+                        \"start\": 1, \"length\": 11
+                      }]
+                    }
+                  ]
+                },
+                \"output\": {\"format\": \"mp4\", \"resolution\": \"sd\"}
+              }")
           
-          # Extract ID carefully
           RID=$(echo $RESPONSE | jq -r '.response.id // "failed"')
           echo "$RID" > render_id.txt
-          echo "🚀 Verified Render ID: $RID"
+          echo "🚀 Verified Render ID ($SUB): $RID"
 
-      - name: 3. Execute Lead Hunters & YouTube Upload
+      - name: 3. Execute Global Author Hunter & YT Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
