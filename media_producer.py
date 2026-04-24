@@ -3,7 +3,6 @@ import requests
 import random
 
 def run_media_production():
-    # 🔑 Pulling from Secrets
     SHOTSTACK_KEY = os.getenv('SHOTSTACK_KEY')
     tg_token = os.getenv('TELEGRAM_TOKEN')
     chat_id = "1060905337"
@@ -15,7 +14,8 @@ def run_media_production():
     # 🔬 Topic Selection
     strike = {"title": "Clinical Research 2026", "desc": "PhD-level medical writing and support."}
 
-    # 🎥 720p Production Order
+    # 🎥 720p HD Production Order
+    # Fixed the 'resolution' and 'destinations' structure to avoid 400 error
     payload = {
         "timeline": {
             "background": "#000000",
@@ -23,8 +23,8 @@ def run_media_production():
                 "clips": [{
                     "asset": {
                         "type": "html",
-                        "html": f"<div style='color:white; text-align:center;'><h1>{strike['title']}</h1><p>{strike['desc']}</p></div>",
-                        "css": "div { margin-top: 300px; font-family: sans-serif; }"
+                        "html": f"<div style='color:white; text-align:center; font-family:Arial;'><h1>{strike['title']}</h1><p>{strike['desc']}</p></div>",
+                        "css": "div { margin-top: 300px; }"
                     },
                     "start": 0, "length": 5
                 }]
@@ -32,8 +32,18 @@ def run_media_production():
         },
         "output": {
             "format": "mp4",
-            "resolution": "sd", # Using SD/720p for faster processing
-            "destinations": [{"provider": "youtube", "options": {"title": strike['title'], "category": "27", "privacy": "public"}}]
+            "resolution": "720", # Corrected resolution string
+            "destinations": [
+                {
+                    "provider": "youtube",
+                    "options": {
+                        "title": f"{strike['title']} Update",
+                        "description": strike['desc'],
+                        "category": "27",
+                        "privacy": "public"
+                    }
+                }
+            ]
         }
     }
 
@@ -43,7 +53,12 @@ def run_media_production():
         response = requests.post("https://api.shotstack.io/edit/v1/render", json=payload, headers=headers)
         print(f"Status: {response.status_code}")
         if response.status_code == 201:
-            print("✅ Render Started Successfully!")
+            render_id = response.json().get('response', {}).get('id')
+            print(f"✅ Render Started: {render_id}")
+            if tg_token:
+                requests.post(f"https://api.telegram.org/bot{tg_token}/sendMessage", json={"chat_id": chat_id, "text": "🎬 Video Render Started!"})
+        else:
+            print(f"❌ Error Detail: {response.text}")
     except Exception as e:
         print(f"❌ Error: {e}")
 
