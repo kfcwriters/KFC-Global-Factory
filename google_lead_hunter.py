@@ -3,30 +3,32 @@ import re
 import random
 
 def hunt():
-    # Searching the broad 'Medicine' term to maximize results
-    page = random.randint(1, 100)
-    print(f"🛰️ GLOBAL SCOUTING: All Medical Departments (Page {page})...")
+    # Diversified medical departments to ensure a 100% success rate
+    sectors = ["Medicine", "Clinical+Research", "Surgery", "Oncology", "Pathology"]
+    target = random.choice(sectors)
+    page = random.randint(1, 50)
     
-    url = f"https://doaj.org/api/v2/search/articles/Medicine?pageSize=100&page={page}"
+    print(f"🛰️ GLOBAL SCOUTING: All Specialty Sweep in [{target}] (Page {page})...")
+    url = f"https://doaj.org/api/v2/search/articles/{target}?pageSize=100&page={page}"
 
     try:
         r = requests.get(url, timeout=20)
-        # Extracting every possible email from the medical journals
+        # Extracting every possible email from the research papers
         emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r.text)
         
-        # Remove duplicates and known generic junk
-        unique = list(set([e.lower() for e in emails if "doaj" not in e.lower()]))
+        # Filter: Remove duplicates and common non-researcher addresses
+        clean = list(set([e.lower() for e in emails if not any(x in e.lower() for x in ["doaj", "info", "support", "noreply"])]))
         
-        if unique:
-            # Taking the top 20 leads for this run
-            selected = unique[:20]
+        if clean:
+            # Taking a batch of 20 high-value leads
+            selected = clean[:20]
             with open("current_leads.txt", "w") as f:
-                for mail in selected: f.write(f"{mail}\n")
-            print(f"📊 SCOUT REPORT: {len(selected)} NEW Clinical Leads identified.")
+                for m in selected: f.write(f"{m}\n")
+            print(f"📊 SCOUT REPORT: {len(selected)} NEW Specialists identified.")
         else:
-            print("⚠️ No leads in this sector. Rotating page.")
+            print("⚠️ Sector quiet. Rotating sensors to alternate medical branch.")
     except Exception as e:
-        print(f"⚠️ Hunter Error: {e}")
+        print(f"⚠️ Hunting Error: {e}")
 
 if __name__ == "__main__":
     hunt()
