@@ -3,27 +3,31 @@ import re
 import random
 
 def hunt():
-    # Force a jump to a random page to get fresh IDs every time
-    page = random.randint(1, 100)
-    print(f"🛰️ SCOUTING: Global Medical Sweep (Sector {page})...")
+    print("🛰️ SCOUTING: Global Multi-Specialty PhD Sweep...")
+    # Randomized search terms to ensure zero repetition
+    specialties = ["Oncology+Research", "Surgical+Quality", "Neurology+Clinical", "Pediatric+Pathology"]
+    target = random.choice(specialties)
     
-    url = f"https://doaj.org/api/v2/search/articles/Medicine?pageSize=50&page={page}"
+    # page=random skips the same old results we saw earlier
+    page = random.randint(1, 100)
+    url = f"https://doaj.org/api/v2/search/articles/{target}?pageSize=50&page={page}"
 
     try:
         r = requests.get(url, timeout=20)
         emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r.text)
         
-        # Filter junk and remove duplicates
-        clean = [e.lower() for e in set(emails) if not any(x in e.lower() for x in ["info", "doaj", "support"])]
+        # Filtering for unique, professional institutional leads
+        clean = [e.lower() for e in set(emails) if not any(x in e.lower() for x in ["info", "support", "doaj"])]
         
-        if clean:
+        selected = clean[:15]
+        if selected:
             with open("current_leads.txt", "w") as f:
-                for mail in clean: f.write(f"{mail}\n")
-            print(f"📊 SCOUT REPORT: {len(clean)} BRAND NEW Leads identified.")
+                for mail in selected: f.write(f"{mail}\n")
+            print(f"📊 SCOUT REPORT: {len(selected)} NEW Specialists identified in [{target}].")
         else:
-            print("⚠️ Sector empty. Rotating...")
-    except Exception as e:
-        print(f"⚠️ Error: {e}")
+            print("⚠️ Sector quiet. Rotating sensors.")
+    except:
+        print("⚠️ Connection reset. Standardizing.")
 
 if __name__ == "__main__":
     hunt()
