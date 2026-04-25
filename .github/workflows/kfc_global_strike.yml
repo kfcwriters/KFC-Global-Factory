@@ -14,12 +14,11 @@ jobs:
       - name: Setup Institutional Environment
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests google-api-python-client google-auth-oauthlib google-auth-httplib2
+          pip install requests google-api-python-client google-auth-oauthlib
 
-      - name: 1. Execution: Hunt, Outreach & Upload
+      - name: Execution: Hunt, Outreach & Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-          # 🛡️ Place your YouTube Refresh Token here
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
