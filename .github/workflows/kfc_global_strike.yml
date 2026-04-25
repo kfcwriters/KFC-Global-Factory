@@ -3,7 +3,7 @@ name: 24-7 KFC Global Synthetic Factory
 on:
   workflow_dispatch:
   schedule:
-    - cron: '5 * * * *' # Runs every hour at the 5-minute mark
+    - cron: '5 * * * *'
 
 jobs:
   medical-industrial-strike:
@@ -16,7 +16,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install requests google-api-python-client google-auth-oauthlib
 
-      - name: Execute: Broad-Spectrum Outreach & 720p Upload
+      - name: Execute Broad-Spectrum Outreach & 720p Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
