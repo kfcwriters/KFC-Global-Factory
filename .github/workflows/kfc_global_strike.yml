@@ -6,27 +6,22 @@ on:
     - cron: '5 * * * *'
 
 jobs:
-  clinical-business:
+  medical-strike:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Leads & Outreach
+
+      - name: Setup Essentials
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg imagemagick
+          pip install requests moviepy google-api-python-client google-auth-oauthlib
+
+      - name: 1. Hunt & Email
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: |
-          pip install requests
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
 
-  synthetic-media:
-    needs: clinical-business
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Stable Video Render (720p)
-        run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-          # 🛡️ Switching to stable MoviePy/Shotstack architecture
-          pip install google-api-python-client google-auth-oauthlib moviepy
-          python3 youtube_uploader.py
+      - name: 2. Render & Upload (720p)
+        run: python3 youtube_uploader.py
