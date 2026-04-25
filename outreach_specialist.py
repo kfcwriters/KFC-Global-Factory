@@ -5,34 +5,32 @@ from email.message import EmailMessage
 def run_outreach():
     pwd = os.getenv('GMAIL_PASSWORD')
     if not os.path.exists("current_leads.txt") or not pwd:
+        print("⚠️ No leads found or GMAIL_PASSWORD missing.")
         return
 
     with open("current_leads.txt", "r") as f:
         leads = [line.strip() for line in f.readlines()]
 
-    print(f"📧 Launching Professional Outreach to {len(leads)} Medical Scientists...")
+    print(f"📧 Launching Global Outreach to {len(leads)} clinicians...")
     
     for addr in leads:
         try:
             msg = EmailMessage()
-            msg['Subject'] = "Inquiry: PhD-Level Support for Advanced Medical Research & Sigma Quality"
+            # Professional Broad-Spectrum Subject Line
+            msg['Subject'] = "PhD Collaboration: Clinical Research Methodology & Manuscript Support"
             msg['From'] = "kfcwriters@gmail.com"
             msg['To'] = addr
             
-            # Institutional PhD Pitch
-            content = f"""Dear Esteemed Researcher,
+            content = f"""Dear Colleague,
 
-I am a Clinical Scientist and PhD Researcher specializing in Clinical Biochemistry and Laboratory Quality Management. Having monitored your recent contributions to the medical science community, I am reaching out to offer professional, PhD-level support for your upcoming publications.
+I am a Clinical Scientist and PhD Researcher specializing in Laboratory Quality Management and Meta-Analysis. I am reaching out to offer professional, PhD-level support for your upcoming medical manuscripts and clinical studies.
 
 My expertise includes:
-• Analytical Performance Optimization (Sigma Metrics & FMEA)
-• Clinical Research Data Interpretation & Statistical Analysis
-• Systematic Reviews and Meta-Analyses for Chronic Pathologies
-• Laboratory Automation and Risk-Based Quality Management
+- Analytical Performance Optimization (Sigma Metrics)
+- Systematic Reviews & Meta-Analysis
+- Cross-checking clinical results with global literature
 
-Whether you require a second set of expert eyes on your methodology or assistance in aligning your findings with current global clinical literature, I am here to ensure your work achieves the highest analytical standard.
-
-I look forward to discussing a potential collaboration on your next manuscript.
+Whether you are in Surgery, Pathology, or Internal Medicine, I can ensure your research meets the highest analytical standards for high-impact publication.
 
 Best Regards,
 
@@ -44,9 +42,9 @@ PhD Researcher | Clinical Scientist
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
                 smtp.login("kfcwriters@gmail.com", pwd)
                 smtp.send_message(msg)
-            print(f"✅ Formal Pitch Delivered: {addr}")
+            print(f"✅ Delivered: {addr}")
         except Exception as e:
-            print(f"❌ Delivery Error {addr}: {e}")
+            print(f"❌ Failed for {addr}: {e}")
 
 if __name__ == "__main__":
     run_outreach()
