@@ -15,7 +15,7 @@ jobs:
       - name: 2. Setup
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests google-api-python-client google-auth-oauthlib
+          pip install requests google-api-python-client google-auth-oauthlib arcreel
 
       - name: 3. Business (Leads & Emails)
         run: |
