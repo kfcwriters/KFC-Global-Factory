@@ -27,6 +27,5 @@ jobs:
       - name: AI Render & Upload (720p)
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          # 🛡️ Fix: Installing ArcReel specifically for this job
-          pip install arcreel google-api-python-client google-auth-oauthlib
+          pip install google-api-python-client google-auth-oauthlib arcreel
           python3 youtube_uploader.py
