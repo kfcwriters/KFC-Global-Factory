@@ -6,19 +6,18 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
 def get_5min_lecture():
-    # Technical PhD Masterclass Script (Approx. 850 words)
+    # Elite, Long-Form PhD Teaching Content (approx 5 mins)
     topic = "ADVANCED ANALYTICAL QUALITY & SIGMA METRICS"
     
-    # Simplified Chapter Overlays for maximum stability
+    # We use stable chapter text that stays on screen longer
     segments = [
-        {"text": "PHD MASTERCLASS: QUALITY MANAGEMENT", "start": 0, "end": 75},
-        {"text": "CALCULATING TOTAL ALLOWABLE ERROR", "start": 75, "end": 150},
-        {"text": "SIGMA METRIC IMPLEMENTATION", "start": 150, "end": 225},
-        {"text": "ACHIEVING WORLD-CLASS SIX SIGMA", "start": 225, "end": 305}
+        {"text": "CHAPTER 1\: ANALYTICAL PRECISION STANDARDS", "start": 0, "end": 100},
+        {"text": "CHAPTER 2\: SIGMA METRIC CALCULATION", "start": 100, "end": 200},
+        {"text": "CHAPTER 3\: TOTAL ALLOWABLE ERROR MAPPING", "start": 200, "end": 305}
     ]
 
     full_script = (
-        "Welcome to the KFC Lab Clinical Scientist series. Today, we are conducting a rigorous deep-dive into "
+        "Welcome to the KFC Lab Clinical Scientist series. Today, we conduct a rigorous deep-dive into "
         "Advanced Analytical Quality Management, specifically focusing on the institutional implementation of Sigma Metrics. "
         "In a high-throughput clinical laboratory, precision is not merely a goal; it is a mathematical requirement. "
         "We begin by understanding that every test result is subject to variation. Our role as senior clinical scientists "
@@ -34,34 +33,32 @@ def get_5min_lecture():
     return {"t": topic, "s": full_script, "segments": segments}
 
 def render_720p(lecture):
-    print(f"🎬 PHD MEGA-RENDER: 5-Minute Visual Stream for {lecture['t']}...")
+    print(f"🎬 STABILITY RENDER: 5-Minute PhD Masterclass for {lecture['t']}...")
     
-    # 1. Voice Generation
+    # 1. Voice Generation (5-Minute Audio)
     tts = gTTS(text=lecture['s'], lang='en')
     tts.save("master_voice.mp3")
 
-    # 2. Dynamic "Moving" Visuals
-    # We use 'mandelbrot' (mathematical patterns) to ensure the visual stream stays active
+    # 2. Build the Filter Chain for Chapters
     filters = []
     for seg in lecture['segments']:
         filters.append(
-            f"drawtext=font='sans':text='{seg['text']}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=350:enable='between(t,{seg['start']},{seg['end']})'"
+            f"drawtext=font='sans':text='{seg['text']}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=350:enable='between(t,{seg['start']},{seg['end']})'"
         )
-    
     filter_chain = ",".join(filters)
     
-    # 3. Secure Render Command
+    # 3. Optimized Render: Uses a static background to prevent CPU crashes
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "mandelbrot=s=1280x720:rate=25:d=305", # Moving Pattern
+        "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=305", # Solid Institutional Blue
         "-i", "master_voice.mp3",
         "-vf", (
-            f"drawgrid=w=100:h=100:t=1:c=white@0.1, "
-            f"drawtext=font='sans':text='{lecture['t']}':fontcolor=gold:fontsize=50:x=(w-text_w)/2:y=150, "
+            f"drawgrid=w=128:h=72:t=1:c=white@0.05, "
+            f"drawtext=font='sans':text='PHD MASTERCLASS\: {lecture['t']}':fontcolor=gold:fontsize=50:x=(w-text_w)/2:y=150, "
             f"{filter_chain}, "
-            "drawtext=font='sans':text='KFC LAB\: SENIOR RESEARCH BROADCAST':fontcolor=0x00FF00:fontsize=22:x=50:y=50"
+            "drawtext=font='sans':text='KFC LAB\: CLINICAL SCIENTIST BROADCAST':fontcolor=0x00FF00:fontsize=22:x=50:y=50"
         ),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-shortest", "masterclass.mp4"
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", "final_masterclass.mp4"
     ]
     subprocess.run(cmd, check=True)
 
@@ -76,12 +73,12 @@ def upload(lecture):
         body={
             "snippet": {
                 "title": f"PhD Masterclass: {lecture['t']}",
-                "description": f"Comprehensive 5-minute PhD review on {lecture['t']}. Support by KFC Lab.",
+                "description": f"Comprehensive 5-minute PhD review on {lecture['t']}. Manuscript and quality support by KFC Lab.",
                 "categoryId": "27"
             },
             "status": {"privacyStatus": "public"}
         },
-        media_body=MediaFileUpload("masterclass.mp4", resumable=True)
+        media_body=MediaFileUpload("final_masterclass.mp4", resumable=True)
     )
     request.execute()
     print(f"✅ 5-Minute PhD Masterclass Published: {lecture['t']}")
