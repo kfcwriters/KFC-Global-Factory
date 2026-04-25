@@ -1,22 +1,24 @@
 import os
-# Fix for MoviePy 2.0 syntax
-from moviepy import ColorClip, TextClip, CompositeVideoClip
+import subprocess
 
-def create_720p_asset(title, text):
-    print(f"🎬 MoviePy 2.0 Engine: Generating 720p Asset: {title}")
+def create_720p_video():
+    print("🎬 FFmpeg Engine: Generating 720p Clinical Asset...")
     
-    # 720p Background (1280x720)
-    bg = ColorClip(size=(1280, 720), color=(0, 0, 50)).with_duration(5)
+    # Text for the clinical asset
+    text = "HbA1c: Gold Standard Monitoring\nLaboratory Quality Management"
     
-    # Clinical Biochemistry text overlay
-    # Using 'caption' method for automatic text wrapping
-    txt = TextClip(text=text, font_size=50, color='white', size=(1000, 500), method='caption')
-    txt = txt.with_position('center').with_duration(5)
+    # Command to create a 5-second 720p blue video with white text
+    cmd = (
+        f'ffmpeg -y -f lavfi -i color=c=0x000032:s=1280x720:d=5 '
+        f'-vf "drawtext=text=\'{text}\':fontcolor=white:fontsize=50:x=(w-text_w)/2:y=(h-text_h)/2" '
+        f'-c:v libx264 -pix_fmt yuv420p clinical_asset_720p.mp4'
+    )
     
-    final = CompositeVideoClip([bg, txt])
-    final.write_videofile("clinical_asset_720p.mp4", fps=24, codec="libx264")
-    print("✅ Video Rendered: clinical_asset_720p.mp4")
+    try:
+        subprocess.run(cmd, shell=True, check=True)
+        print("✅ Asset Rendered: clinical_asset_720p.mp4")
+    except Exception as e:
+        print(f"❌ FFmpeg Error: {e}")
 
 if __name__ == "__main__":
-    # Topic for Science Channel
-    create_720p_asset("HbA1c Lab Quality", "HbA1c Monitoring: Gold Standard\nClinical Biochemistry & Sigma Metrics")
+    create_720p_video()
