@@ -5,8 +5,8 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
 def render_720p():
-    print("🎬 Rendering 720p Clinical Asset...")
-    text = "HbA1c Significance\nAnalytical Quality Management"
+    print("🎬 FFmpeg Engine: Rendering Clinical Asset...")
+    text = "HbA1c: Analytical Excellence\nSigma Metrics in Lab Management"
     cmd = (
         f'ffmpeg -y -f lavfi -i color=c=0x000032:s=1280x720:d=5 '
         f'-vf "drawtext=text=\'{text}\':fontcolor=white:fontsize=45:x=(w-text_w)/2:y=(h-text_h)/2" '
@@ -25,11 +25,11 @@ def upload():
     youtube = build("youtube", "v3", credentials=creds)
     request = youtube.videos().insert(
         part="snippet,status",
-        body={"snippet": {"title": "HbA1c Lab Quality", "categoryId": "27"}, "status": {"privacyStatus": "public"}},
+        body={"snippet": {"title": "HbA1c Lab Quality 720p", "categoryId": "27"}, "status": {"privacyStatus": "public"}},
         media_body=MediaFileUpload("video.mp4")
     )
     request.execute()
-    print("✅ Video Uploaded successfully.")
+    print("✅ 720p Video Published.")
 
 if __name__ == "__main__":
     render_720p()
