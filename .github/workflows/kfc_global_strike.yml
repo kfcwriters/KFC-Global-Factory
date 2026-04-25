@@ -11,12 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Institutional Environment
+      - name: Setup Essentials
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install requests google-api-python-client google-auth-oauthlib
 
-      - name: Execution: Hunt, Outreach & Upload
+      - name: 1. Outreach & Automation
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
