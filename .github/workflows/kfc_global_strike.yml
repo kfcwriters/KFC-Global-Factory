@@ -24,8 +24,9 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: AI Render & Upload (720p)
+      - name: Stable Video Render (720p)
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install google-api-python-client google-auth-oauthlib arcreel
+          # 🛡️ Switching to stable MoviePy/Shotstack architecture
+          pip install google-api-python-client google-auth-oauthlib moviepy
           python3 youtube_uploader.py
