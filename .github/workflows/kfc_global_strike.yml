@@ -9,20 +9,29 @@ jobs:
   medical-strike:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout
+      - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Setup (Video Engine + Libraries)
+      - name: 2. Setup (720p Video Engine + Python)
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests google-api-python-client google-auth-oauthlib arcreel
+          pip install requests google-api-python-client google-auth-oauthlib
 
-      - name: 3. Strike (Leads & Outreach)
+      - name: 3. Core Business: Lead Hunting & Outreach
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: |
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
 
-      - name: 4. Upload (Clinical Assets)
+      - name: 4. ArcReel: Generate 720p Clinical Asset
+        env:
+          ARCREEL_API_KEY: ${{ secrets.ARCREEL_API_KEY }}
+        run: |
+          # Professional PhD Scripting
+          TOPIC="Sigma Metrics & Analytical Quality"
+          SCRIPT="Quantifying laboratory performance through Sigma metrics ensures world-class analytical quality management."
+          python3 arcreel_agent.py "$TOPIC" "$SCRIPT" "720p"
+
+      - name: 5. YouTube: Publish Clinical Asset
         run: python3 youtube_uploader.py
