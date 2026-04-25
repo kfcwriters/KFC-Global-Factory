@@ -1,17 +1,13 @@
 name: 24-7 KFC Global Synthetic Factory
-
 on:
   workflow_dispatch:
   schedule:
     - cron: '5 * * * *'
-
 jobs:
   medical-strike:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Strike
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
