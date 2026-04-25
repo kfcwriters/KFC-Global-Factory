@@ -15,17 +15,10 @@ jobs:
       - name: 2. Core Business: Lead Hunting & Outreach
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
+          # Install only basic requirements
           pip install google-api-python-client google-auth-oauthlib requests
-          # 🚀 Hunting & Emailing happens FIRST. This will NOT fail.
+          
+          # 🚀 Running the Hunter and the Outreach together
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
-
-      - name: 3. Video Factory: Arcreel & YouTube
-        continue-on-error: true # 🛡️ If video fails, the job still marks as "Success"
-        run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install arcreel
-          # 🚀 Attempt video generation and upload
-          python3 youtube_uploader.py
