@@ -1,18 +1,26 @@
 name: 24-7 KFC Global Synthetic Factory
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '5 * * * *'
+
 jobs:
   medical-strike:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Strike
-        env:
-          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+      - name: 1. Checkout
+        uses: actions/checkout@v4
+
+      - name: 2. Setup
+        run: pip install requests google-api-python-client google-auth-oauthlib
+
+      - name: 3. Strike
         run: |
-          pip install requests google-api-python-client google-auth-oauthlib
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
-          python3 youtube_uploader.py
+        env:
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+
+      - name: 4. Upload
+        run: python3 youtube_uploader.py
