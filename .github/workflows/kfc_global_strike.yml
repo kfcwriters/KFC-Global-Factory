@@ -12,13 +12,13 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Core Business: Lead Hunting & Outreach
+      - name: 2. Install Essentials
+        run: pip install requests
+
+      - name: 3. Run Lead Hunter
+        run: python3 google_lead_hunter.py
+
+      - name: 4. Run Outreach Agent
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
-        run: |
-          # Install only basic requirements
-          pip install google-api-python-client google-auth-oauthlib requests
-          
-          # 🚀 Running the Hunter and the Outreach together
-          python3 google_lead_hunter.py
-          python3 outreach_specialist.py
+        run: python3 outreach_specialist.py
