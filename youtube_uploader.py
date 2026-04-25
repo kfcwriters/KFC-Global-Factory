@@ -5,33 +5,34 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
-def get_random_cbme_topic():
+def get_teaching_content():
     topics = [
-        {"title": "Bilirubin Metabolism", "sub": "Jaundice Types & Van Den Bergh Test", "tag": "Biochemistry"},
-        {"title": "Renal Function", "sub": "GFR & Creatinine Clearance Principles", "tag": "Physiology"},
-        {"title": "Anemia Classification", "sub": "Microcytic vs Macrocytic Morphology", "tag": "Hematology"},
-        {"title": "Lab Quality", "sub": "Levey-Jennings Charts & Westgard Rules", "tag": "Quality Control"}
+        {"title": "NEUROLOGY: Cranial Nerves", "sub": "Clinical Localization of Lesions"},
+        {"title": "ONCOLOGY: Tumor Markers", "sub": "Diagnostic Value of CEA and AFP"},
+        {"title": "CARDIOLOGY: Heart Sounds", "sub": "S1 to S4 Auscultation Principles"},
+        {"title": "SURGERY: Aseptic Technique", "sub": "Sterilization vs Disinfection Protocol"}
     ]
     return random.choice(topics)
 
 def render_720p(topic):
-    print(f"🎬 FFmpeg: Rendering Educational Asset: {topic['title']}")
+    print(f"🎬 FFmpeg: Hard-Burning Visuals for {topic['title']}...")
     
-    # We use a solid white background with black/blue text for 100% visibility
-    # We use a steady 'sine' tone so there is definitely audio
-    t1 = f"MEDICAL TEACHING: {topic['title']}"
-    t2 = f"Clinical Key: {topic['sub']}"
-    t3 = "Support: kfcwriters@gmail.com"
+    # We use a white background and high-contrast blue text
+    # The 'force_style' ensures the text is large and visible
+    t1 = topic['title']
+    t2 = topic['sub']
+    t3 = "PhD Support: kfcwriters@gmail.com"
 
+    # SINGLE-PASS HARD BURN COMMAND
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "color=c=white:s=1280x720:d=30",
-        "-f", "lavfi", "-i", "sine=f=440:d=30",
-        "-vf", f"drawtext=font='sans':text='{t1}':fontcolor=blue:fontsize=50:x=(w-text_w)/2:y=150,"
-               f"drawtext=font='sans':text='{t2}':fontcolor=black:fontsize=35:x=(w-text_w)/2:y=350,"
-               f"drawtext=font='sans':text='{t3}':fontcolor=red:fontsize=30:x=(w-text_w)/2:y=600",
+        "-f", "lavfi", "-i", "color=c=white:s=1280x720:d=30", # Background
+        "-f", "lavfi", "-i", "sine=f=440:d=30", # Audio
+        "-vf", f"drawtext=text='{t1}':fontcolor=0x000080:fontsize=60:x=(w-text_w)/2:y=200,"
+               f"drawtext=text='{t2}':fontcolor=black:fontsize=40:x=(w-text_w)/2:y=350,"
+               f"drawtext=fontcolor=red:text='{t3}':fontsize=35:x=(w-text_w)/2:y=600",
         "-c:v", "libx264", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-shortest", "medical_teaching.mp4"
+        "-c:a", "aac", "-b:a", "128k", "-shortest", "final_teaching.mp4"
     ]
     subprocess.run(cmd, check=True)
 
@@ -45,19 +46,19 @@ def upload(topic):
         part="snippet,status",
         body={
             "snippet": {
-                "title": f"CBME Medical Lecture: {topic['title']}",
-                "description": f"Curriculum review on {topic['sub']}. Support by KFC Lab.",
+                "title": f"Medical Science Review: {topic['title']}",
+                "description": f"Review of {topic['sub']}. PhD manuscript support by KFC Lab.",
                 "categoryId": "27"
             },
             "status": {"privacyStatus": "public"}
         },
-        media_body=MediaFileUpload("medical_teaching.mp4")
+        media_body=MediaFileUpload("final_teaching.mp4")
     )
     request.execute()
-    print(f"✅ Published: {topic['title']}")
+    print(f"✅ Published Hard-Burn Asset: {topic['title']}")
 
 if __name__ == "__main__":
-    current = get_random_cbme_topic()
-    render_720p(current)
-    try: upload(current)
+    content = get_teaching_content()
+    render_720p(content)
+    try: upload(content)
     except Exception as e: print(f"⚠️ Error: {e}")
