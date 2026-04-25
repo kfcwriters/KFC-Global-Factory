@@ -7,32 +7,34 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 
 def get_cbme_topic():
+    # Elite PhD-level topics to establish authority
     topics = [
-        {"t": "Sigma Metrics", "s": "Welcome to KFC Lab. We are analyzing analytical quality via Six Sigma metrics to reduce clinical errors.", "cat": "Quality Control"},
-        {"t": "Diabetic Nephropathy", "s": "Institutional Update. We are investigating novel serum biomarkers for early chronic kidney disease detection.", "cat": "Biochemistry"},
-        {"t": "Lab Automation", "s": "Medical Education Series. Exploring automation principles for MBBS and MLT students.", "cat": "Education"}
+        {"t": "SIGMA METRICS", "s": "Welcome to KFC Lab. Today we calibrate analytical performance using Six Sigma metrics to achieve zero-error clinical biochemistry.", "tag": "Quality"},
+        {"t": "RENAL BIOMARKERS", "s": "Institutional Update. We are mapping novel serum indicators for early diabetic nephropathy detection and patient monitoring.", "tag": "Nephrology"},
+        {"t": "PCR PRINCIPLES", "s": "Molecular Series. Analyzing real-time PCR quantification methods for high-precision diagnostic pathology.", "tag": "Molecular"}
     ]
     return random.choice(topics)
 
 def render_720p(topic):
-    print(f"🎬 RENDER: Generating {topic['t']} with Voice...")
+    print(f"🎬 BROADCAST: Rendering {topic['t']} with AI Voice...")
     
-    # Generate Free Voiceover
+    # 1. Voice Generation (Free/Unlimited)
     tts = gTTS(text=topic['s'], lang='en')
     tts.save("voice.mp3")
 
-    # Hard-Burn visuals: Navy Blue, Gold text, and a Scientific Grid
+    # 2. Institutional Visuals: Navy Blue background, Gold-White high contrast
+    # Adding 'drawgrid' for that scientific laboratory feel
     cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=30",
         "-i", "voice.mp3",
         "-vf", (
-            "drawgrid=w=100:h=100:t=1:c=white@0.1, "
-            f"drawtext=font='sans':text='PHD RESEARCH\: {topic['t']}':fontcolor=gold:fontsize=55:x=(w-text_w)/2:y=150, "
-            f"drawtext=font='sans':text='{topic['cat']} Focus':fontcolor=white:fontsize=30:x=(w-text_w)/2:y=300, "
-            "drawtext=font='sans':text='KFC LAB\: CLINICAL BROADCAST':fontcolor=yellow:fontsize=25:x=50:y=50"
+            "drawgrid=w=128:h=72:t=1:c=white@0.05, " # Subtle Scientific Grid
+            f"drawtext=font='sans':text='PHD SERIES\: {topic['t']}':fontcolor=gold:fontsize=55:x=(w-text_w)/2:y=180, "
+            f"drawtext=font='sans':text='{topic['tag']} Specialist View':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=330, "
+            "drawtext=font='sans':text='KFC LAB\: BROADCASTING LIVE':fontcolor=0x00FF00:fontsize=22:x=50:y=50"
         ),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", "institutional_asset.mp4"
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-shortest", "broadcast_asset.mp4"
     ]
     subprocess.run(cmd, check=True)
 
@@ -43,10 +45,18 @@ def upload(topic):
     youtube = build("youtube", "v3", credentials=creds)
     request = youtube.videos().insert(
         part="snippet,status",
-        body={"snippet": {"title": f"PhD Lab Update: {topic['t']}", "categoryId": "27"}, "status": {"privacyStatus": "public"}},
-        media_body=MediaFileUpload("institutional_asset.mp4")
+        body={
+            "snippet": {
+                "title": f"Medical Science Review: {topic['t']}",
+                "description": f"PhD-level review of {topic['t']}. Manuscript and Quality support by KFC Lab.",
+                "categoryId": "27"
+            },
+            "status": {"privacyStatus": "public"}
+        },
+        media_body=MediaFileUpload("broadcast_asset.mp4")
     )
     request.execute()
+    print(f"✅ Published: {topic['t']}")
 
 if __name__ == "__main__":
     current = get_cbme_topic()
