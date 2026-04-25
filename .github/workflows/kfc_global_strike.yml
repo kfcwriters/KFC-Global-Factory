@@ -9,18 +9,14 @@ jobs:
   medical-strike:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout Institutional Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 2. Install Dependencies
-        run: pip install requests google-api-python-client google-auth-oauthlib
-
-      - name: 3. Core Business: Lead Hunting & Outreach
+      - name: Strike
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: |
+          pip install requests google-api-python-client google-auth-oauthlib
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
-
-      - name: 4. YouTube: Publish 1080p Clinical Asset
-        run: python3 youtube_uploader.py
+          python3 youtube_uploader.py
