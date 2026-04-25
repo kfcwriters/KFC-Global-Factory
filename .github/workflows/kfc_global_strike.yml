@@ -12,15 +12,17 @@ jobs:
       - name: 1. Checkout
         uses: actions/checkout@v4
 
-      - name: 2. Setup
-        run: pip install requests google-api-python-client google-auth-oauthlib
+      - name: 2. Setup (Video Engine + Libraries)
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install requests google-api-python-client google-auth-oauthlib arcreel
 
-      - name: 3. Strike
+      - name: 3. Strike (Leads & Outreach)
+        env:
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: |
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
-        env:
-          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
 
-      - name: 4. Upload
+      - name: 4. Upload (Clinical Assets)
         run: python3 youtube_uploader.py
