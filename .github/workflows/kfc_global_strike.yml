@@ -12,7 +12,12 @@ jobs:
       - name: 1. Checkout Institutional Code
         uses: actions/checkout@v4
 
-      - name: 2. Execute Medical Strike Agents
+      - name: 2. Install System Video Engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          
+      - name: 3. Execute Medical Strike Agents
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -20,13 +25,11 @@ jobs:
           # Install Arcreel and dependencies
           pip install arcreel google-api-python-client google-auth-oauthlib requests
           
-          # 🚀 1. Run the Lead Hunter (Finding Real Authors)
+          # 🚀 1. Start Author Hunting
           python3 google_lead_hunter.py
           
-          # 🚀 2. Run the Outreach Specialist (Professional Pitch)
-          # This handles the emails we found
+          # 🚀 2. Start Outreach
           python3 outreach_specialist.py
 
-          # 🚀 3. Run the Video Creator & YouTube Uploader
-          # This will now use Arcreel internally to make the video
+          # 🚀 3. Run Video Generation & YouTube Upload
           python3 youtube_uploader.py
