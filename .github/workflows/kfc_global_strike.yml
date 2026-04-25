@@ -6,13 +6,11 @@ on:
     - cron: '5 * * * *'
 
 jobs:
-  medical-strike:
+  clinical-business:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout Institutional Code
-        uses: actions/checkout@v4
-
-      - name: 2. Core Business: Leads & Outreach
+      - uses: actions/checkout@v4
+      - name: Leads & Outreach
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: |
@@ -20,14 +18,14 @@ jobs:
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
 
-      - name: 3. Video Engine: Install Arcreel
-        continue-on-error: true
+  synthetic-media:
+    needs: clinical-business
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: AI Render & Upload (720p)
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install arcreel google-api-python-client google-auth-oauthlib
-
-      - name: 4. YouTube: Publish 720p Assets
-        continue-on-error: true
-        env:
-          ARCREEL_API_KEY: ${{ secrets.ARCREEL_API_KEY }}
-        run: python3 youtube_uploader.py
+          pip install google-api-python-client google-auth-oauthlib
+          python3 youtube_uploader.py
