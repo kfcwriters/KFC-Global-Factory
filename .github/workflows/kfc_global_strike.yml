@@ -6,22 +6,24 @@ on:
     - cron: '5 * * * *'
 
 jobs:
-  medical-strike:
+  kfc-strike:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Essentials
+      - name: Setup Institutional Environment
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests google-api-python-client google-auth-oauthlib
+          pip install requests google-api-python-client google-auth-oauthlib google-auth-httplib2
 
-      - name: 1. Hunt & Email
+      - name: 1. Execution: Hunt, Outreach & Upload
         env:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          # 🛡️ Place your YouTube Refresh Token here
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
         run: |
           python3 google_lead_hunter.py
           python3 outreach_specialist.py
-
-      - name: 2. Render & Upload (720p)
-        run: python3 youtube_uploader.py
+          python3 youtube_uploader.py
