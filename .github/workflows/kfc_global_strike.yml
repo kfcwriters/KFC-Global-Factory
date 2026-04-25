@@ -14,7 +14,7 @@ jobs:
       - name: Institutional Environment Setup
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests google-api-python-client google-auth-oauthlib
+          pip install requests google-api-python-client google-auth-oauthlib gtts
 
       - name: Execute Broad-Spectrum Outreach & 720p Upload
         env:
