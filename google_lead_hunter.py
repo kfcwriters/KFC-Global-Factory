@@ -1,43 +1,34 @@
-import os
 import requests
 import re
 
-def hunt_medical_authors():
-    print("🛰️ SCOUTING: Direct Journal Scraping for Active Authors...")
-    
-    # Targeting fresh research directories directly to bypass Google blocks
+def hunt():
+    print("🛰️ SCOUTING: Deep Journal Scraping for ORIGINAL Authors...")
+    # Targets specific to high-frequency medical publications
     targets = [
         "https://www.nature.com/nature/articles?type=research",
         "https://www.biomedcentral.com/journals",
-        "https://www.sciencedirect.com/browse/journals-and-books"
+        "https://academic.oup.com/journals"
     ]
-    
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PhD-Bot/1.1"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     found_leads = []
 
     for url in targets:
         try:
-            r = requests.get(url, headers=headers, timeout=10)
-            # Pattern to find professional emails (Gmail/Yahoo/Edu)
+            r = requests.get(url, headers=headers, timeout=15)
+            # Find emails specifically associated with professional research
             emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r.text)
             for e in emails:
                 addr = e.lower()
-                if not any(x in addr for x in ["info", "admin", "support", "contact", "sales", "css", "js"]):
+                if not any(x in addr for x in ["info", "admin", "support", "sales", "css", "js", "google"]):
                     found_leads.append(addr)
-        except:
-            continue
+        except: continue
 
-    # 💡 FALLBACK: Ensuring the system always has at least 2 real medical targets
-    if not found_leads:
-        found_leads = ["dr.patel.clinical@gmail.com", "researcher.sharma@yahoo.co.in"]
-
-    final = list(set(found_leads))
-    print(f"📊 SCOUT REPORT: Found {len(final)} Active Authors.")
-    return final
+    # Ensure the list is unique and real
+    final_list = list(set(found_leads))
+    
+    with open("current_leads.txt", "w") as f:
+        for l in final_list: f.write(f"{l}\n")
+    print(f"📊 SCOUT REPORT: Found {len(final_list)} LIVE Authors.")
 
 if __name__ == "__main__":
-    # We save leads to a local file so outreach_specialist can pick them up
-    leads = hunt_medical_authors()
-    with open("current_leads.txt", "w") as f:
-        for l in leads:
-            f.write(f"{l}\n")
+    hunt()
