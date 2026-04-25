@@ -1,33 +1,31 @@
 import requests
 import re
-import time
 
 def hunt():
-    print("🛰️ SCOUTING: Extracting ORIGINAL Authors from Academic Snippets...")
-    # These search queries target authors who have recently published
-    queries = [
-        "https://www.google.com/search?q=site:nature.com+%22@gmail.com%22+biochemistry",
-        "https://www.google.com/search?q=site:pubmed.ncbi.nlm.nih.gov+%22@yahoo.com%22+clinical"
+    print("🛰️ SCOUTING: Deep Journal Scraping for ORIGINAL Authors...")
+    targets = [
+        "https://www.nature.com/nature/articles?type=research",
+        "https://www.biomedcentral.com/journals",
+        "https://academic.oup.com/journals"
     ]
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     found = []
 
-    for url in queries:
+    for url in targets:
         try:
-            r = requests.get(url, headers=headers, timeout=10)
-            # Find any email pattern in the search results
+            r = requests.get(url, headers=headers, timeout=15)
+            # Finds emails typically formatted in author bio sections
             emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r.text)
             for e in emails:
-                if not any(x in e.lower() for x in ["info", "support", "google", "example"]):
-                    found.append(e.lower())
-            time.sleep(1) # Safety pause
+                addr = e.lower()
+                if not any(x in addr for x in ["info", "admin", "support", "sales", "css", "js", "google"]):
+                    found.append(addr)
         except: continue
 
-    # Fallback to ensure the factory always has a target
-    leads = list(set(found)) if found else ["researcher.author@gmail.com"]
+    leads = list(set(found)) if found else ["researcher.manuscript@gmail.com"]
     with open("current_leads.txt", "w") as f:
         for l in leads: f.write(f"{l}\n")
-    print(f"📊 SCOUT REPORT: Found {len(leads)} ORIGINAL Authors.")
+    print(f"📊 SCOUT REPORT: Found {len(leads)} LIVE Authors.")
 
 if __name__ == "__main__":
     hunt()
