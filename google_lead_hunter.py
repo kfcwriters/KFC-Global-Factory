@@ -3,20 +3,18 @@ import re
 import random
 
 def hunt():
-    # Expanding keywords to ensure leads are found every run
-    keywords = ["Clinical+Biochemistry", "Laboratory+Quality", "Nephropathy", "Biomarkers", "Diabetes+Complications"]
-    target = random.choice(keywords)
-    page = random.randint(1, 50)
-    
-    print(f"🛰️ GLOBAL SCOUTING: Targeted PhD Sweep in [{target}] (Page {page})...")
-    url = f"https://doaj.org/api/v2/search/articles/{target}?pageSize=100&page={page}"
+    print("🛰️ GLOBAL SCOUTING: All Specialty Sweep...")
+    # Using a broader query and random page to force new leads
+    page = random.randint(1, 40)
+    url = f"https://doaj.org/api/v2/search/articles/Medicine?pageSize=100&page={page}"
 
     try:
         r = requests.get(url, timeout=20)
+        # Pulling every email from the global medical database
         emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r.text)
         
-        # Filter duplicates and institutional generic mailboxes
-        clean = list(set([e.lower() for e in emails if not any(x in e.lower() for x in ["doaj", "info", "support", "noreply"])]))
+        # Filter for unique addresses, ignoring common platform emails
+        clean = list(set([e.lower() for e in emails if "doaj" not in e.lower()]))
         
         if clean:
             selected = clean[:20]
