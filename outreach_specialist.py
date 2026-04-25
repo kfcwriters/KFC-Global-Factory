@@ -1,4 +1,5 @@
 import os
+import os
 import smtplib
 from email.message import EmailMessage
 
@@ -11,12 +12,12 @@ def run_outreach():
     with open("current_leads.txt", "r") as f:
         leads = [line.strip() for line in f.readlines()]
 
-    print(f"📧 Launching outreach to {len(leads)} researchers...")
+    print(f"📧 Launching outreach to {len(leads)} Open Access researchers...")
     
     for addr in leads:
         try:
             msg = EmailMessage()
-            msg['Subject'] = "PhD Collaboration: Analytical Quality & Sigma Metrics"
+            msg['Subject'] = "PhD Collaboration: Analytical Quality & Sigma Metrics Assistance"
             msg['From'] = "kfcwriters@gmail.com"
             msg['To'] = addr
             msg.set_content(f"Dear Dr. Researcher,\n\nI offer PhD-level support in Clinical Biochemistry and Sigma Metrics for your manuscripts indexed in DOAJ/Copernicus.\n\nBest,\nKFC Lab")
