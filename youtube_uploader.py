@@ -18,24 +18,22 @@ def get_random_cbme_topic():
 def render_720p(topic):
     print(f"🎬 FFmpeg: Force-Rendering 30s Visual Script for {topic['title']}...")
     
-    # Path to the guaranteed font on GitHub Actions runners
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    
-    # Force duration 30s, add professional medical hum, and FORCE visible text
+    # We use 'sans' which is a universal alias, avoiding path errors
+    # We use 'sine=f=50' to create a deep, low medical background hum (no beep)
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=30", # Dark Medical Blue
-        "-f", "lavfi", "-i", "cosinetone=f=150:d=30", # Deep Medical Hum (No Beeps)
-        "-vf", f"drawtext=fontfile={font_path}:text='CBME SERIES\: {topic['title']}':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=150,"
-               f"drawtext=fontfile={font_path}:text='{topic['sub']}':fontcolor=yellow:fontsize=38:x=(w-text_w)/2:y=350,"
-               f"drawtext=fontfile={font_path}:text='KFC LAB\: PhD RESEARCH SUPPORT':fontcolor=white:fontsize=30:x=(w-text_w)/2:y=600",
+        "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=30",
+        "-f", "lavfi", "-i", "sine=f=50:d=30", 
+        "-vf", f"drawtext=font='sans':text='CBME SERIES\: {topic['title']}':fontcolor=white:fontsize=50:x=(w-text_w)/2:y=150,"
+               f"drawtext=font='sans':text='{topic['sub']}':fontcolor=yellow:fontsize=35:x=(w-text_w)/2:y=350,"
+               f"drawtext=font='sans':text='KFC LAB\: PhD RESEARCH SUPPORT':fontcolor=white:fontsize=30:x=(w-text_w)/2:y=600",
         "-c:v", "libx264", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k", "-shortest",
         "medical_cbme.mp4"
     ]
     
     subprocess.run(cmd, check=True)
-    print("✅ Video/Audio/Script Layered and Synchronized.")
+    print("✅ High-Quality Medical Asset Synchronized.")
 
 def upload(topic):
     token = os.getenv('YOUTUBE_REFRESH_TOKEN')
@@ -43,7 +41,7 @@ def upload(topic):
     client_secret = os.getenv('CLIENT_SECRET')
 
     if not all([token, client_id, client_secret]):
-        print("⚠️ Missing Secrets.")
+        print("⚠️ Missing Secrets in GitHub Vault.")
         return
 
     creds = Credentials(None, refresh_token=token, token_uri="https://oauth2.googleapis.com/token",
@@ -55,7 +53,7 @@ def upload(topic):
         body={
             "snippet": {
                 "title": f"CBME Medical Series: {topic['title']}",
-                "description": f"Curriculum review: {topic['sub']}. Professional PhD support by KFC Lab.",
+                "description": f"Curriculum review: {topic['sub']}. PhD-level manuscript support by KFC Lab.",
                 "categoryId": "27"
             },
             "status": {"privacyStatus": "public"}
@@ -63,7 +61,7 @@ def upload(topic):
         media_body=MediaFileUpload("medical_cbme.mp4")
     )
     request.execute()
-    print(f"✅ Published with Visuals: {topic['title']}")
+    print(f"✅ Published: {topic['title']}")
 
 if __name__ == "__main__":
     current_topic = get_random_cbme_topic()
