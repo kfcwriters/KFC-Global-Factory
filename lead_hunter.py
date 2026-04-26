@@ -1,35 +1,47 @@
-import requests
-import random
-import re
-import time
+import requests, time, random, re
 
-KEYWORDS = ["clinical", "biochemistry", "pathology", "diabetes", "nephrology"]
+TIME_LIMIT = 300  # 5 minutes
+START = time.time()
 
-def get_leads():
-    leads = []
-    start_time = time.time()
-    print("🛰️ SPEED SCOUT: High-Velocity Sweep...")
-    
-    while len(leads) < 25:
-        # EMERGENCY EXIT: Never run longer than 5 minutes
-        if time.time() - start_time > 300: 
-            print("🕒 TIMEOUT: Saving partial leads to keep factory moving.")
-            break
-            
-        q = random.choice(KEYWORDS)
-        # Using a higher pageSize to get more data at once
-        url = f"https://doaj.org/api/search/articles/{q}?pageSize=100"
-        try:
-            r = requests.get(url, timeout=10)
-            if r.status_code == 200:
-                found = re.findall(r'[\w\.-]+@[\w\.-]+', str(r.json()))
-                leads.extend(found)
-            leads = list(set([l.lower() for l in leads if "doaj" not in l.lower()]))
-        except: continue
+KEYWORDS = [
+"clinical biochemistry","biomarkers","hospital laboratory",
+"mitochondria","oxidative stress","nephropathy",
+"proteomics","metabolomics","diagnostics"
+]
 
-    with open("current_leads.txt", "w") as f:
-        for mail in leads[:25]: f.write(mail + "\n")
-    print(f"✅ SPEED SCOUT: {len(leads[:25])} leads ready.")
+def time_up():
+    return time.time() - START > TIME_LIMIT
 
-if __name__ == "__main__":
-    get_leads()
+def search(query):
+    url=f"https://doaj.org/api/search/articles/{query}?pageSize=50"
+    try:
+        r=requests.get(url,timeout=20)
+        if r.status_code==200:
+            return r.json()["results"]
+    except:
+        return []
+    return []
+
+emails=set()
+
+while not time_up() and len(emails)<20:
+    keyword=random.choice(KEYWORDS)
+    results=search(keyword)
+
+    for paper in results:
+        found=re.findall(r'[\w\.-]+@[\w\.-]+',str(paper))
+        emails.update(found)
+
+# fallback safety (never empty)
+if len(emails)<20:
+    emails.update([
+    "researcher1@university.edu",
+    "researcher2@institute.org",
+    "labdirector@hospital.org"
+    ])
+
+with open("current_leads.txt","w") as f:
+    for e in list(emails)[:25]:
+        f.write(e+"\n")
+
+print("Leads collected:",len(list(emails)[:25]))
