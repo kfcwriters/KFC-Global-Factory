@@ -16,13 +16,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick fonts-liberation
-          # CRITICAL: Unlock ImageMagick for Kinetic Typography
-          sudo sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/g' /etc/ImageMagick-6/policy.xml
-          sudo sed -i 's/rights="none" pattern="CAPTION"/rights="read|write" pattern="CAPTION"/g' /etc/ImageMagick-6/policy.xml
+          # NUCLEAR OPTION: Overwrite the restrictive policy with a permissive one
+          sudo convert -list policy
+          sudo sed -i 's/rights="none" pattern="path"/rights="read|write" pattern="path"/g' /etc/ImageMagick-6/policy.xml
+          sudo sed -i 's/rights="none" pattern="@\*"/rights="read|write" pattern="@\*"/g' /etc/ImageMagick-6/policy.xml
+          # Specific fix for the 'not allowed by security policy' error in image_3c1794.png
+          sudo sed -i '/<policy domain="path" rights="none" pattern="@\*"\/>/d' /etc/ImageMagick-6/policy.xml
 
       - name: Install Python Packages
-        run: |
-          pip install "moviepy==1.0.3" "pysrt" "requests" "gtts" "numpy<2.0.0" "imageio-ffmpeg"
+        run: pip install "moviepy==1.0.3" "pysrt" "requests" "gtts" "numpy<2.0.0"
 
       - name: Agent 01 - The Scout
         run: python3 lead_hunter.py
@@ -30,7 +32,7 @@ jobs:
       - name: Agent 02 - The Scholar
         run: python3 sigma_lecture_generator.py
 
-      - name: Agent 03 - The Scribe (Audio & SRT)
+      - name: Agent 03 - The Scribe
         run: |
           python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); gTTS(f.read()).save('voice.mp3')"
           python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{8*(i-1):02},000 --> 00:00:{8*i:02},000\nPHD RESEARCH: SIGMA METRICS\n\n') for i in range(1,40)]"
@@ -43,4 +45,4 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 KINETIC MASTERCLASS READY'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 MASTERCLASS READY'}, files={'video': f})"
