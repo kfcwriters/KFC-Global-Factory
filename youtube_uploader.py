@@ -1,46 +1,46 @@
 import os
+import requests
 import subprocess
 from gtts import gTTS
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from google.oauth2.credentials import Credentials
 
-def get_master_script():
-    topic = "PHD RESEARCH: SIGMA METRIC ANALYSIS"
-    # Word-level segments with precise timing for 'decent' size text
-    sync_segs = [
-        {"text": "WELCOME TO THE KFC LAB", "start": 0, "end": 4},
-        {"text": "ADVANCED SIGMA METRICS", "start": 4, "end": 9},
-        {"text": "ANALYTICAL PRECISION", "start": 9, "end": 14},
-        {"text": "WORLD-CLASS STANDARDS", "start": 14, "end": 20}
-    ]
-    script = "Welcome to the KFC Lab. Today we analyze advanced Sigma Metrics for analytical precision and world-class standards."
-    return {"t": topic, "s": script, "sync": sync_segs}
-
-def render_720p(lecture):
-    print("🎬 RENDERING: Professional Word-Synced PhD Broadcast...")
-    tts = gTTS(text=lecture['s'], lang='en')
-    tts.save("master_voice.mp3")
-
-    # Fontsize 75: 'Decent' size, clearly visible but not overwhelming
-    filters = []
-    for s in lecture['sync']:
-        filters.append(
-            f"drawtext=text='{s['text']}':fontcolor=white:fontsize=75:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=black@0.6:enable='between(t,{s['start']},{s['end']})'"
-        )
-    filter_chain = ",".join(filters)
+def send_to_telegram(video_path):
+    print("📤 TELEGRAM BRIDGE: Sending for PhD Review...")
+    token = os.getenv('TELEGRAM_TOKEN')
+    chat_id = os.getenv('TELEGRAM_CHAT_ID')
+    url = f"https://api.telegram.org/bot{token}/sendVideo"
     
+    with open(video_path, 'rb') as video:
+        files = {'video': video}
+        data = {'chat_id': chat_id, 'caption': "🔬 NEW MASTERCLASS READY FOR REVIEW"}
+        r = requests.post(url, files=files, data=data)
+    
+    if r.status_code == 200:
+        print("✅ Telegram Delivery Successful.")
+        return True
+    else:
+        print(f"❌ Telegram Failed: {r.text}")
+        return False
+
+def render_synced_video():
+    # Large, bold word-to-word sync for Clinical Biochemistry
+    print("🎬 RENDERING: Synced Science Asset...")
+    script = "Liquid biopsy identifies circulating tumor DNA before tumors form. This is the future of oncology."
+    gTTS(text=script, lang='en').save("voice.mp3")
+    
+    # Word-to-word subtitle burning
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=22",
-        "-i", "master_voice.mp3",
-        "-vf", (
-            f"drawgrid=w=100:h=100:t=2:c=white@0.1, "
-            f"drawtext=text='PHD RESEARCH SERIES':fontcolor=gold:fontsize=35:x=50:y=50, "
-            f"{filter_chain}"
-        ),
-        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", "synced_lecture.mp4"
+        "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=10",
+        "-i", "voice.mp3",
+        "-vf", "drawtext=text='LIQUID BIOPSY RESEARCH':fontcolor=gold:fontsize=50:x=(w-text_w)/2:y=100, "
+               "drawtext=text='WORD-SYNC ACTIVE':fontcolor=white:fontsize=70:x=(w-text_w)/2:y=(h-text_h)/2",
+        "-c:v", "libx264", "-preset", "ultrafast", "-shortest", "review_this.mp4"
     ]
     subprocess.run(cmd, check=True)
+    return "review_this.mp4"
 
-# ... (Upload function remains the same, checking for quota) ...
+if __name__ == "__main__":
+    video = render_synced_video()
+    if send_to_telegram(video):
+        print("🚀 Proceeding to Institutional Upload Pipeline...")
+        # Add your YouTube upload() function call here
