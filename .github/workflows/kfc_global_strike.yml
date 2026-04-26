@@ -16,9 +16,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick
-          # CRITICAL: Unlock ImageMagick for Kinetic Typography
+          # CRITICAL: Unlock ImageMagick for text rendering
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
-          pip install requests gtts moviepy pysrt
+          # Force stable version to prevent ModuleNotFound errors
+          pip install requests gtts pysrt
+          pip install moviepy==1.0.3
 
       - name: Agent 01 - The Scout
         run: python3 lead_hunter.py
@@ -39,4 +41,4 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 KINETIC PHD MASTERCLASS READY'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 KINETIC MASTERCLASS READY'}, files={'video': f})"
