@@ -1,19 +1,17 @@
-import os
 import PIL.Image
-
-# --- THE PILLOW PATCH (Fixes image_3baf6e.jpg) ---
+# PILLOW COMPATIBILITY PATCH
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
-# ------------------------------------------------
 
 from moviepy.editor import ColorClip, TextClip, CompositeVideoClip, AudioFileClip
 import pysrt
+import os
 
 WIDTH, HEIGHT = 1280, 720 
 NAVY_BLUE = (11, 29, 58)
 
 def render():
-    print("🎬 DIRECTOR: Applying Pillow Patch and Rendering...")
+    print("🎬 DIRECTOR: Starting Kinetic Render...")
     
     if not os.path.exists("voice.mp3") or not os.path.exists("subtitles.srt"):
         print("❌ Error: Missing assets.")
@@ -41,14 +39,14 @@ def render():
               .fadein(0.2)
               .fadeout(0.2))
         
-        # Kinetic Zoom
+        # Kinetic Zoom for "Non-Frozen" Perception
         txt = txt.resize(lambda t: 1 + 0.02 * t)
         subtitle_clips.append(txt)
 
     final = CompositeVideoClip([bg] + subtitle_clips)
     final = final.set_audio(audio)
     final.write_videofile("final_video.mp4", fps=24, codec="libx264", preset="ultrafast")
-    print("✅ DIRECTOR: Success! Kinetic Video Ready.")
+    print("✅ DIRECTOR: Kinetic Video Ready.")
 
 if __name__ == "__main__":
     render()
