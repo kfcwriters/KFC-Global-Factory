@@ -1,31 +1,42 @@
-name: 24-7 KFC Global Synthetic Factory
+name: 24-7 KFC Global Synthetic Factory (Emperor v1.0)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *' # Optimized to run every 6 hours to avoid Quota limits
+    - cron: '0 */6 * * *'
 
 jobs:
-  medical-industrial-strike:
+  emperor-pipeline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Institutional Environment Setup
+      - name: System Initialization
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests gtts google-api-python-client google-auth-oauthlib
+          pip install requests gtts openai-whisper
 
-      - name: Execute Broad-Spectrum Outreach & Telegram Delivery
+      - name: Agent 01: The Scout (Lead Hunter)
         env:
-          # CRITICAL: These must match your GitHub Secret names exactly
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+        run: python3 lead_hunter.py
+
+      - name: Agent 02: The Scholar (Script Generator)
+        run: python3 script_generator.py
+
+      - name: Agent 03: The Voice & Scribe (TTS & Subtitles)
+        run: |
+          # Uses the 800-900 word script to generate audio
+          python3 generate_voice.py 
+          # Generates the word-for-word synced SRT
+          python3 generate_subtitles.py
+
+      - name: Agent 04: The Director (Video Renderer)
+        run: python3 render_video.py
+
+      - name: Agent 05: The Courier (Telegram & YouTube)
+        env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # YouTube Credentials (for when quota resets)
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-        run: |
-          python3 google_lead_hunter.py
-          python3 youtube_uploader.py
+        run: python3 telegram_courier.py
