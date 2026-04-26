@@ -28,9 +28,7 @@ jobs:
 
       - name: Agent 03 - The Scribe (Audio & SRT)
         run: |
-          # Generate 5-minute Audio
           python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); gTTS(f.read()).save('voice.mp3')"
-          # Generate Timed SRT for Kinetic Animation
           python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{8*(i-1):02},000 --> 00:00:{8*i:02},000\nPHD RESEARCH: SIGMA METRICS\n\n') for i in range(1,40)]"
 
       - name: Agent 04 - The Motion Director
