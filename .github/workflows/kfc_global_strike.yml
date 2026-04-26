@@ -1,7 +1,44 @@
-- name: System Initialization
+name: 24-7 KFC Global Synthetic Factory
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  emperor-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: System Initialization
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick
-          # Fix ImageMagick policy to allow text rendering
+          # CRITICAL: Unlock ImageMagick for Kinetic Typography
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
           pip install requests gtts moviepy pysrt
+
+      - name: Agent 01 - The Scout
+        run: python3 lead_hunter.py
+
+      - name: Agent 02 - The Scholar
+        run: python3 sigma_lecture_generator.py
+
+      - name: Agent 03 - The Scribe (Audio & SRT)
+        run: |
+          # Generate 5-minute Audio
+          python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); gTTS(f.read()).save('voice.mp3')"
+          # Generate Timed SRT for Kinetic Animation
+          python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{8*(i-1):02},000 --> 00:00:{8*i:02},000\nPHD RESEARCH: SIGMA METRICS\n\n') for i in range(1,40)]"
+
+      - name: Agent 04 - The Motion Director
+        run: python3 animate_subtitles.py
+
+      - name: Agent 05 - The Courier
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 KINETIC PHD MASTERCLASS READY'}, files={'video': f})"
