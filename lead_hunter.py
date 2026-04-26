@@ -1,27 +1,35 @@
 import requests
 import random
 import re
+import time
 
-KEYWORDS = ["clinical biochemistry", "mitochondria proteostasis", "diabetic nephropathy", "sigma metrics"]
+KEYWORDS = ["clinical", "biochemistry", "pathology", "diabetes", "nephrology"]
 
 def get_leads():
     leads = []
-    print("🛰️ SCOUT: Starting Universal Medical Sweep...")
+    start_time = time.time()
+    print("🛰️ SPEED SCOUT: High-Velocity Sweep...")
+    
     while len(leads) < 25:
+        # EMERGENCY EXIT: Never run longer than 5 minutes
+        if time.time() - start_time > 300: 
+            print("🕒 TIMEOUT: Saving partial leads to keep factory moving.")
+            break
+            
         q = random.choice(KEYWORDS)
-        url = f"https://doaj.org/api/search/articles/{q}?pageSize=50"
+        # Using a higher pageSize to get more data at once
+        url = f"https://doaj.org/api/search/articles/{q}?pageSize=100"
         try:
-            r = requests.get(url, timeout=20)
+            r = requests.get(url, timeout=10)
             if r.status_code == 200:
-                # Extracting emails from the raw response
                 found = re.findall(r'[\w\.-]+@[\w\.-]+', str(r.json()))
                 leads.extend(found)
-            leads = list(set(leads)) # Unique emails only
+            leads = list(set([l.lower() for l in leads if "doaj" not in l.lower()]))
         except: continue
 
     with open("current_leads.txt", "w") as f:
         for mail in leads[:25]: f.write(mail + "\n")
-    print(f"✅ SCOUT: Identified {len(leads[:25])} Research Specialists.")
+    print(f"✅ SPEED SCOUT: {len(leads[:25])} leads ready.")
 
 if __name__ == "__main__":
     get_leads()
