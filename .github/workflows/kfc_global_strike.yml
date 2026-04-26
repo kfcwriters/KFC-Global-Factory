@@ -1,4 +1,4 @@
-name: 24-7 KFC Global Synthetic Factory (Emperor v1.0)
+name: 24-7 KFC Global Synthetic Factory
 
 on:
   workflow_dispatch:
@@ -9,34 +9,30 @@ jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: System Initialization
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests gtts openai-whisper
+          pip install requests gtts
 
-      - name: Agent 01: The Scout (Lead Hunter)
-        env:
-          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+      - name: Agent 01 - The Scout
         run: python3 lead_hunter.py
 
-      - name: Agent 02: The Scholar (Script Generator)
+      - name: Agent 02 - The Scholar
         run: python3 script_generator.py
 
-      - name: Agent 03: The Voice & Scribe (TTS & Subtitles)
+      - name: Agent 03 - The Scribe
         run: |
-          # Uses the 800-900 word script to generate audio
-          python3 generate_voice.py 
-          # Generates the word-for-word synced SRT
+          python3 generate_voice.py
           python3 generate_subtitles.py
 
-      - name: Agent 04: The Director (Video Renderer)
+      - name: Agent 04 - The Director
         run: python3 render_video.py
 
-      - name: Agent 05: The Courier (Telegram & YouTube)
+      - name: Agent 05 - The Courier
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python3 telegram_courier.py
