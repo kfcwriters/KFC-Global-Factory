@@ -12,15 +12,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: System Initialization
+      - name: Install Video Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick
-          # CRITICAL: Unlock ImageMagick for text rendering
-          sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
-          # Force stable version to prevent ModuleNotFound errors
-          pip install requests gtts pysrt
-          pip install moviepy==1.0.3
+          sudo apt-get install -y ffmpeg imagemagick fonts-liberation
+          # CRITICAL: Unlock ImageMagick Policy for Text Rendering
+          sudo sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/' /etc/ImageMagick-6/policy.xml
+          sudo sed -i 's/rights="none" pattern="CAPTION"/rights="read|write" pattern="CAPTION"/' /etc/ImageMagick-6/policy.xml
+
+      - name: Install Python Packages
+        run: pip install moviepy==1.0.3 pysrt requests gtts numpy<2.0.0
 
       - name: Agent 01 - The Scout
         run: python3 lead_hunter.py
