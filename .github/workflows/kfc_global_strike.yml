@@ -3,7 +3,7 @@ name: 24-7 KFC Global Synthetic Factory
 on:
   workflow_dispatch:
   schedule:
-    - cron: '5 * * * *'
+    - cron: '0 */6 * * *' # Optimized to run every 6 hours to avoid Quota limits
 
 jobs:
   medical-industrial-strike:
@@ -14,15 +14,18 @@ jobs:
       - name: Institutional Environment Setup
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install requests google-api-python-client google-auth-oauthlib gtts
+          pip install requests gtts google-api-python-client google-auth-oauthlib
 
-      - name: Execute Broad-Spectrum Outreach & 720p Upload
+      - name: Execute Broad-Spectrum Outreach & Telegram Delivery
         env:
+          # CRITICAL: These must match your GitHub Secret names exactly
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # YouTube Credentials (for when quota resets)
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
         run: |
           python3 google_lead_hunter.py
-          python3 outreach_specialist.py
           python3 youtube_uploader.py
