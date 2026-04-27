@@ -1,43 +1,55 @@
 from manim import *
 import os
 
+config.pixel_height = 720
+config.pixel_width = 1280
+config.frame_rate = 30
+
 class TeachingMasterclass(Scene):
     def construct(self):
-        # 1. Institutional Background
-        self.camera.background_color = "#0B1D3A" # Navy Blue
+        self.camera.background_color = "#0B1D3A"
         
-        # 2. Load the PhD Script
-        if not os.path.exists("lecture_script.txt"):
-            text_to_say = "Welcome to the PhD Masterclass on Clinical Biochemistry."
-        else:
-            with open("lecture_script.txt", "r") as f:
-                text_to_say = f.read()[:500] # Focus on the key intro
+        # 1. FIXED HEADER
+        title = Text("CLINICAL BIOCHEMISTRY", color=WHITE, weight=BOLD).scale(1.0).to_edge(UP, buff=0.5)
+        subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.6).next_to(title, DOWN)
+        header_group = VGroup(title, subtitle).fix_in_frame()
+        self.add(header_group)
 
-        # 3. Create Teaching Typography
-        title = Text("CLINICAL BIOCHEMISTRY", font="Arial", weight=BOLD).scale(1.2).to_edge(UP)
-        subtitle = Text("Sigma Metrics & Quality Management", font="Arial", color=YELLOW).scale(0.8).next_to(title, DOWN)
+        # 2. THE LONG SCRIPT (Teleprompter Style)
+        try:
+            with open('lecture_script.txt', 'r') as f:
+                full_content = f.read()
+        except:
+            full_content = "Research assets missing. Please check the Scholar Agent output."
+
+        # We break the text into small paragraphs so it fits the width (Line Wrapping)
+        body_text = Paragraph(
+            full_content, 
+            alignment="center", 
+            line_spacing=1.5,
+            width=11 # This prevents the 'Cutting' seen in your screenshot
+        ).scale(0.6)
         
-        main_content = Paragraph(
-            text_to_say, 
-            line_spacing=1.5, 
-            alignment="center"
-        ).scale(0.6).shift(DOWN*0.5)
+        # Position text at the bottom to start scrolling up
+        body_text.next_to(header_group, DOWN, buff=1).to_edge(DOWN, buff=-10)
 
-        # 4. PROFESSOR ANIMATION
-        self.play(Write(title))
-        self.play(FadeIn(subtitle, shift=UP))
+        # 3. DURATION CALCULATION
+        # A 1500-word script usually takes about 4 minutes (240 seconds)
+        # We will scroll the text over the full length of the lecture
+        total_time = 240 
+
+        # 4. THE ANIMATION
+        self.play(Write(header_group), run_time=2)
         self.wait(1)
         
-        # This draws the text word-by-word like a real teacher
-        self.play(AddTextLetterByLetter(main_content), run_time=10)
-        self.wait(2)
+        # Scrolling effect: Moves the long text from bottom to top
+        self.play(
+            body_text.animate.shift(UP * 25), # Adjust '25' based on script length
+            run_time=total_time,
+            rate_func=linear
+        )
         
-        # 5. Outro
-        self.play(FadeOut(main_content))
-        final_note = Text("RESEARCH CONTINUES...", color=YELLOW).scale(1.2)
-        self.play(GrowFromCenter(final_note))
         self.wait(2)
 
 if __name__ == "__main__":
-    # Internal command to render the video
-    os.system("manim -pql animate_subtitles.py TeachingMasterclass")
+    os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
