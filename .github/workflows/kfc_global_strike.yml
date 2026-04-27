@@ -2,8 +2,6 @@ name: 24-7 KFC Global Synthetic Factory
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 */6 * * *'
 
 jobs:
   emperor-pipeline:
@@ -12,61 +10,42 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Video Dependencies
+      - name: System Initialization & Security Unlock
         run: |
           sudo apt-get update
-          # Ghostscript is required to 'draw' the text onto the video frames
           sudo apt-get install -y ffmpeg imagemagick ghostscript fonts-liberation
           
-          # CRITICAL: Overwrite the restrictive security policy
-          # This allows the AI to use 'LABEL' and 'CAPTION' methods for teaching subtitles
-          sudo sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/g' /etc/ImageMagick-6/policy.xml
-          sudo sed -i 's/rights="none" pattern="CAPTION"/rights="read|write" pattern="CAPTION"/g' /etc/ImageMagick-6/policy.xml
-          sudo sed -i 's/rights="none" pattern="path"/rights="read|write" pattern="path"/g' /etc/ImageMagick-6/policy.xml
-          sudo sed -i '/<policy domain="path" rights="none" pattern="@\*"\/>/d' /etc/ImageMagick-6/policy.xml
+          # NUCLEAR UNLOCK: Overwrite the entire policy file to allow everything
+          cat <<EOF | sudo tee /etc/ImageMagick-6/policy.xml
+          <policymap>
+            <policy domain="coder" rights="read|write" pattern="*" />
+            <policy domain="path" rights="read|write" pattern="*" />
+            <policy domain="resource" name="memory" value="2GiB"/>
+            <policy domain="resource" name="map" value="4GiB"/>
+            <policy domain="resource" name="width" value="10KP"/>
+            <policy domain="resource" name="height" value="10KP"/>
+          </policymap>
+          EOF
 
       - name: Install Python Packages
         run: |
-          pip install requests gtts pysrt Pillow imageio-ffmpeg
-          pip install "numpy<2.0.0"
-          pip install moviepy==1.0.3
+          pip install requests gtts pysrt Pillow "moviepy==1.0.3" "numpy<2.0.0"
 
-      - name: Agent 01 - The Scout
-        run: python3 lead_hunter.py
-
-      - name: Agent 02 - The Scholar
-        run: python3 sigma_lecture_generator.py
-
-      - name: Agent 03 - The Scribe (Audio & SRT)
+      - name: Agent 01-03 (Scout, Scholar, Scribe)
         run: |
-          python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); gTTS(f.read()).save('voice.mp3')"
-          # Generate basic timed SRT if your script doesn't produce one
-          python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{8*(i-1):02},000 --> 00:00:{8*i:02},000\nPHD RESEARCH: SIGMA METRICS\n\n') for i in range(1,40)]"
+          python3 lead_hunter.py
+          python3 sigma_lecture_generator.py
+          # Force a 3.5 minute limit on the audio generation
+          python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); text=f.read()[:2500]; gTTS(text).save('voice.mp3')"
+          python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{5*(i-1):02},000 --> 00:00:{5*i:02},000\nPHD RESEARCH STEP {i}\n\n') for i in range(1,41)]"
 
       - name: Agent 04 - The Motion Director
         run: python3 animate_subtitles.py
 
-      - name: Agent 05 - The Courier (Cloud Storage)
-        uses: actions/upload-artifact@v4
-        with:
-          name: hq-teaching-video
-          path: final_video.mp4
-
-      - name: Agent 06 - The Telegram Courier (Split Delivery)
+      - name: Agent 05 - The Courier
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Compress and split to ensure Telegram delivery
-          ffmpeg -i final_video.mp4 -vcodec libx265 -crf 28 compressed_video.mp4
-          ffmpeg -i compressed_video.mp4 -c copy -map 0 -segment_time 00:03:00 -f segment part_%03d.mp4
-          
-          python3 -c "
-          import os, requests, glob
-          token = os.getenv('TELEGRAM_TOKEN')
-          chat_id = os.getenv('TELEGRAM_CHAT_ID')
-          for part in sorted(glob.glob('part_*.mp4')):
-              url = f'https://api.telegram.org/bot{token}/sendVideo'
-              with open(part, 'rb') as f:
-                  requests.post(url, data={'chat_id': chat_id, 'caption': f'🎬 Teaching Part: {part}'}, files={'video': f})
-          "
+          # Send directly; at 3 mins, it will be under 50MB
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🎬 3-MINUTE MASTERCLASS READY'}, files={'video': f})"
