@@ -1,50 +1,55 @@
 from manim import *
 import os
 
+# Global configuration for speed and stability
 config.pixel_height = 720
 config.pixel_width = 1280
 config.frame_rate = 30
 
 class TeachingMasterclass(Scene):
     def construct(self):
+        # 1. Background Setup
         self.camera.background_color = "#0B1D3A"
         
-        # 1. FIXED HEADER
-        title = Text("CLINICAL BIOCHEMISTRY", color=WHITE, weight=BOLD).scale(1.0).to_edge(UP, buff=0.5)
-        subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.6).next_to(title, DOWN)
-        header_group = VGroup(title, subtitle).fix_in_frame()
+        # 2. FIXED HEADER (Removed the 'fix_in_frame' error)
+        title = Text("CLINICAL BIOCHEMISTRY", color=WHITE, weight=BOLD).scale(0.9)
+        subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.6)
+        header_group = VGroup(title, subtitle).arrange(DOWN, buff=0.2).to_edge(UP, buff=0.5)
+        
+        # We add the header to the scene immediately
         self.add(header_group)
 
-        # 2. THE LONG SCRIPT (Teleprompter Style)
+        # 3. LOADING THE LONG SCRIPT
         try:
             with open('lecture_script.txt', 'r') as f:
                 full_content = f.read()
         except:
-            full_content = "Research assets missing. Please check the Scholar Agent output."
+            full_content = "Academic assets missing. Initializing laboratory protocol simulation..."
 
-        # We break the text into small paragraphs so it fits the width (Line Wrapping)
+        # 4. TELEPROMPTER BODY
+        # 'line_spacing' and 'width' ensure it fits within the screen borders
         body_text = Paragraph(
             full_content, 
             alignment="center", 
             line_spacing=1.5,
-            width=11 # This prevents the 'Cutting' seen in your screenshot
+            width=11 
         ).scale(0.6)
         
-        # Position text at the bottom to start scrolling up
-        body_text.next_to(header_group, DOWN, buff=1).to_edge(DOWN, buff=-10)
+        # Position starting point just below the header
+        body_text.next_to(header_group, DOWN, buff=1)
 
-        # 3. DURATION CALCULATION
-        # A 1500-word script usually takes about 4 minutes (240 seconds)
-        # We will scroll the text over the full length of the lecture
+        # 5. DURATION CALCULATION
+        # Match this to your actual audio length (e.g., 240 seconds for 4 minutes)
         total_time = 240 
 
-        # 4. THE ANIMATION
+        # 6. THE ANIMATION
         self.play(Write(header_group), run_time=2)
         self.wait(1)
         
-        # Scrolling effect: Moves the long text from bottom to top
+        # Smooth Scroll: Moves the text from bottom to top
+        # We move it UP by a factor of its own height to ensure every line is seen
         self.play(
-            body_text.animate.shift(UP * 25), # Adjust '25' based on script length
+            body_text.animate.shift(UP * (body_text.height + 2)), 
             run_time=total_time,
             rate_func=linear
         )
@@ -52,4 +57,5 @@ class TeachingMasterclass(Scene):
         self.wait(2)
 
 if __name__ == "__main__":
+    # Internal render command
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
