@@ -15,8 +15,11 @@ jobs:
       - name: Install Video Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick fonts-liberation
-          # NUCLEAR SECURITY UNLOCK
+          # Ghostscript is required to 'draw' the text onto the video frames
+          sudo apt-get install -y ffmpeg imagemagick ghostscript fonts-liberation
+          
+          # CRITICAL: Overwrite the restrictive security policy
+          # This allows the AI to use 'LABEL' and 'CAPTION' methods for teaching subtitles
           sudo sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/g' /etc/ImageMagick-6/policy.xml
           sudo sed -i 's/rights="none" pattern="CAPTION"/rights="read|write" pattern="CAPTION"/g' /etc/ImageMagick-6/policy.xml
           sudo sed -i 's/rights="none" pattern="path"/rights="read|write" pattern="path"/g' /etc/ImageMagick-6/policy.xml
@@ -24,7 +27,9 @@ jobs:
 
       - name: Install Python Packages
         run: |
-          pip install requests gtts pysrt "moviepy==1.0.3" "numpy<2.0.0" imageio-ffmpeg Pillow
+          pip install requests gtts pysrt Pillow imageio-ffmpeg
+          pip install "numpy<2.0.0"
+          pip install moviepy==1.0.3
 
       - name: Agent 01 - The Scout
         run: python3 lead_hunter.py
@@ -35,6 +40,7 @@ jobs:
       - name: Agent 03 - The Scribe (Audio & SRT)
         run: |
           python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); gTTS(f.read()).save('voice.mp3')"
+          # Generate basic timed SRT if your script doesn't produce one
           python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{8*(i-1):02},000 --> 00:00:{8*i:02},000\nPHD RESEARCH: SIGMA METRICS\n\n') for i in range(1,40)]"
 
       - name: Agent 04 - The Motion Director
@@ -43,14 +49,24 @@ jobs:
       - name: Agent 05 - The Courier (Cloud Storage)
         uses: actions/upload-artifact@v4
         with:
-          name: phd-masterclass-hq
+          name: hq-teaching-video
           path: final_video.mp4
 
-      - name: Agent 06 - The Telegram Courier (Mobile Version)
+      - name: Agent 06 - The Telegram Courier (Split Delivery)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Compress to ensure it's under 50MB for Telegram
-          ffmpeg -i final_video.mp4 -vcodec libx265 -crf 28 mobile_video.mp4
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('mobile_video.mp4','rb'); r=requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 MOBILE MASTERCLASS READY. HQ version is in GitHub Artifacts.'}, files={'video': f}); print(r.text)"
+          # Compress and split to ensure Telegram delivery
+          ffmpeg -i final_video.mp4 -vcodec libx265 -crf 28 compressed_video.mp4
+          ffmpeg -i compressed_video.mp4 -c copy -map 0 -segment_time 00:03:00 -f segment part_%03d.mp4
+          
+          python3 -c "
+          import os, requests, glob
+          token = os.getenv('TELEGRAM_TOKEN')
+          chat_id = os.getenv('TELEGRAM_CHAT_ID')
+          for part in sorted(glob.glob('part_*.mp4')):
+              url = f'https://api.telegram.org/bot{token}/sendVideo'
+              with open(part, 'rb') as f:
+                  requests.post(url, data={'chat_id': chat_id, 'caption': f'🎬 Teaching Part: {part}'}, files={'video': f})
+          "
