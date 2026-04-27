@@ -7,18 +7,13 @@ from moviepy.editor import ColorClip, TextClip, CompositeVideoClip, AudioFileCli
 from moviepy.config import change_settings
 import pysrt
 
-# Mandatory Binary Path for GitHub Runners
+# Force Path
 change_settings({"IMAGEMAGICK_BINARY": "/usr/bin/convert"})
 
-def render_teaching_video():
-    print("🎓 PROFESSOR AGENT: Rendering Educational Masterclass...")
+def render():
+    print("🎬 STARTING 3-MINUTE TEACHING RENDER...")
     
-    if not os.path.exists("voice.mp3"):
-        print("❌ Error: Voice file missing.")
-        return
-
-    audio = AudioFileClip("voice.mp3")
-    # Using 'Institutional Navy' for the background
+    audio = AudioFileClip("voice.mp3").subclip(0, 210) # Cap at 3.5 minutes
     bg = ColorClip((1280, 720), color=(11, 29, 58), duration=audio.duration)
     
     subs = pysrt.open("subtitles.srt")
@@ -26,40 +21,25 @@ def render_teaching_video():
 
     for sub in subs:
         start = sub.start.ordinal / 1000
-        end = sub.end.ordinal / 1000
+        if start >= audio.duration: break
+        end = min(sub.end.ordinal / 1000, audio.duration)
         
-        # --- THE TEACHING STYLE UI ---
-        # We add a 'bg_color' to create a high-contrast box around the text
+        # TEACHING STYLE: White text on a semi-transparent black bar
         txt = (TextClip(sub.text,
-                fontsize=45,
+                fontsize=40,
                 color='white',
                 font='Liberation-Sans-Bold',
                 method='caption',
-                size=(1000, None),
-                align='center',
-                bg_color='rgba(0,0,0,0.5)') # 50% transparent black box
+                size=(1100, None),
+                bg_color='rgba(0,0,0,0.6)') 
               .set_start(start)
               .set_duration(end - start)
-              .set_position(('center', 600)) # Positioned at the bottom third
-              .fadein(0.15))
-        
-        # ADDING MOTION: A subtle zoom makes the 'teaching' feel active
-        txt = txt.resize(lambda t: 1 + 0.01*t)
+              .set_position(('center', 550))) # Bottom-center
         
         subtitle_clips.append(txt)
 
-    # Adding a 'Title Card' at the start for professionalism
-    title = (TextClip("CLINICAL BIOCHEMISTRY:\nSIGMA METRICS MASTERCLASS", 
-             fontsize=70, color='yellow', font='Liberation-Sans-Bold')
-             .set_duration(4)
-             .set_position('center')
-             .fadeout(1))
-
-    final = CompositeVideoClip([bg, title] + subtitle_clips)
-    final = final.set_audio(audio)
-    
-    final.write_videofile("final_video.mp4", fps=24, codec="libx264", preset="ultrafast")
-    print("✅ SUCCESS: Teaching video with high-contrast subtitles ready.")
+    final = CompositeVideoClip([bg] + subtitle_clips).set_audio(audio)
+    final.write_videofile("final_video.mp4", fps=20, codec="libx264", preset="ultrafast")
 
 if __name__ == "__main__":
-    render_teaching_video()
+    render()
