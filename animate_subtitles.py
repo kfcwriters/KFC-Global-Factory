@@ -1,65 +1,40 @@
 import os
-import PIL.Image
-if not hasattr(PIL.Image, 'ANTIALIAS'):
-    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+import subprocess
 
-from moviepy.editor import ColorClip, TextClip, CompositeVideoClip, AudioFileClip
-from moviepy.config import change_settings
-import pysrt
-
-change_settings({"IMAGEMAGICK_BINARY": "/usr/bin/convert"})
-
-def render_viral_video():
-    print("🎬 STARTING VIRAL YOUTUBE STYLE RENDER...")
+def render_teaching_video():
+    print("🎬 EMPIRE PROTOCOL: Starting FFmpeg-Direct Render...")
     
-    audio = AudioFileClip("voice.mp3")
-    max_duration = audio.duration
-    bg = ColorClip((1280, 720), color=(11, 29, 58), duration=max_duration)
+    # 1. Validation
+    if not os.path.exists("voice.mp3") or not os.path.exists("subtitles.srt"):
+        print("❌ Error: Missing assets.")
+        return
+
+    # 2. Get Audio Duration
+    cmd_dur = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
+    duration = subprocess.check_output(cmd_dur, shell=True).decode().strip()
     
-    subs = pysrt.open("subtitles.srt")
-    subtitle_clips = []
+    print(f"🔬 Video Length: {duration} seconds")
 
-    for i, sub in enumerate(subs):
-        start = sub.start.ordinal / 1000
-        if start >= max_duration: continue
-        end = min(sub.end.ordinal / 1000, max_duration)
-        
-        # --- THE 'STARTING' YOUTUBE STYLE (First 5 subtitles) ---
-        if i < 5:
-            # Big, Bold, Yellow Text for the Hook
-            txt = (TextClip(sub.text.upper(),
-                    fontsize=75,
-                    color='yellow',
-                    font='Liberation-Sans-Bold',
-                    method='caption',
-                    size=(1000, None),
-                    stroke_color='black',
-                    stroke_width=2) 
-                  .set_start(start)
-                  .set_duration(end - start)
-                  .set_position('center')
-                  .set_opacity(1.0))
-            
-            # Add a 'Pop-in' effect (Grow from 0 to 1)
-            txt = txt.resize(lambda t: 0.8 + 0.4*t if t < 0.2 else 1.0)
-            
-        # --- THE 'TEACHING' STYLE (Remaining subtitles) ---
-        else:
-            txt = (TextClip(sub.text,
-                    fontsize=45,
-                    color='white',
-                    font='Liberation-Sans-Bold',
-                    method='caption',
-                    size=(1100, None),
-                    bg_color='rgba(0,0,0,0.6)') 
-                  .set_start(start)
-                  .set_duration(end - start)
-                  .set_position(('center', 580)))
+    # 3. THE MAGIC COMMAND: 
+    # This creates a Navy Blue Background and 'Bakes' the SRT file into the video
+    # using the 'subtitles' filter. This avoids all ImageMagick errors.
+    
+    # Style: Yellow subtitles, Bold, Bottom-Center, with a Shadow
+    style = "FontSize=24,PrimaryColour=&H00FFFF,OutlineColour=&H000000,BorderStyle=3,Outline=1,Shadow=1,Alignment=2"
+    
+    cmd_render = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", f"color=c=0x0B1D3A:s=1280x720:d={duration}", # Navy Background
+        "-i", "voice.mp3", # Audio
+        "-vf", f"subtitles=subtitles.srt:force_style='{style}'", # The Professional Subtitles
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-shortest", "final_video.mp4"
+    ]
 
-        subtitle_clips.append(txt)
-
-    final = CompositeVideoClip([bg] + subtitle_clips).set_audio(audio).set_duration(max_duration)
-    final.write_videofile("final_video.mp4", fps=24, codec="libx264", preset="ultrafast")
+    print("🚀 Encoding Masterclass...")
+    subprocess.run(cmd_render)
+    print("✅ SUCCESS: Professional Video Created.")
 
 if __name__ == "__main__":
-    render_viral_video()
+    render_teaching_video()
