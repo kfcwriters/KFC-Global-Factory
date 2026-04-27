@@ -6,32 +6,46 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
+    # Extending timeout because 4-minute high-quality animation takes time
+    timeout-minutes: 30 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Professor Tools
+      - name: Install Academic Animation Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils libpng-dev libjpeg-dev
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils libpng-dev libjpeg-dev fonts-liberation
           pip install manim requests gtts
 
-      - name: Generate PhD Assets
+      - name: Generate PhD Content Assets
         run: |
           python3 lead_hunter.py
+          # Scholar must produce the full 1500-word lecture
           python3 sigma_lecture_generator.py
+          # Audio creation for the full script
           python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); text=f.read(); gTTS(text).save('voice.mp3')"
 
-      - name: Render Professional Animation
+      - name: Render Full-Length Teaching Video
         run: |
-          # We run Manim in 'Low Quality' first to ensure it passes the memory test
-          python3 animate_subtitles.py
+          # Render in Low Quality (480p) to ensure speed and delivery success
+          manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media
 
-      - name: Deliver Masterclass
+      - name: Deliver Full Masterclass
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # Locate the generated MP4 in the Manim media folder
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
-          if [ -z "$VIDEO_PATH" ]; then echo "Video not found"; exit 1; fi
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('$VIDEO_PATH','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 MANIM TEACHING VIDEO READY'}, files={'video': f})"
+          
+          if [ -z "$VIDEO_PATH" ]; then
+            echo "❌ ERROR: Video file not found!"
+            exit 1
+          fi
+          
+          # Compress slightly to ensure it slides under the 50MB Telegram limit
+          ffmpeg -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
+          
+          # Send to Telegram
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); r=requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL 4-MINUTE LECTURE READY'}, files={'video': f}); print(r.text)"
