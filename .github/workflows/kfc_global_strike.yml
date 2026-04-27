@@ -1,50 +1,65 @@
-name: 24-7 KFC Global Synthetic Factory
+import os
+import PIL.Image
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-on:
-  workflow_dispatch:
+from moviepy.editor import ColorClip, TextClip, CompositeVideoClip, AudioFileClip
+from moviepy.config import change_settings
+import pysrt
 
-jobs:
-  emperor-pipeline:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+change_settings({"IMAGEMAGICK_BINARY": "/usr/bin/convert"})
 
-      - name: System Initialization & Security Unlock
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick ghostscript fonts-liberation
-          
-          # Overwrite the policy to ensure visuals appear
-          cat <<EOF | sudo tee /etc/ImageMagick-6/policy.xml
-          <policymap>
-            <policy domain="coder" rights="read|write" pattern="*" />
-            <policy domain="path" rights="read|write" pattern="*" />
-            <policy domain="resource" name="memory" value="2GiB"/>
-            <policy domain="resource" name="map" value="4GiB"/>
-          </policymap>
-          EOF
+def render_viral_video():
+    print("🎬 STARTING VIRAL YOUTUBE STYLE RENDER...")
+    
+    audio = AudioFileClip("voice.mp3")
+    max_duration = audio.duration
+    bg = ColorClip((1280, 720), color=(11, 29, 58), duration=max_duration)
+    
+    subs = pysrt.open("subtitles.srt")
+    subtitle_clips = []
 
-      - name: Install Python Packages
-        run: |
-          pip install requests gtts pysrt Pillow "moviepy==1.0.3" "numpy<2.0.0"
+    for i, sub in enumerate(subs):
+        start = sub.start.ordinal / 1000
+        if start >= max_duration: continue
+        end = min(sub.end.ordinal / 1000, max_duration)
+        
+        # --- THE 'STARTING' YOUTUBE STYLE (First 5 subtitles) ---
+        if i < 5:
+            # Big, Bold, Yellow Text for the Hook
+            txt = (TextClip(sub.text.upper(),
+                    fontsize=75,
+                    color='yellow',
+                    font='Liberation-Sans-Bold',
+                    method='caption',
+                    size=(1000, None),
+                    stroke_color='black',
+                    stroke_width=2) 
+                  .set_start(start)
+                  .set_duration(end - start)
+                  .set_position('center')
+                  .set_opacity(1.0))
+            
+            # Add a 'Pop-in' effect (Grow from 0 to 1)
+            txt = txt.resize(lambda t: 0.8 + 0.4*t if t < 0.2 else 1.0)
+            
+        # --- THE 'TEACHING' STYLE (Remaining subtitles) ---
+        else:
+            txt = (TextClip(sub.text,
+                    fontsize=45,
+                    color='white',
+                    font='Liberation-Sans-Bold',
+                    method='caption',
+                    size=(1100, None),
+                    bg_color='rgba(0,0,0,0.6)') 
+                  .set_start(start)
+                  .set_duration(end - start)
+                  .set_position(('center', 580)))
 
-      - name: Agents 01-03 (Scout, Scholar, Scribe)
-        run: |
-          python3 lead_hunter.py
-          python3 sigma_lecture_generator.py
-          # Generate exactly what the Scholar wrote
-          python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); text=f.read(); gTTS(text).save('voice.mp3')"
-          # Syncing subtitles
-          python3 -c "f=open('subtitles.srt','w'); [f.write(f'{i}\n00:00:{5*(i-1):02},000 --> 00:00:{5*i:02},000\nTeaching Point {i}\n\n') for i in range(1,60)]"
+        subtitle_clips.append(txt)
 
-      - name: Agent 04 - The Motion Director
-        run: python3 animate_subtitles.py
+    final = CompositeVideoClip([bg] + subtitle_clips).set_audio(audio).set_duration(max_duration)
+    final.write_videofile("final_video.mp4", fps=24, codec="libx264", preset="ultrafast")
 
-      - name: Agent 05 - The Courier
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          # Split only if the file is massive, otherwise send directly
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS READY'}, files={'video': f})"
+if __name__ == "__main__":
+    render_viral_video()
