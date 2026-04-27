@@ -1,73 +1,65 @@
 import os
 import PIL.Image
-
-# --- THE PILLOW PATCH (CRITICAL FIX) ---
-# This fixes the 'AttributeError: module PIL.Image has no attribute ANTIALIAS'
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
-# ---------------------------------------
 
 from moviepy.editor import ColorClip, TextClip, CompositeVideoClip, AudioFileClip
+from moviepy.config import change_settings
 import pysrt
 
-# Video Specifications
-WIDTH, HEIGHT = 1280, 720 
-NAVY_BLUE = (11, 29, 58) # Institutional Deep Blue
+# Mandatory Binary Path for GitHub Runners
+change_settings({"IMAGEMAGICK_BINARY": "/usr/bin/convert"})
 
-def render_kinetic_video():
-    print("🎬 DIRECTOR: Initializing Kinetic Typography Engine...")
+def render_teaching_video():
+    print("🎓 PROFESSOR AGENT: Rendering Educational Masterclass...")
     
-    # Validation
-    if not os.path.exists("voice.mp3") or not os.path.exists("subtitles.srt"):
-        print("❌ Error: Assets missing. Ensure Agent 03 finished correctly.")
+    if not os.path.exists("voice.mp3"):
+        print("❌ Error: Voice file missing.")
         return
 
-    # Load Assets
     audio = AudioFileClip("voice.mp3")
-    background = ColorClip((WIDTH, HEIGHT), color=NAVY_BLUE, duration=audio.duration)
+    # Using 'Institutional Navy' for the background
+    bg = ColorClip((1280, 720), color=(11, 29, 58), duration=audio.duration)
     
     subs = pysrt.open("subtitles.srt")
     subtitle_clips = []
 
-    print(f"🔬 DIRECTOR: Processing {len(subs)} subtitle segments...")
-
     for sub in subs:
         start = sub.start.ordinal / 1000
         end = sub.end.ordinal / 1000
-        duration = end - start
         
-        # Create Text Layer
+        # --- THE TEACHING STYLE UI ---
+        # We add a 'bg_color' to create a high-contrast box around the text
         txt = (TextClip(sub.text,
-                fontsize=55,
+                fontsize=45,
                 color='white',
-                font='Liberation-Sans-Bold', # Standard Linux font
+                font='Liberation-Sans-Bold',
                 method='caption',
-                size=(int(WIDTH*0.8), None))
+                size=(1000, None),
+                align='center',
+                bg_color='rgba(0,0,0,0.5)') # 50% transparent black box
               .set_start(start)
-              .set_duration(duration)
-              .set_position(('center', 'center'))
-              .fadein(0.2)
-              .fadeout(0.2))
+              .set_duration(end - start)
+              .set_position(('center', 600)) # Positioned at the bottom third
+              .fadein(0.15))
         
-        # KINETIC ANIMATION: Subtle 2% zoom over time to keep the eye engaged
-        txt = txt.resize(lambda t: 1 + 0.02 * t)
+        # ADDING MOTION: A subtle zoom makes the 'teaching' feel active
+        txt = txt.resize(lambda t: 1 + 0.01*t)
         
         subtitle_clips.append(txt)
 
-    # Composite Layers: Background + All moving text clips
-    final_composition = CompositeVideoClip([background] + subtitle_clips)
-    final_composition = final_composition.set_audio(audio)
+    # Adding a 'Title Card' at the start for professionalism
+    title = (TextClip("CLINICAL BIOCHEMISTRY:\nSIGMA METRICS MASTERCLASS", 
+             fontsize=70, color='yellow', font='Liberation-Sans-Bold')
+             .set_duration(4)
+             .set_position('center')
+             .fadeout(1))
 
-    # Export Video
-    print("🎬 DIRECTOR: Encoding final master (ultrafast)...")
-    final_composition.write_videofile(
-        "final_video.mp4", 
-        fps=24, 
-        codec="libx264", 
-        preset="ultrafast",
-        audio_codec="aac"
-    )
-    print("✅ DIRECTOR: Asset 'final_video.mp4' is ready for Courier.")
+    final = CompositeVideoClip([bg, title] + subtitle_clips)
+    final = final.set_audio(audio)
+    
+    final.write_videofile("final_video.mp4", fps=24, codec="libx264", preset="ultrafast")
+    print("✅ SUCCESS: Teaching video with high-contrast subtitles ready.")
 
 if __name__ == "__main__":
-    render_kinetic_video()
+    render_teaching_video()
