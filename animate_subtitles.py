@@ -2,10 +2,10 @@ from manim import *
 import os
 import subprocess
 
-# ULTRA-LIGHT CONFIG: Designed to sneak through busy server queues
-config.pixel_height = 360 # Reduced resolution for maximum speed
-config.pixel_width = 640
-config.frame_rate = 10 
+# EMPEROR SPEED CONFIG
+config.pixel_height = 480 
+config.pixel_width = 854
+config.frame_rate = 15 
 config.verbosity = "ERROR" 
 
 class TeachingMasterclass(Scene):
@@ -19,35 +19,36 @@ class TeachingMasterclass(Scene):
         except:
             audio_duration = 300 
 
-        # 2. HEADERS
-        title = Text("CLINICAL BIOCHEMISTRY", weight=BOLD).scale(0.7).to_edge(UP, buff=0.2)
-        subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.4).next_to(title, DOWN, buff=0.1)
+        # 2. BRANDING
+        title = Text("CLINICAL BIOCHEMISTRY", weight=BOLD).scale(0.8).to_edge(UP, buff=0.3)
+        subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.5).next_to(title, DOWN)
         self.add(title, subtitle)
 
-        # 3. SCRIPT LOAD
+        # 3. LOAD 800-WORD SCRIPT
         with open('lecture_script.txt', 'r') as f:
             full_content = f.read()
 
-        # 4. FAST TELEPROMPTER
-        # Text with disable_ligatures=True uses the least possible RAM
-        body_text = Text(
-            full_content, 
-            font_size=24, 
-            line_spacing=1.8,
-            font="Monospace",
-            disable_ligatures=True 
-        ).scale(0.7)
+        # 4. THE TURBO SUBTITLE WAY (Tex Method)
+        # We wrap the text so it fits the screen width (width=6.5)
+        # Using Tex() instead of Text() prevents the loop in image_23c515.png
+        body_text = Tex(
+            r"\begin{flushleft} " + full_content + r" \end{flushleft}",
+            tex_environment=None,
+            color=WHITE,
+            font_size=28
+        ).scale(0.8).set_width(7)
         
-        body_text.next_to(subtitle, DOWN, buff=0.5)
+        body_text.next_to(subtitle, DOWN, buff=1)
 
         # 5. DYNAMIC SCROLL
-        scroll_distance = body_text.height + 10
+        scroll_distance = body_text.height + 15
         
         self.play(
             body_text.animate.shift(UP * scroll_distance), 
             run_time=audio_duration, 
             rate_func=linear
         )
+        self.wait(1)
 
 if __name__ == "__main__":
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
