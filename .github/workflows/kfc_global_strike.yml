@@ -6,7 +6,7 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # HARD 1000 WORD LIMIT FOR SUBTITLE SUCCESS
+          # HARD 1000 WORD LIMIT
           python3 -c "
           import os
           with open('lecture_script.txt', 'r') as f:
@@ -33,7 +33,9 @@ jobs:
           "
 
       - name: Render Teaching Video (The Subtitle Way)
-        run: xvfb-run -a python3 animate_subtitles.py
+        run: |
+          # The xvfb-run command creates the virtual display for Manim
+          xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Full Masterclass
         env:
@@ -47,7 +49,7 @@ jobs:
             exit 1
           fi
           
-          # Final Sync
+          # Final Sync Merge
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 1000-WORD SUBTITLE VIDEO READY'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: THE SUBTITLE WAY READY'}, files={'video': f})"
