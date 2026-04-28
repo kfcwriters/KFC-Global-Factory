@@ -1,5 +1,6 @@
 from manim import *
 import os
+import subprocess
 
 config.pixel_height = 480 
 config.pixel_width = 854
@@ -10,23 +11,39 @@ class TeachingMasterclass(Scene):
     def construct(self):
         self.camera.background_color = "#0B1D3A"
         
-        # 1. Load and Split Script
+        # 1. Sync Logic
+        try:
+            cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
+            total_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
+        except:
+            total_duration = 600
+
+        # 2. Load Script
         with open('lecture_script.txt', 'r') as f:
             words = f.read().split()
         
-        # Split into 4 chunks (~250 words each)
-        chunks = [" ".join(words[i:i + 250]) for i in range(0, len(words), 250)]
+        # Split into 5 Chapters for better readability
+        chunk_size = len(words) // 5
+        chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+        time_per_chapter = total_duration / 5
 
         for i, chunk in enumerate(chunks):
-            # Header for each chapter
-            header = Text(f"CHAPTER {i+1}", color=YELLOW).scale(0.6).to_edge(UP)
-            body = Paragraph(chunk, line_spacing=1.5, alignment="center", width=10).scale(0.7)
-            
-            self.play(Write(header))
-            self.play(FadeIn(body, shift=UP))
-            self.wait(20) # Shows the block for 20 seconds
-            self.play(FadeOut(body), FadeOut(header))
-            self.wait(1)
+            # Header
+            header = Text(f"CHAPTER {i+1}: PhD Insights", color=YELLOW, weight=BOLD).scale(0.7).to_edge(UP, buff=0.3)
+            self.add(header)
+
+            # LARGE READABLE TEXT (Fixes the issue in image_21f759.jpg)
+            body = Text(chunk, line_spacing=2.0, font_size=32).scale(0.8)
+            body.next_to(header, DOWN, buff=1)
+
+            # Scroll each chapter
+            scroll_dist = body.height + 10
+            self.play(
+                body.animate.shift(UP * scroll_dist), 
+                run_time=time_per_chapter, 
+                rate_func=linear
+            )
+            self.remove(body, header)
 
 if __name__ == "__main__":
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
