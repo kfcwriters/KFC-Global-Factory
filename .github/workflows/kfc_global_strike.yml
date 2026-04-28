@@ -6,45 +6,44 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45 # Increased to allow for 4-minute video processing
+    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Professor Tools (Academic Engine)
+      - name: Install Professor Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils libpng-dev libjpeg-dev fonts-liberation
+          # xvfb is the critical missing piece for rendering visuals
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils libpng-dev libjpeg-dev fonts-liberation xvfb
           pip install manim requests gtts
 
       - name: Generate PhD Content Assets
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # Audio creation for the full script
           python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); text=f.read(); gTTS(text).save('voice.mp3')"
 
       - name: Render Full-Length Teaching Video
         run: |
-          # REDIRECTION: We send logs to a file to prevent the console from freezing
-          # This solves the 'Log Truncation' error from image_5bb692.jpg
-          python3 animate_subtitles.py > render_log.txt 2>&1 || (tail -n 50 render_log.txt && exit 1)
+          # xvfb-run -a provides the virtual screen needed to draw the subtitles
+          xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Full Masterclass
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Find the Manim output
+          # Precisely locate the video file in Manim's nested folders
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Animation file not found!"
+            echo "❌ ERROR: Animation file not found! Check Render logs."
             exit 1
           fi
           
-          # Final Merge: Ensure Audio and Video are locked together
+          # Final Encoding: Lock Audio and Video together
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
           
           # Telegram Delivery
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); r=requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 4-MINUTE TEACHING VIDEO: RENDER SUCCESSFUL'}, files={'video': f}); print(r.text)"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); r=requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: RENDER SUCCESSFUL'}, files={'video': f}); print(r.text)"
