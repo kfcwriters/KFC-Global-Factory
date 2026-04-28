@@ -1,50 +1,14 @@
-name: 24-7 KFC Global Synthetic Factory
-
-on:
-  workflow_dispatch:
-
-jobs:
-  emperor-pipeline:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install Professor Tools
-        run: |
-          sudo apt-get update
-          # Install xvfb for virtual display and ffprobe for sync
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils libpng-dev libjpeg-dev fonts-liberation xvfb
-          pip install manim requests gtts
-
-      - name: Generate PhD Content Assets
+- name: Generate PhD Assets (1000 Word Limit)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # Audio Generation
-          python3 -c "from gtts import gTTS; f=open('lecture_script.txt'); text=f.read(); gTTS(text).save('voice.mp3')"
-
-      - name: Render Full-Length Teaching Video
-        run: |
-          # Use xvfb-run to provide the screen for Manim to draw on
-          xvfb-run -a python3 animate_subtitles.py
-
-      - name: Deliver Full Masterclass
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
-          
-          if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Animation file not found!"
-            exit 1
-          fi
-          
-          # FINAL SYNC MERGE:
-          # -shortest ensures the video stops exactly when the audio ends
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
-          
-          # Delivery
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); r=requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL SYNC SUCCESSFUL'}, files={'video': f}); print(r.text)"
+          # HARD WORD COUNT LIMIT (1000 Words)
+          python3 -c "
+          with open('lecture_script.txt', 'r') as f:
+              words = f.read().split()
+          limited_text = ' '.join(words[:1000])
+          with open('lecture_script.txt', 'w') as f:
+              f.write(limited_text)
+          from gtts import gTTS
+          gTTS(limited_text).save('voice.mp3')
+          "
