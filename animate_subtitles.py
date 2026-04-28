@@ -2,45 +2,45 @@ from manim import *
 import os
 import subprocess
 
-# HARD CONFIG: Fast render for 1000-word PhD scripts
+# MASTER CONFIG: Built for GitHub Speed
 config.pixel_height = 480 
 config.pixel_width = 854
 config.frame_rate = 15 
-config.verbosity = "ERROR" # Prevents the repeating logs seen in your previous run
+config.verbosity = "ERROR" 
 
 class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Institutional Navy
+        self.camera.background_color = "#0B1D3A" # Deep Academic Navy
         
-        # 1. GET DURATION (The Sync Engine)
+        # 1. AUDIO DURATION SYNC
         try:
             cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
             audio_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
         except:
-            audio_duration = 360 # Fallback 6 mins
+            audio_duration = 360 
 
-        # 2. FIXED HEADER
+        # 2. BRANDING HEADERS
         title = Text("CLINICAL BIOCHEMISTRY", weight=BOLD).scale(0.8).to_edge(UP, buff=0.3)
         subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.5).next_to(title, DOWN)
         self.add(title, subtitle)
 
-        # 3. LOAD SCRIPT
+        # 3. 1000-WORD SCRIPT LOAD
         with open('lecture_script.txt', 'r') as f:
             full_content = f.read()
 
         # 4. TELEPROMPTER SUBTITLES (The Method You Prefer)
-        # disable_ligatures=True makes rendering 10x faster for long text
+        # Monospace + disable_ligatures = Maximum rendering speed
         body_text = Text(
             full_content, 
             font_size=24, 
             line_spacing=1.8,
+            font="Monospace", 
             disable_ligatures=True 
         ).scale(0.7)
         
         body_text.next_to(subtitle, DOWN, buff=1)
 
-        # 5. DYNAMIC SCROLL
-        # Height + 15 ensures the conclusion scrolls fully off screen
+        # 5. DYNAMIC SCROLLING
         scroll_distance = body_text.height + 15
         
         self.play(
