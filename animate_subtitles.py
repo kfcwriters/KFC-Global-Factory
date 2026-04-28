@@ -2,7 +2,7 @@ from manim import *
 import os
 import subprocess
 
-# MASTER CONFIG: Fast & Clear
+# MASTER CONFIG: Built for High-Density Readability
 config.pixel_height = 480 
 config.pixel_width = 854
 config.frame_rate = 15
@@ -10,42 +10,49 @@ config.verbosity = "ERROR"
 
 class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A"
+        self.camera.background_color = "#0B1D3A" # Institutional Navy
         
-        # 1. Get Exact Audio Duration
+        # 1. GET EXACT DURATION
         try:
             cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
             total_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
         except:
-            total_duration = 720 # 12 mins fallback
+            total_duration = 600
 
-        # 2. Load Script
+        # 2. LOAD SCRIPT
         with open('lecture_script.txt', 'r') as f:
             words = f.read().split()
         
-        # 3. SEGMENTATION: 40 words per slide for maximum font size
-        words_per_slide = 40
+        # 3. SEGMENTATION: 120 words per slide as requested
+        words_per_slide = 120
         chunks = [" ".join(words[i:i + words_per_slide]) for i in range(0, len(words), words_per_slide)]
         time_per_slide = total_duration / len(chunks)
 
         for i, chunk in enumerate(chunks):
-            # Header - Small and at the top
-            header = Text(f"PART {i+1}", color=YELLOW, weight=BOLD).scale(0.5).to_edge(UP, buff=0.2)
-            
-            # THE FONT FIX: Large, readable, and wrapped
-            # We use a fixed font_size=36 to ensure it's big enough for Telegram
-            body = Text(chunk, font_size=36, line_spacing=1.5, t2c={chunk: WHITE}).scale(0.8)
-            
-            # Wrap the text manually by width
-            if body.width > 7:
-                body.set_width(7.5)
-            
-            body.next_to(header, DOWN, buff=0.5)
+            # Header
+            header = Text(f"PHD MASTERCLASS | CHAPTER {i+1}", color=YELLOW, weight=BOLD).scale(0.5).to_edge(UP, buff=0.3)
+            self.add(header)
 
-            # High-Speed Display
-            self.add(header, body)
+            # THE FONT FIX:
+            # - We use Paragraph for better line-breaking
+            # - We use scale(1.1) to force it to be much LARGER than the previous run
+            # - alignment="center" makes it look like a professional slide
+            body = Paragraph(
+                chunk, 
+                line_spacing=1.2, 
+                alignment="center", 
+                width=12, # Slightly wider than screen to force larger font scaling
+                color=WHITE
+            ).scale(1.1) 
+            
+            # Ensure it fits within the camera frame but remains LARGE
+            body.set_width(7.8)
+            body.next_to(header, DOWN, buff=0.4)
+
+            # Display logic
+            self.add(body)
             self.wait(time_per_slide)
-            self.remove(header, body)
+            self.remove(body, header)
 
 if __name__ == "__main__":
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
