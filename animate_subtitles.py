@@ -18,32 +18,29 @@ class TeachingMasterclass(Scene):
         except:
             total_duration = 600
 
-        # 2. Load Script
+        # 2. Load and Split Script
         with open('lecture_script.txt', 'r') as f:
             words = f.read().split()
         
-        # Split into 5 Chapters for better readability
-        chunk_size = len(words) // 5
+        # Split into 10 smaller "Slides" for perfect readability
+        num_slides = 10
+        chunk_size = len(words) // num_slides
         chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
-        time_per_chapter = total_duration / 5
+        time_per_slide = total_duration / num_slides
 
         for i, chunk in enumerate(chunks):
-            # Header
-            header = Text(f"CHAPTER {i+1}: PhD Insights", color=YELLOW, weight=BOLD).scale(0.7).to_edge(UP, buff=0.3)
-            self.add(header)
+            # FIXED HEADER
+            header = Text(f"PHD LECTURE: PART {i+1}", color=YELLOW, weight=BOLD).scale(0.6).to_edge(UP, buff=0.3)
+            
+            # SLIDE CONTENT - We use a simple Paragraph with NO animation to stop the loop
+            body = Paragraph(chunk, line_spacing=1.5, alignment="center", width=11).scale(0.6)
+            body.next_to(header, DOWN, buff=0.5)
 
-            # LARGE READABLE TEXT (Fixes the issue in image_21f759.jpg)
-            body = Text(chunk, line_spacing=2.0, font_size=32).scale(0.8)
-            body.next_to(header, DOWN, buff=1)
-
-            # Scroll each chapter
-            scroll_dist = body.height + 10
-            self.play(
-                body.animate.shift(UP * scroll_dist), 
-                run_time=time_per_chapter, 
-                rate_func=linear
-            )
-            self.remove(body, header)
+            # RENDER: Just a simple FadeIn/FadeOut. 
+            # This is 100x faster than 'Scrolling' or 'Writing'
+            self.add(header, body)
+            self.wait(time_per_slide)
+            self.remove(header, body)
 
 if __name__ == "__main__":
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
