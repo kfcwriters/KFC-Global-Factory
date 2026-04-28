@@ -6,7 +6,7 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -21,20 +21,21 @@ jobs:
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # HARD 1000 WORD LIMIT
+          # HARD 1000 WORD LIMIT: Ensures a 6-7 minute video
           python3 -c "
           import os
-          with open('lecture_script.txt', 'r') as f:
-              words = f.read().split()[:1000]
-          limited_text = ' '.join(words)
-          with open('lecture_script.txt', 'w') as f: f.write(limited_text)
-          from gtts import gTTS
-          gTTS(limited_text).save('voice.mp3')
+          if os.path.exists('lecture_script.txt'):
+              with open('lecture_script.txt', 'r') as f:
+                  words = f.read().split()[:1000]
+              limited_text = ' '.join(words)
+              with open('lecture_script.txt', 'w') as f: f.write(limited_text)
+              from gtts import gTTS
+              gTTS(limited_text).save('voice.mp3')
           "
 
       - name: Render Teaching Video (The Subtitle Way)
         run: |
-          # The xvfb-run command creates the virtual display for Manim
+          # xvfb-run provides the virtual screen for the animation
           xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Full Masterclass
@@ -42,14 +43,16 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # Find the animation file
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Animation failed."
+            echo "❌ ERROR: Render failed. Check logs above."
             exit 1
           fi
           
-          # Final Sync Merge
+          # Final Sync: Merge Video and Voice
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: THE SUBTITLE WAY READY'}, files={'video': f})"
+          # Delivery to Telegram
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 1000-WORD SUBTITLE MASTERCLASS SUCCESSFUL'}, files={'video': f})"
