@@ -6,34 +6,37 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Media Tools
+      - name: Install Academic Media Suite
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb
+          # We install texlive-latex-extra and dvisvgm to support high-speed LaTeX rendering
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb texlive texlive-latex-extra dvisvgm
           pip install manim requests gtts
 
-      - name: Generate PhD Assets (800 Word Guard)
+      - name: Generate PhD Assets (800 Word LaTeX Guard)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # HARD CAP at 800 words to ensure the runner picks it up during high traffic
+          # LaTeX Bouncer: Cuts words to 800 and cleans 'illegal' characters like % and &
           python3 -c "
           import os
           if os.path.exists('lecture_script.txt'):
               with open('lecture_script.txt', 'r') as f:
                   words = f.read().split()[:800]
-              limited_text = ' '.join(words)
-              with open('lecture_script.txt', 'w') as f: f.write(limited_text)
+              raw_text = ' '.join(words)
+              # LaTeX needs special characters escaped
+              clean_text = raw_text.replace('%', '\\%').replace('&', '\\&').replace('_', '\\_').replace('$', '\\$')
+              with open('lecture_script.txt', 'w') as f: f.write(clean_text)
               from gtts import gTTS
-              gTTS(limited_text).save('voice.mp3')
+              gTTS(raw_text).save('voice.mp3')
           "
 
-      - name: Render Teaching Video (The Subtitle Way)
+      - name: Render Teaching Video (The LaTeX Subtitle Way)
         run: xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Masterclass
@@ -44,10 +47,12 @@ jobs:
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ Render step failed."
+            echo "❌ ERROR: Render failed. Check LaTeX logs."
             exit 1
           fi
           
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 30 -c:a aac -shortest final_teaching_video.mp4
+          # Final Encoding & Audio Sync
+          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: ULTRA-LIGHT RENDER SUCCESSFUL'}, files={'video': f})"
+          # Delivery to Telegram
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: LaTeX SYNC SUCCESSFUL'}, files={'video': f})"
