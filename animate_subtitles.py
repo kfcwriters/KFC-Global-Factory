@@ -1,29 +1,47 @@
 from manim import *
 import os
+import subprocess
 
+# SPEED CONFIG: Lower resolution ensures it finishes on GitHub
 config.pixel_height = 480 
 config.pixel_width = 854
-config.frame_rate = 15
+config.frame_rate = 15 
 config.verbosity = "ERROR"
 
-class TeachingLoop(Scene):
+class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Institutional Navy
+        self.camera.background_color = "#0B1D3A"
         
-        # 1. Branding Header
-        title = Text("PHD RESEARCH MASTERCLASS", weight=BOLD, color=WHITE).scale(0.8).to_edge(UP)
-        subtitle = Text("Clinical Biochemistry & Lab Management", color=YELLOW).scale(0.5).next_to(title, DOWN)
+        # 1. GET DURATION
+        try:
+            cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
+            audio_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
+        except:
+            audio_duration = 360 # 6 mins fallback
+
+        # 2. FIXED HEADER
+        title = Text("CLINICAL BIOCHEMISTRY", color=WHITE, weight=BOLD).scale(0.8)
+        subtitle = Text("Sigma Metrics & Quality Management", color=YELLOW).scale(0.5)
+        header = VGroup(title, subtitle).arrange(DOWN, buff=0.2).to_edge(UP, buff=0.3)
+        self.add(header)
+
+        # 3. LOAD 1000-WORD SCRIPT
+        with open('lecture_script.txt', 'r') as f:
+            full_content = f.read()
+
+        # 4. THE TELEPROMPTER SUBTITLES (The method you prefer)
+        body_text = Text(full_content, font_size=24, line_spacing=1.8).scale(0.7)
+        body_text.next_to(header, DOWN, buff=1)
+
+        # 5. DYNAMIC SYNC
+        scroll_distance = body_text.height + 15
         
-        # 2. Visual Frame
-        frame = RoundedRectangle(corner_radius=0.2, height=4.5, width=7.5, color=BLUE_B)
-        status = Text("• LECTURE IN PROGRESS", color=GREEN, font_size=18).next_to(frame, UP, buff=0.1)
-        
-        self.add(title, subtitle, frame, status)
-        
-        # 3. Micro-Animation (Very fast to render)
-        self.play(status.animate.set_opacity(0.3), run_time=1)
-        self.play(status.animate.set_opacity(1), run_time=1)
-        self.wait(1)
+        # We scroll the text block as a single unit to save time
+        self.play(
+            body_text.animate.shift(UP * scroll_distance), 
+            run_time=audio_duration, 
+            rate_func=linear
+        )
 
 if __name__ == "__main__":
-    os.system("manim -ql animate_subtitles.py TeachingLoop --media_dir ./media")
+    os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
