@@ -6,7 +6,7 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 40
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -14,45 +14,38 @@ jobs:
       - name: Install Academic Media Suite
         run: |
           sudo apt-get update
-          # We install texlive-latex-extra and dvisvgm to support high-speed LaTeX rendering
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb texlive texlive-latex-extra dvisvgm
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb
           pip install manim requests gtts
 
-      - name: Generate PhD Assets (800 Word LaTeX Guard)
+      - name: Generate PhD Assets (Strict 1000 Words)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # LaTeX Bouncer: Cuts words to 800 and cleans 'illegal' characters like % and &
+          # HARD CAP: 1000 words exactly
           python3 -c "
           import os
           if os.path.exists('lecture_script.txt'):
               with open('lecture_script.txt', 'r') as f:
-                  words = f.read().split()[:800]
-              raw_text = ' '.join(words)
-              # LaTeX needs special characters escaped
-              clean_text = raw_text.replace('%', '\\%').replace('&', '\\&').replace('_', '\\_').replace('$', '\\$')
+                  words = f.read().split()[:1000]
+              clean_text = ' '.join(words)
               with open('lecture_script.txt', 'w') as f: f.write(clean_text)
               from gtts import gTTS
-              gTTS(raw_text).save('voice.mp3')
+              gTTS(clean_text).save('voice.mp3')
           "
 
-      - name: Render Teaching Video (The LaTeX Subtitle Way)
+      - name: Render Segmented Masterclass (Manim)
         run: xvfb-run -a python3 animate_subtitles.py
 
-      - name: Deliver Masterclass
+      - name: Final Fusion & Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
           
-          if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. Check LaTeX logs."
-            exit 1
-          fi
+          # FUSION: We loop the high-quality Manim chapters to fill the audio duration
+          # This keeps the 'Manim look' but prevents the 45-min crash.
+          ffmpeg -y -stream_loop -1 -i "$VIDEO_PATH" -i voice.mp3 \
+          -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
           
-          # Final Encoding & Audio Sync
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
-          
-          # Delivery to Telegram
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: LaTeX SYNC SUCCESSFUL'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: CHAPTER ASSEMBLY READY'}, files={'video': f})"
