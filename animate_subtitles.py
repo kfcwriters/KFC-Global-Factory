@@ -2,6 +2,7 @@ from manim import *
 import os
 import subprocess
 
+# MASTER CONFIG: Fast & Clear
 config.pixel_height = 480 
 config.pixel_width = 854
 config.frame_rate = 15
@@ -11,33 +12,37 @@ class TeachingMasterclass(Scene):
     def construct(self):
         self.camera.background_color = "#0B1D3A"
         
-        # 1. Sync Logic
+        # 1. Get Exact Audio Duration
         try:
             cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
             total_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
         except:
-            total_duration = 600
+            total_duration = 720 # 12 mins fallback
 
-        # 2. Load and Split Script
+        # 2. Load Script
         with open('lecture_script.txt', 'r') as f:
             words = f.read().split()
         
-        # Split into 10 smaller "Slides" for perfect readability
-        num_slides = 10
-        chunk_size = len(words) // num_slides
-        chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
-        time_per_slide = total_duration / num_slides
+        # 3. SEGMENTATION: 40 words per slide for maximum font size
+        words_per_slide = 40
+        chunks = [" ".join(words[i:i + words_per_slide]) for i in range(0, len(words), words_per_slide)]
+        time_per_slide = total_duration / len(chunks)
 
         for i, chunk in enumerate(chunks):
-            # FIXED HEADER
-            header = Text(f"PHD LECTURE: PART {i+1}", color=YELLOW, weight=BOLD).scale(0.6).to_edge(UP, buff=0.3)
+            # Header - Small and at the top
+            header = Text(f"PART {i+1}", color=YELLOW, weight=BOLD).scale(0.5).to_edge(UP, buff=0.2)
             
-            # SLIDE CONTENT - We use a simple Paragraph with NO animation to stop the loop
-            body = Paragraph(chunk, line_spacing=1.5, alignment="center", width=11).scale(0.6)
+            # THE FONT FIX: Large, readable, and wrapped
+            # We use a fixed font_size=36 to ensure it's big enough for Telegram
+            body = Text(chunk, font_size=36, line_spacing=1.5, t2c={chunk: WHITE}).scale(0.8)
+            
+            # Wrap the text manually by width
+            if body.width > 7:
+                body.set_width(7.5)
+            
             body.next_to(header, DOWN, buff=0.5)
 
-            # RENDER: Just a simple FadeIn/FadeOut. 
-            # This is 100x faster than 'Scrolling' or 'Writing'
+            # High-Speed Display
             self.add(header, body)
             self.wait(time_per_slide)
             self.remove(header, body)
