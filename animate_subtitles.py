@@ -1,8 +1,9 @@
 from manim import *
 import os
 import subprocess
+import textwrap
 
-# MASTER CONFIG: UPGRADED TO FULL HD
+# MASTER CONFIG: FULL HD
 config.pixel_height = 1080 
 config.pixel_width = 1920
 config.frame_rate = 15
@@ -10,47 +11,48 @@ config.verbosity = "ERROR"
 
 class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Institutional Navy
+        self.camera.background_color = "#0B1D3A" # Navy
         
         # 1. AUDIO SYNC
         try:
             cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
             total_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
         except:
-            total_duration = 600
+            total_duration = 720 # 12 mins fallback
 
         # 2. LOAD SCRIPT
         with open('lecture_script.txt', 'r') as f:
-            words = f.read().split()
+            script_text = f.read()
         
-        # 3. SEGMENTATION: 60 words per slide for MASSIVE visibility
-        num_slides = 20
-        chunk_size = len(words) // num_slides
+        # 3. SEGMENTATION: 50 words per slide for MASSIVE visibility
+        words = script_text.split()
+        chunk_size = 50 
         chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
-        time_per_slide = total_duration / num_slides
+        time_per_slide = total_duration / len(chunks)
 
         for i, chunk in enumerate(chunks):
-            # HEADER - Increased scale for 1080p
-            header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(1.2).to_edge(UP, buff=0.5)
+            # HEADER - Professional & Large
+            header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(1.5).to_edge(UP, buff=0.7)
             
             # THE FONT FIX:
-            # - width=16: At 1080p, this forces the text to the very edges.
-            # - scale(1.8): This makes the letters physically massive.
-            body = Paragraph(
-                chunk, 
-                line_spacing=1.5, 
-                alignment="center", 
-                width=16, 
-                color=WHITE
-            ).scale(1.8) 
+            # - We wrap the text at 45 characters per line
+            # - We set a fixed font_size=55 (Huge for 1080p)
+            wrapped_text = "\n".join(textwrap.wrap(chunk, width=45))
+            body = Text(
+                wrapped_text, 
+                font_size=55, 
+                line_spacing=1.8, 
+                color=WHITE,
+                t2c={chunk: WHITE} # Ensures high contrast
+            )
             
             body.next_to(header, DOWN, buff=1)
 
-            # STATIC RENDER: Instant speed, no loops
+            # RENDER: Static page-turn for speed and clarity
             self.add(header, body)
             self.wait(time_per_slide)
             self.remove(header, body)
 
 if __name__ == "__main__":
-    # We use -qh (High Quality) to match the 1080p config
+    # We use -qh to ensure the 1080p resolution is applied
     os.system("manim -qh animate_subtitles.py TeachingMasterclass --media_dir ./media")
