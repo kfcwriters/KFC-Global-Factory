@@ -2,7 +2,7 @@ from manim import *
 import os
 import subprocess
 
-# MASTER CONFIG: Force Large Display
+# MASTER CONFIG: Force Full Screen Usage
 config.pixel_height = 480 
 config.pixel_width = 854
 config.frame_rate = 15
@@ -24,12 +24,12 @@ class TeachingMasterclass(Scene):
             full_content = f.read()
 
         # 3. FIXED HEADER
+        # Removed .fix_in_frame() to prevent the error in image_a7afce.png
         header = Text("PHD CLINICAL BIOCHEMISTRY", color=YELLOW, weight=BOLD).scale(0.6).to_edge(UP, buff=0.2)
-        header.fix_in_frame()
         self.add(header)
 
         # 4. THE BIG FONT FIX (No Empty Screen)
-        # We tell Paragraph the width is huge (14) to prevent auto-shrinking
+        # Using Paragraph with a massive width(14) prevents auto-shrinking
         body_text = Paragraph(
             full_content, 
             line_spacing=1.6, 
@@ -37,8 +37,9 @@ class TeachingMasterclass(Scene):
             width=14 
         )
 
-        # FORCE STRETCH: This pulls the text to the edges, making the font HUGE
-        body_text.set_width(config.frame_width - 0.5)
+        # FORCE STRETCH: This pulls the text to the very edges of the screen
+        # This makes the font physically as large as possible
+        body_text.set_width(config.frame_width - 0.4)
         body_text.next_to(header, DOWN, buff=1)
 
         # 5. READABLE SCROLL
@@ -51,5 +52,4 @@ class TeachingMasterclass(Scene):
         )
 
 if __name__ == "__main__":
-    # Use -ql for speed, and explicitly set the media directory
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
