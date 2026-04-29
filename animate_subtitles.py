@@ -2,15 +2,15 @@ from manim import *
 import os
 import subprocess
 
-# MASTER CONFIG: Force Full Screen Usage
+# MASTER CONFIG: Fast-Render Academic Display
 config.pixel_height = 480 
 config.pixel_width = 854
-config.frame_rate = 15
+config.frame_rate = 12 # Low frame rate = High render speed
 config.verbosity = "ERROR"
 
 class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Institutional Navy
+        self.camera.background_color = "#0B1D3A" # Navy
         
         # 1. AUDIO SYNC
         try:
@@ -24,25 +24,24 @@ class TeachingMasterclass(Scene):
             full_content = f.read()
 
         # 3. FIXED HEADER
-        # Removed .fix_in_frame() to prevent the error in image_a7afce.png
         header = Text("PHD CLINICAL BIOCHEMISTRY", color=YELLOW, weight=BOLD).scale(0.6).to_edge(UP, buff=0.2)
         self.add(header)
 
         # 4. THE BIG FONT FIX (No Empty Screen)
-        # Using Paragraph with a massive width(14) prevents auto-shrinking
-        body_text = Paragraph(
+        # Using Monospace + disable_ligatures stops the loop in image_a745fb.jpg
+        body_text = Text(
             full_content, 
-            line_spacing=1.6, 
-            alignment="center", 
-            width=14 
+            font="Monospace",
+            line_spacing=2.0, 
+            disable_ligatures=True
         )
 
-        # FORCE STRETCH: This pulls the text to the very edges of the screen
-        # This makes the font physically as large as possible
+        # FORCE STRETCH: Use the full screen width to make font HUGE
         body_text.set_width(config.frame_width - 0.4)
         body_text.next_to(header, DOWN, buff=1)
 
-        # 5. READABLE SCROLL
+        # 5. THE MOTION SCROLL (Zero-Loop Method)
+        # We move the block as one single object, not character-by-character
         scroll_dist = body_text.height + 15
         
         self.play(
