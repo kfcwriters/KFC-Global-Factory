@@ -3,7 +3,7 @@ import os
 import subprocess
 import textwrap
 
-# MASTER CONFIG: 720p (Perfect for Large Fonts & Stability)
+# MASTER CONFIG: 720p for Stability
 config.pixel_height = 720 
 config.pixel_width = 1280
 config.frame_rate = 15
@@ -18,18 +18,15 @@ class TeachingMasterclass(Scene):
             cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
             total_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
         except:
-            total_duration = 720 
+            total_duration = 600
 
         # 2. LOAD SCRIPT
-        if os.path.exists('lecture_script.txt'):
-            with open('lecture_script.txt', 'r') as f:
-                script_text = f.read()
-        else:
-            script_text = "Data Sync Error."
+        with open('lecture_script.txt', 'r') as f:
+            script_text = f.read()
         
-        # 3. SEGMENTATION: 30 words per slide = MASSIVE Font
+        # 3. SEGMENTATION: 35 words per slide = MASSIVE Font
         words = script_text.split()
-        chunk_size = 30 
+        chunk_size = 35 
         chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
         time_per_slide = total_duration / len(chunks)
 
@@ -38,23 +35,24 @@ class TeachingMasterclass(Scene):
             header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(0.8).to_edge(UP, buff=0.4)
             
             # THE FONT FIX:
-            # - Wrap width 35 keeps text centered and huge
-            # - font_size 42 on 720p looks like a giant headline
+            # - We wrap at 35 chars to use the whole screen width
+            # - font_size 40 is physically massive on 720p
             wrapped_text = "\n".join(textwrap.wrap(chunk, width=35))
             body = Text(
                 wrapped_text, 
-                font_size=42, 
-                line_spacing=1.4, 
+                font_size=40, 
+                line_spacing=1.5, 
                 color=WHITE,
                 alignment=CENTER
             )
             
             body.next_to(header, DOWN, buff=0.6)
 
-            # RENDER
+            # RENDER: Page-turn method (Fast & Stable)
             self.add(header, body)
             self.wait(time_per_slide)
             self.remove(header, body)
 
 if __name__ == "__main__":
+    # We use -ql for speed and to prevent runner timeouts
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
