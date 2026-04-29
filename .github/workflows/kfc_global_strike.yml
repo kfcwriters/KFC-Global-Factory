@@ -6,6 +6,7 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -13,50 +14,45 @@ jobs:
       - name: Install Media Suite
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-liberation
-          pip install gtts requests
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb
+          pip install manim requests gtts
 
-      - name: Generate PhD Assets (Audio + Text Formatting)
+      - name: Generate PhD Assets (Audio Slice Logic)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # HARD CAP & TEXT PREP
+          # Split audio to bypass gTTS API limits for 1200 words
           python3 -c "
           import os
           from gtts import gTTS
           if os.path.exists('lecture_script.txt'):
               with open('lecture_script.txt', 'r') as f:
-                  text = f.read().replace('\n', ' ')
-                  words = text.split()[:1200]
-              clean_text = ' '.join(words)
-              # Escape characters for FFmpeg drawtext engine
-              ffmpeg_text = clean_text.replace(\"'\", \"\\\\'\").replace(\":\", \"\\\\:\").replace(\",\", \"\\\\,\")
-              with open('ffmpeg_text.txt', 'w') as f: f.write(ffmpeg_text)
-              
-              # Audio Splitting for gTTS API stability
+                  words = f.read().split()[:1200]
               mid = len(words) // 2
               gTTS(' '.join(words[:mid])).save('p1.mp3')
               gTTS(' '.join(words[mid:])).save('p2.mp3')
               os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
+              with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
           "
 
-      - name: Direct Stream Render (Massive Font Edition)
+      - name: Render Masterclass (Manim Big Font Edition)
         run: |
-          # 1. Get exact duration for perfect scroll sync
-          DUR=$(ffprobe -i voice.mp3 -show_entries format=duration -v quiet -of csv='p=0')
-          
-          # 2. FFmpeg Drawing Engine:
-          # fontsize=52: This is huge and fills the frame.
-          # x=100 / w=w-200: Creates professional margins while using the whole screen.
-          # y=h-t*(h+22000)/DUR: Fast, smooth scroll tied to 1200 words.
-          ffmpeg -y -f lavfi -i "color=c=0x0B1D3A:s=1280x720:d=$DUR" -i voice.mp3 \
-          -vf "drawtext=text='PHD CLINICAL BIOCHEMISTRY':fontcolor=yellow:fontsize=60:x=(w-text_w)/2:y=50,
-               drawtext=textfile=ffmpeg_text.txt:fontcolor=white:fontsize=52:line_spacing=25:x=100:w=w-200:y=h-t*(h+22000)/$DUR" \
-          -c:v libx264 -preset ultrafast -crf 28 -c:a aac -shortest final_masterclass.mp4
+          mkdir -p media/videos
+          xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Masterclass
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: DIRECT STREAM SUCCESSFUL'}, files={'video': f})"
+          sleep 10
+          VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
+          
+          if [ -z "$VIDEO_PATH" ]; then
+            echo "❌ ERROR: Render failed. Video not found."
+            exit 1
+          fi
+          
+          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_video.mp4
+          
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MANIM BIG FONT READY'}, files={'video': f})"
