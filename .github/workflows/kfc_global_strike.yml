@@ -10,43 +10,45 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Academic Media Suite
+      - name: Install Media Suite
         run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-liberation gtts
 
       - name: Generate PhD Assets (Audio + Text Formatting)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # PREP: Split audio for stability and format text for FFmpeg
+          # HARD CAP & TEXT PREP
           python3 -c "
           import os
           from gtts import gTTS
-          with open('lecture_script.txt', 'r') as f:
-              words = f.read().split()[:1200]
-          text = ' '.join(words)
-          # Escape characters for FFmpeg
-          ffmpeg_text = text.replace(\"'\", \"\\\\'\").replace(\":\", \"\\\\:\")
-          with open('ffmpeg_text.txt', 'w') as f: f.write(ffmpeg_text)
-          
-          # Audio Generation
-          mid = len(words) // 2
-          gTTS(' '.join(words[:mid])).save('p1.mp3')
-          gTTS(' '.join(words[mid:])).save('p2.mp3')
-          os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
+          if os.path.exists('lecture_script.txt'):
+              with open('lecture_script.txt', 'r') as f:
+                  text = f.read().replace('\n', ' ')
+                  words = text.split()[:1200]
+              clean_text = ' '.join(words)
+              # Format text for FFmpeg (escape special characters)
+              ffmpeg_text = clean_text.replace(\"'\", \"\\\\'\").replace(\":\", \"\\\\:\")
+              with open('ffmpeg_text.txt', 'w') as f: f.write(ffmpeg_text)
+              
+              # Audio Splitting for gTTS Stability
+              mid = len(words) // 2
+              gTTS(' '.join(words[:mid])).save('p1.mp3')
+              gTTS(' '.join(words[mid:])).save('p2.mp3')
+              os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
           "
 
       - name: Direct Stream Render (The High-Speed Big Font Way)
         run: |
           # 1. Get exact duration
-          DUR=$(ffprobe -i voice.mp3 -show_entries format=duration -v quiet -of csv='p0')
+          DUR=$(ffprobe -i voice.mp3 -show_entries format=duration -v quiet -of csv='p=0')
           
-          # 2. FFmpeg Engine:
-          # - fontsize=45: This is massive and readable
-          # - w-200: Creates perfect margins so it's not 'Empty' but not 'Cut-off'
-          # - y=h-t*(h+text_h)/$DUR: Moves text perfectly with the voice
+          # 2. FFmpeg Drawing Engine:
+          # fontsize=48: This is massive.
+          # line_spacing=25: Ensures clarity.
+          # y=h-t*(h+text_h)/DUR: Mathematical scroll tied to audio.
           ffmpeg -y -f lavfi -i "color=c=0x0B1D3A:s=1280x720:d=$DUR" -i voice.mp3 \
-          -vf "drawtext=text='PHD CLINICAL BIOCHEMISTRY':fontcolor=yellow:fontsize=50:x=(w-text_w)/2:y=50,
-               drawtext=textfile=ffmpeg_text.txt:fontcolor=white:fontsize=45:line_spacing=20:x=100:w=w-200:y=h-t*(h+15000)/$DUR" \
+          -vf "drawtext=text='PHD CLINICAL BIOCHEMISTRY':fontcolor=yellow:fontsize=55:x=(w-text_w)/2:y=60,
+               drawtext=textfile=ffmpeg_text.txt:fontcolor=white:fontsize=48:line_spacing=25:x=80:w=w-160:y=h-t*(h+18000)/$DUR" \
           -c:v libx264 -preset ultrafast -crf 28 -c:a aac -shortest final_masterclass.mp4
 
       - name: Deliver Masterclass
@@ -54,4 +56,4 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: 10-MIN HIGH-SPEED RENDER SUCCESSFUL'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: 1200-WORD DIRECT RENDER SUCCESS'}, files={'video': f})"
