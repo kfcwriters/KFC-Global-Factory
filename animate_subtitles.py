@@ -2,15 +2,15 @@ from manim import *
 import os
 import subprocess
 
-# MASTER CONFIG: Fast-Render High Visibility
-config.pixel_height = 480 
-config.pixel_width = 854
+# MASTER CONFIG: UPGRADED TO FULL HD
+config.pixel_height = 1080 
+config.pixel_width = 1920
 config.frame_rate = 15
 config.verbosity = "ERROR"
 
 class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Navy
+        self.camera.background_color = "#0B1D3A" # Institutional Navy
         
         # 1. AUDIO SYNC
         try:
@@ -19,35 +19,38 @@ class TeachingMasterclass(Scene):
         except:
             total_duration = 600
 
-        # 2. LOAD & SEGMENT SCRIPT
+        # 2. LOAD SCRIPT
         with open('lecture_script.txt', 'r') as f:
             words = f.read().split()
         
-        # Split into 6 manageable segments to prevent IndexError
-        num_segments = 6
-        segment_size = len(words) // num_segments
-        chunks = [" ".join(words[i:i + segment_size]) for i in range(0, len(words), segment_size)]
-        time_per_segment = total_duration / num_segments
+        # 3. SEGMENTATION: 60 words per slide for MASSIVE visibility
+        num_slides = 20
+        chunk_size = len(words) // num_slides
+        chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+        time_per_slide = total_duration / num_slides
 
         for i, chunk in enumerate(chunks):
-            # FIXED HEADER
-            header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(0.5).to_edge(UP, buff=0.2)
-            self.add(header)
-
-            # THE BIG FONT FIX (No Empty Screen)
-            # Using Text with fixed width forces HUGE letters
-            body = Text(chunk, line_spacing=2.0, font="Monospace", disable_ligatures=True)
-            body.set_width(config.frame_width - 0.5)
+            # HEADER - Increased scale for 1080p
+            header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(1.2).to_edge(UP, buff=0.5)
+            
+            # THE FONT FIX:
+            # - width=16: At 1080p, this forces the text to the very edges.
+            # - scale(1.8): This makes the letters physically massive.
+            body = Paragraph(
+                chunk, 
+                line_spacing=1.5, 
+                alignment="center", 
+                width=16, 
+                color=WHITE
+            ).scale(1.8) 
+            
             body.next_to(header, DOWN, buff=1)
 
-            # READABLE SCROLL FOR THIS SEGMENT
-            scroll_dist = body.height + 10
-            self.play(
-                body.animate.shift(UP * scroll_dist), 
-                run_time=time_per_segment, 
-                rate_func=linear
-            )
-            self.remove(body, header)
+            # STATIC RENDER: Instant speed, no loops
+            self.add(header, body)
+            self.wait(time_per_slide)
+            self.remove(header, body)
 
 if __name__ == "__main__":
-    os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
+    # We use -qh (High Quality) to match the 1080p config
+    os.system("manim -qh animate_subtitles.py TeachingMasterclass --media_dir ./media")
