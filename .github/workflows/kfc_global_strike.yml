@@ -21,7 +21,7 @@ jobs:
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # Audio Slicing to bypass API limits
+          # Audio Slicing to bypass gTTS API limits for 1200 words
           python3 -c "
           import os
           from gtts import gTTS
@@ -29,8 +29,10 @@ jobs:
               with open('lecture_script.txt', 'r') as f:
                   words = f.read().split()[:1200]
               mid = len(words) // 2
+              # Generate in two halves to prevent API Timeout
               gTTS(' '.join(words[:mid])).save('p1.mp3')
               gTTS(' '.join(words[mid:])).save('p2.mp3')
+              # Merge into single voice.mp3
               os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
               with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
           "
@@ -38,6 +40,7 @@ jobs:
       - name: Render Masterclass (Maximum Font Edition)
         run: |
           mkdir -p media/videos
+          # xvfb-run provides the virtual display for Manim
           xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Masterclass
@@ -45,14 +48,17 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # Give the file system time to settle
           sleep 10
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. No file generated."
+            echo "❌ ERROR: Render failed. No MP4 found in media/videos."
             exit 1
           fi
           
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_video.mp4
+          # Final Fusion: Merge the Scrolling Video with the Voiceover
+          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MAX FONT READY'}, files={'video': f})"
+          # Telegram Dispatch
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MAX FONT RENDER COMPLETE'}, files={'video': f})"
