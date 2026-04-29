@@ -17,33 +17,24 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb
           pip install manim requests gtts
 
-      - name: Generate PhD Assets (Split-Audio Logic)
+      - name: Generate PhD Assets (Audio Slice Logic)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # AUDIO SLICER: Splits the 1200 words into 2 parts to avoid the gTTS 200 Error
           python3 -c "
           import os
           from gtts import gTTS
-          if os.path.exists('lecture_script.txt'):
-              with open('lecture_script.txt', 'r') as f:
-                  words = f.read().split()[:1200]
-              
-              mid = len(words) // 2
-              part1, part2 = ' '.join(words[:mid]), ' '.join(words[mid:])
-              
-              # Generate parts
-              gTTS(part1).save('p1.mp3')
-              gTTS(part2).save('p2.mp3')
-              
-              # Join them using FFmpeg
-              os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
-              
-              # Save the full text for Manim
-              with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
+          with open('lecture_script.txt', 'r') as f:
+              words = f.read().split()[:1200]
+          # Split audio to bypass gTTS 200 Error
+          mid = len(words) // 2
+          gTTS(' '.join(words[:mid])).save('p1.mp3')
+          gTTS(' '.join(words[mid:])).save('p2.mp3')
+          os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
+          with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
           "
 
-      - name: Render Masterclass (Big Font Edition)
+      - name: Render Masterclass (Maximum Font Edition)
         run: xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Masterclass
@@ -51,6 +42,15 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # Wait for file system to sync
+          sleep 5
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
+          
+          if [ -z "$VIDEO_PATH" ]; then
+            echo "❌ ERROR: Render failed. No file generated."
+            exit 1
+          fi
+          
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 12-MINUTE MASTERCLASS: AUDIO SYNC SUCCESS'}, files={'video': f})"
+          
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MAX FONT SUCCESSFUL'}, files={'video': f})"
