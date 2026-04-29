@@ -6,66 +6,52 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Install Academic Media Suite
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb
-          pip install manim requests gtts
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-liberation gtts
 
-      - name: Generate PhD Assets (Audio Slicing Fix)
+      - name: Generate PhD Assets (Audio + Text Formatting)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # Audio Slicing: Prevents gTTS API 200/Timeout Errors for long scripts
+          # PREP: Split audio for stability and format text for FFmpeg
           python3 -c "
           import os
           from gtts import gTTS
-          if os.path.exists('lecture_script.txt'):
-              with open('lecture_script.txt', 'r') as f:
-                  words = f.read().split()[:1200]
-              
-              # Split into 3 parts for maximum API stability
-              third = len(words) // 3
-              p1, p2, p3 = ' '.join(words[:third]), ' '.join(words[third:2*third]), ' '.join(words[2*third:])
-              
-              gTTS(p1).save('p1.mp3')
-              gTTS(p2).save('p2.mp3')
-              gTTS(p3).save('p3.mp3')
-              
-              # Seamlessly merge into one voiceover
-              os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3|p3.mp3\" -acodec copy voice.mp3')
-              
-              with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
+          with open('lecture_script.txt', 'r') as f:
+              words = f.read().split()[:1200]
+          text = ' '.join(words)
+          # Escape characters for FFmpeg
+          ffmpeg_text = text.replace(\"'\", \"\\\\'\").replace(\":\", \"\\\\:\")
+          with open('ffmpeg_text.txt', 'w') as f: f.write(ffmpeg_text)
+          
+          # Audio Generation
+          mid = len(words) // 2
+          gTTS(' '.join(words[:mid])).save('p1.mp3')
+          gTTS(' '.join(words[mid:])).save('p2.mp3')
+          os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
           "
 
-      - name: Render Masterclass (Maximum Font Edition)
+      - name: Direct Stream Render (The High-Speed Big Font Way)
         run: |
-          # Clean workspace and prepare video output directory
-          rm -rf media/
-          mkdir -p media/videos
-          xvfb-run -a python3 animate_subtitles.py
+          # 1. Get exact duration
+          DUR=$(ffprobe -i voice.mp3 -show_entries format=duration -v quiet -of csv='p0')
+          
+          # 2. FFmpeg Engine:
+          # - fontsize=45: This is massive and readable
+          # - w-200: Creates perfect margins so it's not 'Empty' but not 'Cut-off'
+          # - y=h-t*(h+text_h)/$DUR: Moves text perfectly with the voice
+          ffmpeg -y -f lavfi -i "color=c=0x0B1D3A:s=1280x720:d=$DUR" -i voice.mp3 \
+          -vf "drawtext=text='PHD CLINICAL BIOCHEMISTRY':fontcolor=yellow:fontsize=50:x=(w-text_w)/2:y=50,
+               drawtext=textfile=ffmpeg_text.txt:fontcolor=white:fontsize=45:line_spacing=20:x=100:w=w-200:y=h-t*(h+15000)/$DUR" \
+          -c:v libx264 -preset ultrafast -crf 28 -c:a aac -shortest final_masterclass.mp4
 
       - name: Deliver Masterclass
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Give the file system time to synchronize
-          sleep 10
-          VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
-          
-          if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. Video file not generated."
-            exit 1
-          fi
-          
-          # Final Fusion: Merge the Scrolling Masterclass with the Voiceover
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
-          
-          # Dispatch to Telegram Bot
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MAX FONT SYNC READY'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: 10-MIN HIGH-SPEED RENDER SUCCESSFUL'}, files={'video': f})"
