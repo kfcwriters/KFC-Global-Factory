@@ -2,7 +2,7 @@ from manim import *
 import os
 import subprocess
 
-# MASTER CONFIG: Ultra-Wide for Big Font
+# MASTER CONFIG: Force Large Display
 config.pixel_height = 480 
 config.pixel_width = 854
 config.frame_rate = 15
@@ -15,41 +15,40 @@ class TeachingMasterclass(Scene):
         # 1. AUDIO SYNC
         try:
             cmd = "ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3"
-            total_duration = float(subprocess.check_output(cmd, shell=True).decode().strip())
+            audio_dur = float(subprocess.check_output(cmd, shell=True).decode().strip())
         except:
-            total_duration = 600
+            audio_dur = 600
 
+        # 2. LOAD 1200-WORD SCRIPT
         with open('lecture_script.txt', 'r') as f:
             full_content = f.read()
 
-        # 2. FIXED HEADER
+        # 3. FIXED HEADER
         header = Text("PHD CLINICAL BIOCHEMISTRY", color=YELLOW, weight=BOLD).scale(0.6).to_edge(UP, buff=0.2)
         header.fix_in_frame()
         self.add(header)
 
-        # 3. THE "SCREEN-FILLER" FONT FIX
-        # width=14 forces the internal engine to think the screen is giant
+        # 4. THE BIG FONT FIX (No Empty Screen)
+        # Paragraph with a wide width (14) forces Manim to use more horizontal space
         body_text = Paragraph(
             full_content, 
-            line_spacing=1.5, 
+            line_spacing=1.6, 
             alignment="center", 
             width=14 
         )
 
-        # THIS IS THE KEY: We stretch the text block to 95% of the screen width.
-        # This physically pulls the letters apart and makes them HUGE.
-        body_text.set_width(config.frame_width - 0.6)
+        # FORCE STRETCH: This pulls the text to the edges, making the font HUGE
+        body_text.set_width(config.frame_width - 0.8)
         body_text.next_to(header, DOWN, buff=1)
 
-        # 4. THE READABLE SCROLL
-        scroll_distance = body_text.height + 10
+        # 5. READABLE SCROLL
+        scroll_dist = body_text.height + 15
         
         self.play(
-            body_text.animate.shift(UP * scroll_distance), 
-            run_time=total_duration, 
+            body_text.animate.shift(UP * scroll_dist), 
+            run_time=audio_dur, 
             rate_func=linear
         )
 
 if __name__ == "__main__":
-    # We use explicit naming to ensure the YML can find the file
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
