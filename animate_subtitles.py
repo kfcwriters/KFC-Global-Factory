@@ -19,7 +19,7 @@ class TeachingMasterclass(Scene):
         except:
             audio_dur = 600
 
-        # 2. LOAD 1200-WORD SCRIPT
+        # 2. LOAD SCRIPT
         with open('lecture_script.txt', 'r') as f:
             full_content = f.read()
 
@@ -29,7 +29,7 @@ class TeachingMasterclass(Scene):
         self.add(header)
 
         # 4. THE BIG FONT FIX (No Empty Screen)
-        # Paragraph with a wide width (14) forces Manim to use more horizontal space
+        # We tell Paragraph the width is huge (14) to prevent auto-shrinking
         body_text = Paragraph(
             full_content, 
             line_spacing=1.6, 
@@ -38,7 +38,7 @@ class TeachingMasterclass(Scene):
         )
 
         # FORCE STRETCH: This pulls the text to the edges, making the font HUGE
-        body_text.set_width(config.frame_width - 0.8)
+        body_text.set_width(config.frame_width - 0.5)
         body_text.next_to(header, DOWN, buff=1)
 
         # 5. READABLE SCROLL
@@ -51,4 +51,5 @@ class TeachingMasterclass(Scene):
         )
 
 if __name__ == "__main__":
+    # Use -ql for speed, and explicitly set the media directory
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
