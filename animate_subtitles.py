@@ -2,7 +2,7 @@ from manim import *
 import os
 import subprocess
 
-# MASTER CONFIG: High-Contrast Academic Style
+# MASTER CONFIG: Ultra-Wide for Big Font
 config.pixel_height = 480 
 config.pixel_width = 854
 config.frame_rate = 15
@@ -28,8 +28,7 @@ class TeachingMasterclass(Scene):
         self.add(header)
 
         # 3. THE "SCREEN-FILLER" FONT FIX
-        # We use Paragraph to handle the 120-word blocks
-        # 'width=14' tells Manim to treat the text as a very wide block
+        # width=14 forces the internal engine to think the screen is giant
         body_text = Paragraph(
             full_content, 
             line_spacing=1.5, 
@@ -37,13 +36,12 @@ class TeachingMasterclass(Scene):
             width=14 
         )
 
-        # THIS IS THE KEY: We force the text to be as wide as the screen (minus a tiny gap)
-        # This will make the font size jump up significantly to fill the empty space.
-        body_text.set_width(config.frame_width - 0.8)
+        # THIS IS THE KEY: We stretch the text block to 95% of the screen width.
+        # This physically pulls the letters apart and makes them HUGE.
+        body_text.set_width(config.frame_width - 0.6)
         body_text.next_to(header, DOWN, buff=1)
 
         # 4. THE READABLE SCROLL
-        # Because the font is now HUGE, we scroll it slowly for the full audio duration
         scroll_distance = body_text.height + 10
         
         self.play(
@@ -53,4 +51,5 @@ class TeachingMasterclass(Scene):
         )
 
 if __name__ == "__main__":
+    # We use explicit naming to ensure the YML can find the file
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
