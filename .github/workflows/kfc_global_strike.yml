@@ -21,36 +21,40 @@ jobs:
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
+          # Split audio to bypass gTTS API limits
           python3 -c "
           import os
           from gtts import gTTS
-          with open('lecture_script.txt', 'r') as f:
-              words = f.read().split()[:1200]
-          # Split audio to bypass gTTS 200 Error
-          mid = len(words) // 2
-          gTTS(' '.join(words[:mid])).save('p1.mp3')
-          gTTS(' '.join(words[mid:])).save('p2.mp3')
-          os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
-          with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
+          if os.path.exists('lecture_script.txt'):
+              with open('lecture_script.txt', 'r') as f:
+                  words = f.read().split()[:1200]
+              mid = len(words) // 2
+              gTTS(' '.join(words[:mid])).save('p1.mp3')
+              gTTS(' '.join(words[mid:])).save('p2.mp3')
+              os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
+              with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
           "
 
       - name: Render Masterclass (Maximum Font Edition)
-        run: xvfb-run -a python3 animate_subtitles.py
+        run: |
+          # Clean old media to prevent the 2-second crash
+          rm -rf media/
+          xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Masterclass
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Wait for file system to sync
-          sleep 5
+          # Wait for file system sync
+          sleep 10
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. No file generated."
+            echo "❌ ERROR: Video file not found. Render likely failed."
             exit 1
           fi
           
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_teaching_video.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MAX FONT SUCCESSFUL'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_teaching_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MAX FONT SYNC READY'}, files={'video': f})"
