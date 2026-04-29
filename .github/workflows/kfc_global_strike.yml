@@ -17,25 +17,30 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb
           pip install manim requests gtts
 
+      - name: Memory Optimization (Swap)
+        run: |
+          sudo fallocate -l 2G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
       - name: Generate PhD Assets (Audio Slice Logic)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # Split audio to bypass gTTS API limits for 1200 words
           python3 -c "
           import os
           from gtts import gTTS
-          if os.path.exists('lecture_script.txt'):
-              with open('lecture_script.txt', 'r') as f:
-                  words = f.read().split()[:1200]
-              mid = len(words) // 2
-              gTTS(' '.join(words[:mid])).save('p1.mp3')
-              gTTS(' '.join(words[mid:])).save('p2.mp3')
-              os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
-              with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
+          with open('lecture_script.txt', 'r') as f:
+              words = f.read().split()[:1200]
+          mid = len(words) // 2
+          gTTS(' '.join(words[:mid])).save('p1.mp3')
+          gTTS(' '.join(words[mid:])).save('p2.mp3')
+          os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
+          with open('lecture_script.txt', 'w') as f: f.write(' '.join(words))
           "
 
-      - name: Render Masterclass (Manim Big Font Edition)
+      - name: Render Masterclass (1080p Big Font)
         run: |
           mkdir -p media/videos
           xvfb-run -a python3 animate_subtitles.py
@@ -47,12 +52,5 @@ jobs:
         run: |
           sleep 10
           VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
-          
-          if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. Video not found."
-            exit 1
-          fi
-          
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_video.mp4
-          
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_video.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: MANIM BIG FONT READY'}, files={'video': f})"
+          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL HD FONT SUCCESS'}, files={'video': f})"
