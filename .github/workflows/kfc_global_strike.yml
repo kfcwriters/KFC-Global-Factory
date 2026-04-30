@@ -6,25 +6,24 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Media Suite
+      - name: Install Academic Media Suite
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb \
           libjpeg-dev zlib1g-dev libfreetype6-dev
           pip install manim requests gtts
 
-      - name: Generate PhD Assets (Stability Fix)
+      - name: Generate PhD Assets (Audio Slice Logic)
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # EMERGENCY FALLBACK: Create script if lead_hunter fails
+          # EMERGENCY FALLBACK
           if [ ! -f lecture_script.txt ]; then
-            echo "Clinical Biochemistry Masterclass: Understanding Sigma Metrics and Laboratory Quality Control." > lecture_script.txt
+            echo "Clinical Biochemistry Masterclass: Advanced Sigma Metrics and Analytical Quality Management." > lecture_script.txt
           fi
           
           python3 -c "
@@ -49,13 +48,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           sleep 10
-          VIDEO_PATH=$(find media/videos -name "TeachingMasterclass.mp4" | head -n 1)
+          # Search for the MP4 in any subfolder
+          VIDEO_PATH=$(find media/videos -name "*.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Video not found."
+            echo "❌ ERROR: Render failed. No MP4 found."
             exit 1
           fi
           
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: ASSET SYNC SUCCESSFUL'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL-SCREEN FONT SUCCESS'}, files={'video': f})"
