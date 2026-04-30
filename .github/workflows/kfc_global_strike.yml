@@ -21,16 +21,17 @@ jobs:
         run: |
           python3 lead_hunter.py
           python3 sigma_lecture_generator.py
-          # EMERGENCY FALLBACK
-          if [ ! -f lecture_script.txt ]; then
-            echo "PhD Clinical Biochemistry: Masterclass on Sigma Metrics and Quality Control." > lecture_script.txt
-          fi
           
           python3 -c "
           import os
           from gtts import gTTS
-          with open('lecture_script.txt', 'r') as f:
+          script = 'lecture_script.txt'
+          if not os.path.exists(script):
+              with open(script, 'w') as f: f.write('Advanced Clinical Biochemistry Masterclass.')
+          
+          with open(script, 'r') as f:
               words = f.read().split()[:1200]
+          
           mid = len(words) // 2
           gTTS(' '.join(words[:mid])).save('p1.mp3')
           gTTS(' '.join(words[mid:])).save('p2.mp3')
@@ -39,7 +40,8 @@ jobs:
 
       - name: Render Masterclass (720p Big Font)
         run: |
-          mkdir -p media/videos
+          # Clean old media and render fresh
+          rm -rf media/
           xvfb-run -a python3 animate_subtitles.py
 
       - name: Deliver Masterclass
@@ -48,8 +50,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           sleep 10
-          # SEARCH AND DESTROY: Find any MP4 in the media folder
-          VIDEO_PATH=$(find media/videos -name "*.mp4" | head -n 1)
+          # FINDER: Looks for any MP4 produced by the script
+          VIDEO_PATH=$(find . -name "TeachingMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
             echo "❌ ERROR: Render failed. No MP4 file was found."
