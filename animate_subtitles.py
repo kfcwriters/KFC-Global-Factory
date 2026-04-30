@@ -32,15 +32,16 @@ class TeachingMasterclass(Scene):
             header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(0.8).to_edge(UP, buff=0.4)
             
             # THE FONT FIX:
-            # - Wrap width 35 forces the text to fill the center horizontally
-            # - font_size 42 is huge and readable on mobile
+            # - Wrap width 35 forces text to expand horizontally
+            # - font_size 42 is huge and readable
+            # - alignment is set to center (lowercase string) to fix image_0ea87d.png crash
             wrapped_text = "\n".join(textwrap.wrap(chunk, width=35))
             body = Text(
                 wrapped_text, 
                 font_size=42, 
                 line_spacing=1.5, 
                 color=WHITE,
-                alignment=CENTER
+                alignment="center" 
             )
             
             body.next_to(header, DOWN, buff=0.6)
@@ -51,5 +52,4 @@ class TeachingMasterclass(Scene):
             self.remove(header, body)
 
 if __name__ == "__main__":
-    # Explicitly set the media directory for the YML to find
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
