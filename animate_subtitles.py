@@ -2,7 +2,7 @@ from manim import *
 import os
 import textwrap
 
-# MASTER CONFIG: 720p (Max Stability)
+# MASTER CONFIG: 720p (Maximum Reliability)
 config.pixel_height = 720 
 config.pixel_width = 1280
 config.frame_rate = 15
@@ -10,9 +10,9 @@ config.verbosity = "ERROR"
 
 class TeachingMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Navy
+        self.camera.background_color = "#0B1D3A" # Institutional Navy
         
-        # 1. LOAD SCRIPT
+        # 1. ASSET SYNC
         if not os.path.exists('lecture_script.txt'):
             return
 
@@ -24,7 +24,7 @@ class TeachingMasterclass(Scene):
         chunk_size = 30 
         chunks = [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
         
-        # Duration fallback
+        # Calculate timing for a 12-minute video (720 seconds)
         time_per_slide = 720 / len(chunks) if len(chunks) > 0 else 10
 
         for i, chunk in enumerate(chunks):
@@ -32,9 +32,9 @@ class TeachingMasterclass(Scene):
             header = Text(f"PHD MASTERCLASS | PART {i+1}", color=YELLOW, weight=BOLD).scale(0.8).to_edge(UP, buff=0.4)
             
             # THE FONT FIX:
-            # - Wrap width 35 forces text to expand horizontally
-            # - font_size 42 is huge and readable
-            # - alignment is set to center (lowercase string) to fix image_0ea87d.png crash
+            # - Wrap width 35 forces the text to expand horizontally
+            # - font_size 42 is huge and readable on mobile
+            # - alignment="center" ensures it fills the frame perfectly
             wrapped_text = "\n".join(textwrap.wrap(chunk, width=35))
             body = Text(
                 wrapped_text, 
@@ -52,4 +52,5 @@ class TeachingMasterclass(Scene):
             self.remove(header, body)
 
 if __name__ == "__main__":
+    # Explicitly set the media directory
     os.system("manim -ql animate_subtitles.py TeachingMasterclass --media_dir ./media")
