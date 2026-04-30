@@ -10,7 +10,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Academic Media Suite
+      - name: Install Media Suite
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb \
@@ -23,7 +23,7 @@ jobs:
           python3 sigma_lecture_generator.py
           # EMERGENCY FALLBACK
           if [ ! -f lecture_script.txt ]; then
-            echo "Clinical Biochemistry Masterclass: Advanced Sigma Metrics and Analytical Quality Management." > lecture_script.txt
+            echo "PhD Clinical Biochemistry: Masterclass on Sigma Metrics and Quality Control." > lecture_script.txt
           fi
           
           python3 -c "
@@ -48,14 +48,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           sleep 10
-          # Search for the MP4 in any subfolder
+          # SEARCH AND DESTROY: Find any MP4 in the media folder
           VIDEO_PATH=$(find media/videos -name "*.mp4" | head -n 1)
           
           if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. No MP4 found."
+            echo "❌ ERROR: Render failed. No MP4 file was found."
             exit 1
           fi
           
           ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
           
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL-SCREEN FONT SUCCESS'}, files={'video': f})"
+          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL-SCREEN FONT READY'}, files={'video': f})"
