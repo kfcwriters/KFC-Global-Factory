@@ -14,10 +14,10 @@ jobs:
         run: python3 lead_hunter_global.py
 
       - name: Execute Email Dispatch
-        # Using the Gmail secrets already saved in your Repo
+        # MAPPING SECRETS: Using your exact names from image_660da4.png
         env:
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          EMAIL_USER: "your-email@gmail.com" # Replace this with your actual Gmail or a new secret
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: python3 email_sender.py
 
       - name: Notify Telegram of Success
