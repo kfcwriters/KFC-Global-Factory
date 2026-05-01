@@ -1,25 +1,41 @@
 name: 24-7 Multi-Agent PhD Factory
-on: workflow_dispatch
+
+on:
+  workflow_dispatch:
+
 jobs:
   run-agents:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Agent Dependencies (PangoCairo Fix)
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+          sudo apt-get update
+          # These specific binaries fix the crash in image_75ebf7.png
+          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev \
+          libjpeg-dev zlib1g-dev libfreetype6-dev
           pip install manim gtts requests
-      - name: Run Scholar & Orator
+
+      - name: Run Agent 1 & 2 (Scholar & Orator)
         run: |
           python3 scribe_agent.py
           python3 voice_agent.py
-      - name: Run Architect
+
+      - name: Run Agent 3 (The Architect)
         run: xvfb-run -a python3 render_agent.py
-      - name: Deliver
+
+      - name: Agent 4 (Delivery Dispatch)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          VIDEO=$(find . -name "*.mp4" | head -n 1)
-          ffmpeg -y -i "$VIDEO" -i voice.mp3 -c:v libx264 -shortest final.mp4
-          python3 -c "import requests; f=open('final.mp4','rb'); requests.post(f'https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendVideo', data={'chat_id': '${{ secrets.TELEGRAM_CHAT_ID }}'}, files={'video': f})"
+          sleep 10
+          VIDEO=$(find . -name "PhDArchitect.mp4" | head -n 1)
+          if [ -z "$VIDEO" ]; then exit 1; fi
+          
+          # Fusion: Merge PhD visuals with Orator audio
+          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
+          
+          python3 -c "import requests; f=open('final_masterclass.mp4','rb'); requests.post(f'https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendVideo', data={'chat_id': '${{ secrets.TELEGRAM_CHAT_ID }}', 'caption': '🔬 PHD MULTI-AGENT SUCCESS'}, files={'video': f})"
