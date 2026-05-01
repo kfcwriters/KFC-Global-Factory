@@ -1,15 +1,26 @@
 import textwrap
+import os
 
-def generate_phd_script():
-    # In a full run, this pulls from lead_hunter.py
-    raw_content = "The integration of Sigma metrics into clinical biochemistry laboratories has redefined analytical quality. By quantifying the performance of assays like HbA1c and Serum Myonectin, we can move beyond traditional QC rules to a risk-based model. This ensures patient safety while optimizing laboratory resources."
+def generate_academic_content():
+    # Research: Proteomics of Glycated Proteins in Diabetes
+    topic = (
+        "Advanced proteomics now allows us to map the precise sites of protein glycation "
+        "in diabetic patients. By identifying these biomarkers early, we can predict "
+        "the progression of diabetic nephropathy with high sensitivity. This is the "
+        "frontier of clinical biochemistry research today."
+    )
     
-    # WRAP LOGIC: We force 30 characters per line here so Agent 3 doesn't have to think
-    wrapped = "\n".join(textwrap.wrap(raw_content, width=30))
+    # WRAP LOGIC: width=28 forces the text to occupy the full width of a 720p frame
+    # We use double newlines to signal "Slides" to Agent 3
+    wrapped_slides = textwrap.wrap(topic, width=28)
+    final_output = "\n\n".join(wrapped_slides)
     
-    with open('lecture_script.txt', 'w') as f:
-        f.write(wrapped)
-    print("✅ Agent 1: Script generated and wrapped.")
+    # Force writing to the current working directory
+    with open('phd_script.txt', 'w') as f:
+        f.write(final_output)
+    
+    if os.path.exists('phd_script.txt'):
+        print("✅ Agent 1: Script verified at root.")
 
 if __name__ == "__main__":
-    generate_phd_script()
+    generate_academic_content()
