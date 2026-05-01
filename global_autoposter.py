@@ -1,20 +1,24 @@
 import requests, os, random
 
 def post_to_socials():
+    # High-Authority Medical Insights
     insights = [
-        "Metabolic Reset: Myonectin is key for insulin sensitivity.",
-        "Renal Protocol: pH balance is essential for stone prevention.",
-        "Weight Science: Hormones dictate fat loss more than calories.",
-        "Diagnostic Audit: Clinical lab analysis is the first step."
+        "Metabolic Reset: Myonectin signaling is the primary driver for insulin sensitivity.",
+        "Renal Protocol: Clinical biochemistry is essential for chronic stone prevention.",
+        "Weight Science: Hormonal pathways dictate fat distribution more than calories.",
+        "Diagnostic Audit: Clinical lab analysis is the foundation of precision health."
     ]
+    
+    # Global Search Keywords (The "GPS" for patients)
+    # These stay at the bottom so the post looks professional
+    tags = "#MetabolicHealth #DiabetesReversal #RenalDiet #ClinicalNutrition #HealthUK #HealthUSA"
     
     medical_images = [
         "https://images.pexels.com/photos/356040/pexels-photo-356040.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
         "https://images.pexels.com/photos/3912981/pexels-photo-3912981.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
     ]
     
-    # Simplified text to prevent "400" errors
-    content = f"🔬 Bansal Metabolic Lab Insight: {random.choice(insights)} 📩 Consult: bansallab@outlook.com"
+    content = f"🔬 Bansal Metabolic Lab: {random.choice(insights)}\n\n📩 Consult: bansallab@outlook.com\n\n{tags}"
     
     payload = {
         "post": content,
