@@ -16,37 +16,38 @@ jobs:
           sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
           pip install manim gtts requests
 
-      - name: STEP 1: Generate Video Track
+      - name: STEP 1 Generate Video Track
         run: |
           python3 scholar_agent.py
           xvfb-run -a python3 master_agent.py
 
-      - name: STEP 2: Business Outreach Track (5 Leads)
+      - name: STEP 2 Business Outreach Track
         run: python3 lead_hunter_global.py
 
-      - name: STEP 3: Execute Email Strike
+      - name: STEP 3 Execute Email Strike
         env:
           GMAIL_USER: "kfcwriters@gmail.com"
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: python3 email_sender.py
 
-      - name: STEP 4: YouTube Upload
+      - name: STEP 4 YouTube Upload
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: |
-          # Find and fuse the video first
           VIDEO=$(find . -name "*.mp4" | grep -v "final_module" | head -n 1)
           if [ -n "$VIDEO" ]; then
             ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -shortest final_module.mp4
             python3 youtube_uploader.py
           fi
 
-      - name: STEP 5: Telegram Delivery & Report
+      - name: STEP 5 Deliver Assets
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW MODULE: Published to YouTube & Sent to Telegram'}, files={'video': f})"
+          if [ -f "final_module.mp4" ]; then
+            python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW MODULE: Published to YouTube & Sent to Telegram'}, files={'video': f})"
+          fi
           python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': '📬 BUSINESS STRIKE COMPLETE: 5 Outreach emails dispatched.'})"
