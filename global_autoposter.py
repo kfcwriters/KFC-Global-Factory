@@ -1,37 +1,29 @@
-import requests
-import os
-import random
-
-def generate_scientific_content():
-    # Tailored for High-Authority LinkedIn & Viral Pinterest Reach
-    topics = [
-        "Metabolic Reset: Why Myonectin is the key to Insulin Sensitivity.",
-        "Renal Health Protocol: Balancing pH through Clinical Biochemistry.",
-        "Weight Loss Science: Why Hormonal Signaling beats Calorie Counting.",
-        "Laboratory Insights: How to audit your own Blood Reports for Health."
-    ]
-    topic = random.choice(topics)
-    return f"🔬 Clinical Insight from Dr. Abhishek Bansal (PhD Researcher):\n\n{topic}\n\n✅ Scientific Approach. ✅ No Starvation.\n📩 Consult: bansallab@outlook.com"
+import requests, os, random
 
 def post_to_socials():
-    content = generate_scientific_content()
-    api_key = os.environ.get('AYRSHARE_API_KEY')
+    insights = [
+        "Metabolic Reset: Myonectin signaling is the primary driver for cellular insulin sensitivity.",
+        "Renal Protocol: Clinical biochemistry indicates that pH balance is essential for stone prevention.",
+        "Weight Management: Hormonal signaling pathways dictate adipose tissue distribution more than caloric intake.",
+        "Diagnostic Audit: Clinical lab report analysis is the first step in precision nutrition."
+    ]
+    
+    # Branding is now institutional only
+    content = f"🔬 Clinical Insight from Bansal Metabolic Lab:\n\n{random.choice(insights)}\n\n✅ Evidence-Based Protocol. ✅ PhD-Led Research.\n📩 Professional Consultation: bansallab@outlook.com"
     
     payload = {
         "post": content,
         "platforms": ["linkedin", "pinterest"],
+        "mediaUrls": ["https://images.unsplash.com/photo-1579152276503-6175b96143c7?q=80&w=1000&auto=format&fit=crop"] 
     }
+    
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {os.environ['AYRSHARE_API_KEY']}",
         "Content-Type": "application/json"
     }
     
     response = requests.post("https://app.ayrshare.com/api/post", json=payload, headers=headers)
-    
-    if response.status_code == 200:
-        print("🚀 Global Billboard Updated Successfully!")
-    else:
-        print(f"❌ Error: {response.text}")
+    print(f"Broadcast Status: {response.text}")
 
 if __name__ == "__main__":
     post_to_socials()
