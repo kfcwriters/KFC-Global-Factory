@@ -1,63 +1,25 @@
-name: 24-7 KFC Global Synthetic Factory
-
-on:
-  workflow_dispatch:
-
+name: 24-7 Multi-Agent PhD Factory
+on: workflow_dispatch
 jobs:
-  emperor-pipeline:
+  run-agents:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install Media Suite
+      - uses: actions/checkout@v4
+      - name: Setup
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev fonts-liberation xvfb \
-          libjpeg-dev zlib1g-dev libfreetype6-dev
-          pip install manim requests gtts
-
-      - name: Generate PhD Assets (Audio Slice Logic)
+          sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+          pip install manim gtts requests
+      - name: Run Scholar & Orator
         run: |
-          python3 lead_hunter.py
-          python3 sigma_lecture_generator.py
-          
-          python3 -c "
-          import os
-          from gtts import gTTS
-          script = 'lecture_script.txt'
-          if not os.path.exists(script):
-              with open(script, 'w') as f: f.write('Advanced Clinical Biochemistry Masterclass.')
-          
-          with open(script, 'r') as f:
-              words = f.read().split()[:1200]
-          
-          mid = len(words) // 2
-          gTTS(' '.join(words[:mid])).save('p1.mp3')
-          gTTS(' '.join(words[mid:])).save('p2.mp3')
-          os.system('ffmpeg -y -i \"concat:p1.mp3|p2.mp3\" -acodec copy voice.mp3')
-          "
-
-      - name: Render Masterclass (720p Big Font)
-        run: |
-          # Clean old media and render fresh
-          rm -rf media/
-          xvfb-run -a python3 animate_subtitles.py
-
-      - name: Deliver Masterclass
+          python3 scribe_agent.py
+          python3 voice_agent.py
+      - name: Run Architect
+        run: xvfb-run -a python3 render_agent.py
+      - name: Deliver
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          sleep 10
-          # FINDER: Looks for any MP4 produced by the script
-          VIDEO_PATH=$(find . -name "TeachingMasterclass.mp4" | head -n 1)
-          
-          if [ -z "$VIDEO_PATH" ]; then
-            echo "❌ ERROR: Render failed. No MP4 file was found."
-            exit 1
-          fi
-          
-          ffmpeg -y -i "$VIDEO_PATH" -i voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
-          
-          python3 -c "import os, requests; url=f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo'; f=open('final_masterclass.mp4','rb'); requests.post(url, data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MASTERCLASS: FULL-SCREEN FONT READY'}, files={'video': f})"
+          VIDEO=$(find . -name "*.mp4" | head -n 1)
+          ffmpeg -y -i "$VIDEO" -i voice.mp3 -c:v libx264 -shortest final.mp4
+          python3 -c "import requests; f=open('final.mp4','rb'); requests.post(f'https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendVideo', data={'chat_id': '${{ secrets.TELEGRAM_CHAT_ID }}'}, files={'video': f})"
