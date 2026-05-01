@@ -1,7 +1,9 @@
 name: 24-7 PhD Video, Outreach & YouTube Factory
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Allows you to run it manually
+  schedule:
+    - cron: '0 0,6,12,18 * * *' # RUNS AUTOMATICALLY 4 TIMES A DAY
 
 jobs:
   emperor-pipeline:
@@ -42,12 +44,12 @@ jobs:
             python3 youtube_uploader.py
           fi
 
-      - name: STEP 5 Deliver Assets
+      - name: STEP 5 Deliver Assets to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           if [ -f "final_module.mp4" ]; then
-            python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW MODULE: Published to YouTube & Sent to Telegram'}, files={'video': f})"
+            python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 CLOUD STRIKE: New Module Live on YouTube'}, files={'video': f})"
           fi
-          python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': '📬 BUSINESS STRIKE COMPLETE: 5 Outreach emails dispatched.'})"
+          python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': '📬 BUSINESS STRIKE COMPLETE: 5 unique medical authors contacted.'})"
