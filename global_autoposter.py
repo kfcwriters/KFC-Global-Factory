@@ -2,20 +2,19 @@ import requests, os, random
 
 def post_to_socials():
     insights = [
-        "Metabolic Reset: Myonectin signaling is the primary driver for cellular insulin sensitivity.",
-        "Renal Protocol: Clinical biochemistry indicates that pH balance is essential for stone prevention.",
-        "Weight Management: Hormonal signaling pathways dictate adipose tissue distribution more than caloric intake.",
-        "Diagnostic Audit: Clinical lab report analysis is the first step in precision nutrition."
+        "Metabolic Reset: Myonectin is key for insulin sensitivity.",
+        "Renal Protocol: pH balance is essential for stone prevention.",
+        "Weight Science: Hormones dictate fat loss more than calories.",
+        "Diagnostic Audit: Clinical lab analysis is the first step."
     ]
     
-    # Professional Medical Images that trigger "Trust" in Global Patients
     medical_images = [
-        "https://images.unsplash.com/photo-1579152276503-6175b96143c7?auto=format&fit=crop&w=1000", # Lab Tech
-        "https://images.unsplash.com/photo-1532187875605-1fc3459468e2?auto=format&fit=crop&w=1000", # Microscope
-        "https://images.unsplash.com/photo-1581595221475-ad669b82d0c3?auto=format&fit=crop&w=1000"  # Clinical Data
+        "https://images.pexels.com/photos/356040/pexels-photo-356040.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+        "https://images.pexels.com/photos/3912981/pexels-photo-3912981.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
     ]
     
-    content = f"🔬 Clinical Insight from Bansal Metabolic Lab:\n\n{random.choice(insights)}\n\n✅ Evidence-Based Protocol. ✅ PhD-Led Research.\n📩 Professional Consultation: bansallab@outlook.com"
+    # Simplified text to prevent "400" errors
+    content = f"🔬 Bansal Metabolic Lab Insight: {random.choice(insights)} 📩 Consult: bansallab@outlook.com"
     
     payload = {
         "post": content,
@@ -29,7 +28,7 @@ def post_to_socials():
     }
     
     response = requests.post("https://app.ayrshare.com/api/post", json=payload, headers=headers)
-    print(f"Global Billboard Updated: {response.status_code}")
+    print(f"Global Billboard Status: {response.status_code}")
 
 if __name__ == "__main__":
     post_to_socials()
