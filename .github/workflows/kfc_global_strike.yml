@@ -1,36 +1,48 @@
-name: 24-7 Global Medical Outreach Strike
+name: 24-7 PhD Video & Global Outreach Factory
 
 on:
   workflow_dispatch:
 
 jobs:
-  outreach-cycle:
+  emperor-pipeline:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Run Global Lead Hunter
+      - name: Setup Media & Dev Suite
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
+          pip install manim gtts requests
+
+      - name: VIDEO TRACK: Generate Masterclass
+        run: |
+          # 1. Scholar writes the medical script
+          python3 scholar_agent.py
+          # 2. Master Architect renders the massive font visuals
+          xvfb-run -a python3 master_agent.py
+
+      - name: BUSINESS TRACK: 5-Lead Original Hunter
         run: python3 lead_hunter_global.py
 
-      - name: Execute Email Dispatch
+      - name: EXECUTE STRIKE: Email Dispatch
         env:
-          # HARD-CODED USER: Replace with your actual Gmail address
-          GMAIL_USER: "kfcwriters@gmail.com" 
-          # SECRET INJECTION: Make sure GMAIL_PASSWORD in GitHub = tnhyxpgbnkykelze
+          GMAIL_USER: "kfcwriters@gmail.com"
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: python3 email_sender.py
 
-      - name: Notify Telegram
+      - name: Deliver Video & Status to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 -c "
-          import requests, os
-          if os.path.exists('business_leads.txt'):
-              lead = open('business_leads.txt').readlines()[0].strip()
-              msg = f'📬 OUTREACH COMPLETE\n{lead}\nStatus: Dispatched via Secure App Pass.'
-              requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', 
-                            data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': msg})
-          "
+          # 1. Video Fusion
+          VIDEO=$(find . -name "PhDArchitect.mp4" | head -n 1)
+          if [ -n "$VIDEO" ]; then
+            ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -shortest final_module.mp4
+            python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW GLOBAL MEDICAL MODULE READY'}, files={'video': f})"
+          fi
+          
+          # 2. Outreach Confirmation
+          python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': '📬 BUSINESS STRIKE COMPLETE: 5 Outreach emails dispatched to original authors.'})"
