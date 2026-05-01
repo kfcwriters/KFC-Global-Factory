@@ -1,41 +1,54 @@
 import random
 import textwrap
 
-def generate_dynamic_script():
-    # DATABASE: Rotating between Thesis Writing, CBME MBBS topics, and MLT Tech
-    library = {
-        "THESIS_WRITING": [
-            "Methodology: Designing a segment-specific molecular panel for Diabetic Nephropathy.",
-            "Thesis Structure: How to humanize AI-generated discussions while maintaining academic rigor.",
-            "Grant Writing: Navigating ICMR Extra-Mural project frameworks for clinical scientists.",
-            "Ethics in Research: The importance of patient consent in clinical biochemistry datasets."
-        ],
-        "CBME_MBBS": [
-            "Metabolism: The hormonal regulation of Gluconeogenesis in the fasting state.",
-            "Clinical Correlation: Understanding the anion gap in Metabolic Acidosis (ABG Analysis).",
-            "Enzymology: Competitive vs Non-competitive inhibition in drug design (Statins example).",
-            "Organ Function: Interpreting Liver Function Tests (LFT) in Obstructive Jaundice."
-        ],
-        "MLT_LAB_TECH": [
-            "Automation: The shift from manual assays to Total Laboratory Automation (TLA).",
-            "Quality Control: Implementing Westgard Rules and Sigma metrics in high-volume labs.",
-            "Point of Care: Troubleshooting glucometer variance in clinical ward settings.",
-            "Pre-analytical Errors: Impact of hemolysis and lipemia on spectrophotometric results."
-        ]
-    }
-
-    # PICK CATEGORY & TOPIC
-    category = random.choice(list(library.keys()))
-    topic = random.choice(library[category])
+def generate_deep_script():
+    # Focused on your thesis, CBME MBBS curriculum, and MLT Tech
+    library = [
+        {
+            "category": "PHD_THESIS",
+            "content": [
+                "Advanced proteomics allows us to map precise sites of protein glycation.",
+                "In diabetic patients, these biomarkers predict nephropathy progression.",
+                "Identifying RBP4 and GPLD1 early is the frontier of clinical research.",
+                "Designing segment-specific molecular panels is key to early detection.",
+                "This methodology ensures high sensitivity in clinical biochemistry trials."
+            ]
+        },
+        {
+            "category": "CBME_MBBS",
+            "content": [
+                "Gluconeogenesis is the metabolic pathway that generates glucose from non-carbohydrates.",
+                "This occurs primarily in the liver during periods of fasting or intense exercise.",
+                "Key enzymes like Pyruvate Carboxylase regulate this critical energy flux.",
+                "Hormonal control via Glucagon and Insulin ensures blood glucose homeostasis.",
+                "Clinical defects in this pathway can lead to severe hypoglycemia and acidosis."
+            ]
+        },
+        {
+            "category": "LAB_QUALITY",
+            "content": [
+                "Sigma metrics quantify laboratory quality by measuring bias and CV.",
+                "A Six Sigma process represents world-class quality with minimal defects.",
+                "Implementing Westgard Rules ensures analytical performance stays within limits.",
+                "Total Laboratory Automation (TLA) reduces pre-analytical errors significantly.",
+                "Moving to risk-based QC models optimizes both safety and laboratory cost."
+            ]
+        }
+    ]
     
-    # FORMAT FOR MASSIVE FONT: Wrap at 22 chars
-    # We use double newlines to signal "Slides" to the Master Agent
-    wrapped_content = "\n\n".join(textwrap.wrap(topic, width=22))
+    selected = random.choice(library)
     
+    # Process into narrow slices (22 chars) to force MASSIVE font
+    all_slices = []
+    for line in selected["content"]:
+        # Double wrap ensures we break the text into small "slides"
+        all_slices.extend(textwrap.wrap(line, width=22))
+    
+    # Use double newlines to signal "Slide Changes" to the Master Agent
     with open('phd_script.txt', 'w') as f:
-        f.write(wrapped_content)
+        f.write("\n\n".join(all_slices))
     
-    print(f"✅ Scholar Agent: Generated a {category} script.")
+    print(f"✅ Scholar Agent: Generated a deep module for {selected['category']}.")
 
 if __name__ == "__main__":
-    generate_dynamic_script()
+    generate_deep_script()
