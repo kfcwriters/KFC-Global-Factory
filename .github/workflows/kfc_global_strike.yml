@@ -1,4 +1,4 @@
-name: 24-7 PhD Multi-Agent Factory
+name: 24-7 PhD Long-Form Factory
 
 on:
   workflow_dispatch:
@@ -12,7 +12,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Academic Media Suite
-        # These libraries are essential for Manim to handle large fonts and high-res rendering
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev \
@@ -21,10 +20,10 @@ jobs:
 
       - name: Run Multi-Agent Sequence
         run: |
-          # AGENT 1: The Scholar writes the dynamic script (Thesis/CBME/MLT)
+          # Step 1: Scholar writes the 1-2 minute technical script
           python3 scholar_agent.py
           
-          # AGENT 2: The Master Architect renders visuals with audio sync
+          # Step 2: Master Architect renders visuals with audio sync
           xvfb-run -a python3 master_agent.py
 
       - name: Deliver Masterclass
@@ -33,17 +32,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           sleep 10
-          # FINDER: Search for the MP4 produced by the Architect
           VIDEO=$(find . -name "PhDMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO" ]; then
-            echo "❌ ERROR: Master Agent failed to produce a video file."
+            echo "❌ ERROR: Render failed."
             exit 1
           fi
           
-          # FUSION: Merge the visual slides with the generated voiceover
-          # -shortest ensures they end exactly at the same millisecond
-          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
+          # Perfect sync fusion for long-form content
+          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_module.mp4
           
-          # DISPATCH: Send the final academic module to Telegram
-          python3 -c "import requests, os; f=open('final_masterclass.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW PHD ACADEMIC MODULE READY'}, files={'video': f})"
+          python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW LONG-FORM ACADEMIC MODULE UPLOADED'}, files={'video': f})"
