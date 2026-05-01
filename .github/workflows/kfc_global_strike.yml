@@ -1,37 +1,35 @@
-name: 24-7 Medical Business Lead Factory
+name: 24-7 Global Medical Outreach Strike
 
 on:
   workflow_dispatch:
 
 jobs:
-  lead-generation:
+  outreach-cycle:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Install Dependencies
-        run: pip install requests
-
       - name: Run Global Lead Hunter
         run: python3 lead_hunter_global.py
 
-      - name: Deliver Lead to Telegram
+      - name: Execute Email Dispatch
+        # Using the Gmail secrets already saved in your Repo
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: python3 email_sender.py
+
+      - name: Notify Telegram of Success
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f "business_leads.txt" ]; then
-            LEAD_DATA=$(cat business_leads.txt)
-            python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': os.getenv('LEAD_DATA')})"
-          else
-            echo "❌ No lead file found."
-            exit 1
-          fi
-        env:
-          LEAD_DATA: ${{ steps.lead_hunter.outputs.lead }}
+          python3 -c "
+          import requests, os
+          if os.path.exists('business_leads.txt'):
+              lead = open('business_leads.txt').readlines()[0].strip()
+              msg = f'📬 OUTREACH COMPLETE\n{lead}\nStatus: Email Dispatched Successfully.'
+              requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', 
+                            data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': msg})
+          "
