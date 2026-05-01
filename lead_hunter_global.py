@@ -1,27 +1,61 @@
 import random
 
-def hunt_global_leads():
-    fields = ["Oncology", "Cardiology", "Neurology", "Clinical Biochemistry"]
-    providers = ["gmail.com", "yahoo.com", "rediffmail.com", "outlook.com"]
-    names = ["Dr. Anil", "Dr. Sarah", "Dr. Priya", "Dr. James", "Dr. Vikram"]
-    lasts = ["Gupta", "Smith", "Sharma", "Lee", "Mehta"]
+def hunt_global_medical_leads():
+    # Global Medical Science Topics 2026
+    fields = [
+        "Surgical Oncology", "Cardiovascular Medicine", "Pediatric Neurology", 
+        "Clinical Biochemistry", "Precision Neurogenomics", "Radiology AI"
+    ]
     
-    first = random.choice(names).lower().replace('dr. ', '').strip()
-    last = random.choice(lasts).lower().strip()
+    # MIXED DOMAINS: Institutional + Global Personal Providers
+    domains = [
+        "gmail.com", "yahoo.com", "rediffmail.com", "outlook.com", 
+        "aiims.edu", "ox.ac.uk", "hopkinsmedicine.org", "mayo.edu"
+    ]
     
-    # THE FIX: Replace '..' with '.' to prevent the 553 RFC 5321 error
-    target_email = f"{first}.{last}.research@{random.choice(providers)}".replace('..', '.')
-    target_name = f"Dr. {first.capitalize()} {last.capitalize()}"
+    names = ["Dr. Anil", "Dr. Sarah", "Dr. Vikram", "Dr. Linda", "Dr. Priya", "Dr. James"]
+    lasts = ["Gupta", "Smith", "Sharma", "Lee", "Mehta", "Vasiliev"]
+    
+    first = random.choice(names)
+    last = random.choice(lasts)
+    target_name = f"{first} {last}"
+    
+    # THE FIX: Pattern rotation to hit different provider types
+    provider = random.choice(domains)
+    if ".com" in provider:
+        # Personal pattern
+        target_email = f"{first.lower()}.{last.lower()}.research@{provider}"
+    else:
+        # Institutional pattern
+        target_email = f"clinical.trials@{provider}"
+    
     field = random.choice(fields)
 
-    pitch = f"Subject: Publishing Support for your {field} Research\n\nDear {target_name},\n\n" \
-            f"I offer professional services to humanize AI manuscripts and structure clinical data " \
-            f"for high-impact journals. Would you be open to a brief sync?\n\nBest, [Your Name]"
+    # Professional Outreach Pitch
+    pitch = f"""
+    Subject: Publication Support for your {field} Manuscript
+    
+    Dear {target_name},
+    
+    I noticed your research contributions in the field of {field}. As a fellow 
+    scientist specializing in PhD thesis humanization and academic consulting, 
+    I offer professional services to help manuscripts pass high-impact peer review.
+    
+    Our Focus:
+    - Humanizing AI-generated academic text to pass rigorous rigor checks.
+    - Designing segment-specific molecular panels for clinical data.
+    - Systematic review and meta-analysis formatting for Lancet-tier journals.
+    
+    Are you open to a brief sync on increasing your citation potential?
+    
+    Best regards,
+    [Academic Writing Lead]
+    """
     
     with open('business_leads.txt', 'w') as f:
         f.write(f"LEAD: {target_name}\nEMAIL: {target_email}\nFIELD: {field}\n\n{pitch}")
     
-    print(f"✅ Lead Hunter: Found {target_name} ({target_email}).")
+    print(f"✅ Lead Hunter: Targeted {target_name} ({target_email}).")
 
 if __name__ == "__main__":
-    hunt_global_leads()
+    hunt_global_medical_leads()
