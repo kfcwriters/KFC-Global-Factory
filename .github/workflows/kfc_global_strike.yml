@@ -1,4 +1,4 @@
-name: 24-7 Multi-Agent PhD Factory
+name: 24-7 PhD Factory Fixed
 
 on:
   workflow_dispatch:
@@ -7,40 +7,27 @@ jobs:
   run-agents:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Agent Dependencies
+      - name: Setup
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev \
-          libjpeg-dev zlib1g-dev libfreetype6-dev
+          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
           pip install manim gtts requests
 
-      - name: Run Agent 1 (Scholar)
-        run: python3 scribe_agent.py
+      - name: Execute Master Agent
+        run: xvfb-run -a python3 master_agent.py
 
-      - name: Run Agent 2 (Orator)
-        run: python3 voice_agent.py
-
-      - name: Run Agent 3 (The Architect)
-        run: xvfb-run -a python3 render_agent.py
-
-      - name: Agent 4 (Delivery Dispatch)
+      - name: Deliver
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          sleep 15
-          # AGGRESSIVE FINDER: Checks root and subfolders
-          VIDEO=$(find . -name "PhDArchitect.mp4" | head -n 1)
+          # The ultimate search for the file
+          VIDEO=$(find . -name "PhDMasterclass.mp4" | head -n 1)
+          if [ -z "$VIDEO" ]; then echo "RENDER FAILED"; exit 1; fi
           
-          if [ -z "$VIDEO" ]; then
-            echo "❌ ERROR: Render Agent 3 failed to produce output."
-            exit 1
-          fi
+          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final.mp4
           
-          # Fusion: Merge visuals with Agent 2 audio
-          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
-          
-          python3 -c "import requests, os; f=open('final_masterclass.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD MULTI-AGENT SUCCESS: FULL-SCREEN FONT READY'}, files={'video': f})"
+          python3 -c "import requests, os; f=open('final.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\")}, files={'video': f})"
