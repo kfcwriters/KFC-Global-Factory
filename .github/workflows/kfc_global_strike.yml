@@ -15,8 +15,9 @@ jobs:
 
       - name: Execute Email Dispatch
         env:
-          # Replace with your actual Gmail address
-          EMAIL_USER: "your-email@gmail.com" 
+          # HARD-CODED USER: Replace with your actual Gmail address
+          GMAIL_USER: "kfcwriters@gmail.com" 
+          # SECRET INJECTION: Make sure GMAIL_PASSWORD in GitHub = tnhyxpgbnkykelze
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: python3 email_sender.py
 
@@ -29,7 +30,7 @@ jobs:
           import requests, os
           if os.path.exists('business_leads.txt'):
               lead = open('business_leads.txt').readlines()[0].strip()
-              msg = f'📬 OUTREACH COMPLETE\n{lead}\nStatus: Email Sent via App Pass.'
+              msg = f'📬 OUTREACH COMPLETE\n{lead}\nStatus: Dispatched via Secure App Pass.'
               requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', 
                             data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': msg})
           "
