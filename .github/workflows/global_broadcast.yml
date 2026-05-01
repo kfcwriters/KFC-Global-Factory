@@ -1,0 +1,22 @@
+name: Global Patient Discovery
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 3 * * *' # 9:00 AM IST daily
+
+jobs:
+  broadcast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install Dependencies
+        run: pip install requests
+      - name: Run Global Post
+        env:
+          AYRSHARE_API_KEY: ${{ secrets.AYRSHARE_API_KEY }}
+        run: python3 global_autoposter.py
