@@ -1,24 +1,40 @@
 import random
 
 def hunt_global_leads():
-    specialties = ["Oncology", "Cardiology", "Neurology", "Clinical Biochemistry"]
-    providers = ["gmail.com", "yahoo.com", "rediffmail.com", "outlook.com"]
+    # Global medical fields for broad outreach
+    fields = ["Oncology", "Cardiology", "Neurology", "Clinical Biochemistry", "Pediatrics"]
+    # Including personal and regional email providers
+    providers = ["gmail.com", "yahoo.com", "rediffmail.com", "outlook.com", "icloud.com"]
     names = ["Dr. Anil", "Dr. Sarah", "Dr. Priya", "Dr. James", "Dr. Vikram"]
     lasts = ["Gupta", "Smith", "Sharma", "Lee", "Mehta"]
     
     target_name = f"{random.choice(names)} {random.choice(lasts)}"
+    # Professional-pattern personal email
     target_email = f"{target_name.lower().replace(' ', '.')}.research@{random.choice(providers)}"
-    field = random.choice(specialties)
+    field = random.choice(fields)
 
-    pitch = f"Subject: Publishing Support for your {field} Research\n\nDear {target_name},\n\n" \
-            f"We specialize in humanizing AI-generated medical manuscripts and designing " \
-            f"clinical data panels for high-impact journals. Would you be open to a " \
-            f"5-minute sync on increasing your citation h-index?\n\nBest, [Your Name]"
+    # Professional outreach pitch for your humanizing & publication services
+    pitch = f"""
+    Subject: Publication Support for your {field} Research
+    
+    Dear {target_name},
+    
+    I noticed your active work in {field}. As a fellow scientist specializing in 
+    PhD thesis optimization and academic consulting, I offer professional services 
+    to help manuscripts pass high-impact peer review.
+    
+    Our Focus:
+    - Humanizing AI-generated academic text for better rigor.
+    - Designing segment-specific clinical data panels.
+    - Formatting for Lancet, BMJ, and NEJM standards.
+    
+    Would you be open to a 5-minute sync on increasing your citation h-index?
+    """
     
     with open('business_leads.txt', 'w') as f:
         f.write(f"LEAD: {target_name}\nEMAIL: {target_email}\nFIELD: {field}\n\n{pitch}")
     
-    print(f"✅ Lead Hunter: Found {target_name} ({target_email}).")
+    print(f"✅ Business Agent: Generated lead for {target_name} ({target_email}).")
 
 if __name__ == "__main__":
     hunt_global_leads()
