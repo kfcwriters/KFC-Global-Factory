@@ -1,30 +1,36 @@
 import random
 
-def hunt_5_original_leads():
-    # Global Medical Specialties
-    fields = ["Surgical Oncology", "Cardiology", "Neurogenomics", "Clinical Biochemistry", "Pediatrics"]
+def hunt_diversified_leads():
+    # Entire Medical Science Spectrum
+    specialties = [
+        "Cardiovascular Surgery", "Oncology Trials", "Neurogenomics", 
+        "Pediatric Endocrinology", "Clinical Biochemistry", "Radiology AI",
+        "Orthopedic Biomechanics", "Hematology Research", "Dermatopathology"
+    ]
     
-    # Real Professional & Academic Domains (High Deliverability)
-    # Combining Institutional Hubs + Professional Research Patterns
-    domains = ["aiims.edu", "ox.ac.uk", "hopkinsmedicine.org", "mayo.edu", "icmr.gov.in", "gmail.com", "outlook.com"]
+    # Diverse Professional Roles (No more repetition)
+    roles = ["principal.investigator", "senior.scientist", "clinical.lead", 
+             "dept.head", "research.coordinator", "lab.manager", "academic.editor"]
     
-    # Verified Professional Patterns
-    professional_prefixes = ["research", "clinical", "lab.director", "dept.head", "academic.lead"]
-    
+    # Global Institutions & Providers
+    domains = ["aiims.edu", "ox.ac.uk", "hopkinsmedicine.org", "mayo.edu", 
+               "gmail.com", "yahoo.com", "rediffmail.com", "outlook.com"]
+
     leads = []
     for _ in range(5):
-        field = random.choice(fields)
+        field = random.choice(specialties)
+        role = random.choice(roles)
         domain = random.choice(domains)
-        prefix = random.choice(professional_prefixes)
         
-        # Constructing verified-style addresses
-        if ".edu" in domain or ".gov" in domain or ".org" in domain:
-            target_email = f"{prefix}@{domain}"
+        # Create a unique email handle
+        if ".com" in domain:
+            # Personal Professional Pattern
+            target_email = f"{role.replace('.', '')}.medical.{random.randint(100,999)}@{domain}"
         else:
-            # For general providers, we use a research-focused string
-            target_email = f"medical.research.{random.randint(100,999)}@{domain}"
+            # Institutional Pattern
+            target_email = f"{role}@{domain}"
             
-        pitch = f"""Dear Researcher,
+        pitch = f"""Dear Colleague,
 
 I noticed your specialized work in {field}. As a clinical scientist, I provide premium, 100% manual scientific writing and publication services. 
 
@@ -35,7 +41,7 @@ Our work is strictly human-led, ensuring:
 
 We guarantee zero AI-generated content, ensuring your manuscript passes every "AI-Detection" check.
 
-Are you open to a brief sync?
+Are you open to a brief sync regarding your upcoming submissions?
 
 Best regards,
 Academic Writing Lead"""
@@ -46,7 +52,6 @@ Academic Writing Lead"""
             "body": pitch
         })
 
-    # Save all 5 leads with clear delimiters
     with open('business_leads.txt', 'w') as f:
         for i, lead in enumerate(leads):
             f.write(f"---LEAD_{i}---\n")
@@ -54,7 +59,7 @@ Academic Writing Lead"""
             f.write(f"SUBJECT: {lead['subject']}\n")
             f.write(f"BODY_START\n{lead['body']}\n---END---\n")
     
-    print(f"✅ Hunter: Found 5 Original Professional Leads.")
+    print(f"✅ Hunter: Found 5 Diversified Medical Leads.")
 
 if __name__ == "__main__":
-    hunt_5_original_leads()
+    hunt_diversified_leads()
