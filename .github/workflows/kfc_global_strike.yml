@@ -16,17 +16,15 @@ jobs:
           sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
           pip install manim gtts requests
 
-      - name: VIDEO TRACK: Generate Masterclass
+      - name: VIDEO TRACK Generate Masterclass
         run: |
-          # 1. Scholar writes the medical script
           python3 scholar_agent.py
-          # 2. Master Architect renders the massive font visuals
           xvfb-run -a python3 master_agent.py
 
-      - name: BUSINESS TRACK: 5-Lead Original Hunter
+      - name: BUSINESS TRACK 5-Lead Original Hunter
         run: python3 lead_hunter_global.py
 
-      - name: EXECUTE STRIKE: Email Dispatch
+      - name: EXECUTE STRIKE Email Dispatch
         env:
           GMAIL_USER: "kfcwriters@gmail.com"
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
@@ -37,12 +35,9 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # 1. Video Fusion
           VIDEO=$(find . -name "PhDArchitect.mp4" | head -n 1)
           if [ -n "$VIDEO" ]; then
             ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -shortest final_module.mp4
             python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW GLOBAL MEDICAL MODULE READY'}, files={'video': f})"
           fi
-          
-          # 2. Outreach Confirmation
-          python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': '📬 BUSINESS STRIKE COMPLETE: 5 Outreach emails dispatched to original authors.'})"
+          python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': '📬 BUSINESS STRIKE COMPLETE: 5 Outreach emails dispatched.'})"
