@@ -1,4 +1,4 @@
-name: 24-7 PhD Synthetic Factory (Perfect Sync)
+name: 24-7 PhD Dynamic Factory
 
 on:
   workflow_dispatch:
@@ -6,7 +6,6 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -14,13 +13,12 @@ jobs:
       - name: Install Academic Media Suite
         run: |
           sudo apt-get update
-          # These binaries are required for Manim to render fonts without crashing
           sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev \
           libjpeg-dev zlib1g-dev libfreetype6-dev
           pip install manim gtts requests
 
-      - name: Execute Synchronized Master Agent
-        # xvfb-run allows Manim to render on a headless server
+      - name: Execute Dynamic Master Agent
+        # Each run generates a different biochemistry topic
         run: xvfb-run -a python3 master_agent.py
 
       - name: Deliver Masterclass
@@ -29,16 +27,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           sleep 10
-          # FINDER: Hunt for the generated MP4 file
           VIDEO=$(find . -name "PhDMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO" ]; then
-            echo "❌ ERROR: Render failed. Video file not found."
+            echo "❌ ERROR: Render failed."
             exit 1
           fi
           
-          # FUSION: Merge visuals and audio with -shortest to ensure perfect alignment
-          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
+          # Perfect sync fusion
+          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_video.mp4
           
-          # DISPATCH: Send to Telegram
-          python3 -c "import requests, os; f=open('final_masterclass.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 PHD SYNCED MASTERCLASS: FULL-SCREEN FONT READY'}, files={'video': f})"
+          python3 -c "import requests, os; f=open('final_video.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW PHD MODULE: DYNAMIC SYNC SUCCESS'}, files={'video': f})"
