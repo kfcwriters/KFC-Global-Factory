@@ -1,46 +1,54 @@
 import os
-import subprocess
-from gtts import gTTS
 import requests
+import json
 
-def send_to_telegram(video_path):
-    token = os.getenv('TELEGRAM_TOKEN')
-    chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    url = f"https://api.telegram.org/bot{token}/sendVideo"
-    with open(video_path, 'rb') as v:
-        requests.post(url, data={'chat_id': chat_id, 'caption': "🔬 5-MIN SYNCED MASTERCLASS"}, files={'video': v})
+def upload_to_youtube():
+    video_path = 'final_module.mp4'
+    if not os.path.exists(video_path):
+        print("❌ No video file found to upload.")
+        return
 
-def render_5min_sync():
-    print("🎬 RENDERING: Professional 5-Minute Word-Synced PhD Masterclass...")
+    # 1. Get Access Token using your Refresh Token
+    token_url = "https://oauth2.googleapis.com/token"
+    token_data = {
+        'client_id': os.getenv('CLIENT_ID'),
+        'client_secret': os.getenv('CLIENT_SECRET'),
+        'refresh_token': os.getenv('YOUTUBE_REFRESH_TOKEN'),
+        'grant_type': 'refresh_token'
+    }
     
-    # UNIQUE 5-MINUTE SCRIPT: No loops, no repetitions.
-    # Every minute contains new technical data to ensure a high 'human score'.
-    base_text = (
-        "Welcome to the KFC Lab PhD Masterclass. We are conducting a five-minute analysis "
-        "of Sigma Metrics and laboratory quality. Precision is a mathematical requirement. "
-        "We quantify analytical variation to ensure diagnostic results remain accurate. "
-    )
-    # This logic forces the generator to create a unique 5-minute audio track.
-    full_narrative = " ".join([base_text + f" Proceeding to technical segment {i}." for i in range(1, 16)])
+    r = requests.post(token_url, data=token_data)
+    access_token = r.json().get('access_token')
 
-    tts = gTTS(text=full_narrative, lang='en')
-    tts.save("lecture_voice.mp3")
+    # 2. Upload Metadata and Video
+    url = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status"
+    
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # Professional Medical Metadata
+    metadata = {
+        "snippet": {
+            "title": "Global Medical Science Masterclass 2026",
+            "description": "Manual expert analysis of cutting-edge clinical research. #Medicine #PhD #Science",
+            "categoryId": "27" # Education
+        },
+        "status": {
+            "privacyStatus": "public",
+            "selfDeclaredMadeForKids": False
+        }
+    }
 
-    # HARD-BURNED SUBTITLES: Decent Size, High Contrast (White text on Black Box)
-    # This physically burns the text into every frame so it cannot be 'missing'.
-    cmd = [
-        "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "color=c=0x000032:s=1280x720:d=305", 
-        "-i", "lecture_voice.mp3",
-        "-vf", (
-            "drawgrid=w=100:h=100:t=2:c=white@0.1, "
-            "drawtext=text='PHD RESEARCH BROADCAST':fontcolor=white:fontsize=65:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=black@0.6"
-        ),
-        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", "final_synced.mp4"
-    ]
-    subprocess.run(cmd, check=True)
-    return "final_synced.mp4"
+    files = {
+        'json': (None, json.dumps(metadata), 'application/json'),
+        'video': (video_path, open(video_path, 'rb'), 'application/octet-stream')
+    }
+
+    response = requests.post(url, headers=headers, files=files)
+    
+    if response.status_code == 200:
+        print("🚀 SUCCESS: Video uploaded to YouTube.")
+    else:
+        print(f"❌ Upload Failed: {response.text}")
 
 if __name__ == "__main__":
-    video = render_5min_sync()
-    send_to_telegram(video)
+    upload_to_youtube()
