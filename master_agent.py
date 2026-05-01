@@ -1,51 +1,56 @@
 import os
 import textwrap
 import subprocess
+import random
 from gtts import gTTS
 from manim import *
 
-# 1. RESEARCH & WRAP LOGIC
-def get_script_content():
-    # Focused on your research: Proteomics in Diabetic Nephropathy
-    content = ("Advanced proteomics now allows us to map the precise sites of protein glycation "
-               "in diabetic patients. By identifying these biomarkers early, we can predict "
-               "the progression of diabetic nephropathy with high sensitivity. This is the "
-               "frontier of clinical biochemistry research today.")
-    # Tight wrap (22 chars) forces MASSIVE font and uses full horizontal screen
+# 1. DYNAMIC RESEARCH AGENT
+def get_random_phd_topic():
+    topics = [
+        "The role of RBP4 and GPLD1 as novel biomarkers for predicting the onset of Diabetic Nephropathy.",
+        "How Sigma Metrics revolutionize laboratory quality management by quantifying analytical performance.",
+        "The impact of mitoprotective drugs like Miglustat on Rotenone-induced toxicity in SH-SY5Y cell lines.",
+        "Analyzing the proteomics of glycated proteins to identify early-stage diabetic kidney disease.",
+        "The transition from traditional QC rules to risk-based analytical models in clinical biochemistry.",
+        "Investigating circulating serum myonectin levels as a metabolic regulator in Type 2 Diabetes."
+    ]
+    content = random.choice(topics)
+    # Tight wrap (20-22 chars) forces MASSIVE font and full horizontal coverage
     return textwrap.wrap(content, width=22)
 
-# 2. SYNCED RENDERING
+# 2. SYNCHRONIZED RENDERING
 config.pixel_height, config.pixel_width = 720, 1280
 config.frame_rate = 15
 config.verbosity = "ERROR"
 
 class PhDMasterclass(Scene):
     def construct(self):
-        self.camera.background_color = "#0B1D3A" # Institutional Navy
-        slides = get_script_content()
+        self.camera.background_color = "#0B1D3A" # Navy
+        slides = get_random_phd_topic()
         
-        # GENERATE VOICE FIRST TO GET DURATION
+        # Audio Generation
         full_text = " ".join(slides)
-        tts = gTTS(full_text, lang='en')
+        tts = gTTS(full_text, lang='en', tld='co.in')
         tts.save('phd_voice.mp3')
         
-        # MEASURE REAL DURATION
+        # MEASURE AUDIO DURATION (The Alignment Fix)
         try:
             result = subprocess.check_output(
                 'ffprobe -i phd_voice.mp3 -show_entries format=duration -v quiet -of csv="p=0"',
                 shell=True).decode().strip()
             total_duration = float(result)
         except:
-            total_duration = len(full_text) / 15 # Fallback estimate
+            total_duration = len(full_text) / 14 
             
-        time_per_slide = total_duration / len(slides)
+        duration_per_slide = total_duration / len(slides)
 
-        # RENDER WITH PERFECT SYNC
+        # RENDER WITH DYNAMIC FONT
         for chunk in slides:
-            # Huge font (scale 1.5) that hits the screen edges
-            txt = Text(chunk, font="Sans", color=WHITE, weight=BOLD).scale(1.5)
+            # Scale 1.6 ensures the text hits the margins
+            txt = Text(chunk, font="Sans", color=WHITE, weight=BOLD).scale(1.6)
             self.add(txt)
-            self.wait(time_per_slide)
+            self.wait(duration_per_slide)
             self.remove(txt)
 
 if __name__ == "__main__":
