@@ -1,4 +1,4 @@
-name: 24-7 PhD Long-Form Factory
+name: 24-7 Global Medical Factory
 
 on:
   workflow_dispatch:
@@ -6,40 +6,37 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Academic Media Suite
+      - name: Setup Media & Dev Suite
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev \
-          libjpeg-dev zlib1g-dev libfreetype6-dev
+          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
           pip install manim gtts requests
 
-      - name: Run Multi-Agent Sequence
+      - name: VIDEO TRACK: Run Scholar & Architect
         run: |
-          # Step 1: Scholar writes the 1-2 minute technical script
           python3 scholar_agent.py
-          
-          # Step 2: Master Architect renders visuals with audio sync
           xvfb-run -a python3 master_agent.py
 
-      - name: Deliver Masterclass
+      - name: BUSINESS TRACK: Run Lead Hunter Global
+        # This agent uses a different name to avoid file conflicts
+        run: python3 lead_hunter_global.py
+
+      - name: Deliver Assets
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          sleep 10
+          # 1. Delivery Video
           VIDEO=$(find . -name "PhDMasterclass.mp4" | head -n 1)
+          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -shortest final.mp4
+          python3 -c "import requests, os; f=open('final.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW GLOBAL MEDICAL MODULE READY'}, files={'video': f})"
           
-          if [ -z "$VIDEO" ]; then
-            echo "❌ ERROR: Render failed."
-            exit 1
-          fi
-          
-          # Perfect sync fusion for long-form content
-          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_module.mp4
-          
-          python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW LONG-FORM ACADEMIC MODULE UPLOADED'}, files={'video': f})"
+          # 2. Deliver Business Lead separately
+          LEAD_DATA=$(cat business_leads.txt)
+          python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': os.getenv('LEAD_DATA')})"
+        env:
+          LEAD_DATA: ${{ steps.business_hunter.outputs.lead }}
