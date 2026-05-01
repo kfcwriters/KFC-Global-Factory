@@ -1,40 +1,43 @@
 import random
 
 def hunt_global_leads():
-    # Global medical fields for broad outreach
-    fields = ["Oncology", "Cardiology", "Neurology", "Clinical Biochemistry", "Pediatrics"]
-    # Including personal and regional email providers
+    # Targeted specialties for high-impact writing & humanizing services
+    fields = [
+        "Cardiovascular Research", "Oncology Trials", "Surgical Innovation", 
+        "Clinical Biochemistry", "Neurogenomics", "Pediatric Medicine"
+    ]
+    # Providers as requested: University + General (Gmail/Yahoo/Rediff)
     providers = ["gmail.com", "yahoo.com", "rediffmail.com", "outlook.com", "icloud.com"]
-    names = ["Dr. Anil", "Dr. Sarah", "Dr. Priya", "Dr. James", "Dr. Vikram"]
-    lasts = ["Gupta", "Smith", "Sharma", "Lee", "Mehta"]
+    names = ["Dr. Anil", "Dr. Sarah", "Dr. Vikram", "Dr. Linda", "Dr. Priya", "Dr. James"]
+    lasts = ["Gupta", "Smith", "Sharma", "Lee", "Mehta", "Vasiliev"]
     
-    target_name = f"{random.choice(names)} {random.choice(lasts)}"
-    # Professional-pattern personal email
-    target_email = f"{target_name.lower().replace(' ', '.')}.research@{random.choice(providers)}"
+    selected_name = f"{random.choice(names)} {random.choice(lasts)}"
+    # Creating a professional-style personal email
+    selected_email = f"{selected_name.lower().replace(' ', '.')}.research@{random.choice(providers)}"
     field = random.choice(fields)
 
-    # Professional outreach pitch for your humanizing & publication services
+    # Outreach Pitch focused on your services (AI humanizing, Meta-analysis, Thesis)
     pitch = f"""
-    Subject: Publication Support for your {field} Research
+    Subject: Publication Support for your {field} Manuscript
     
-    Dear {target_name},
+    Dear {selected_name},
     
-    I noticed your active work in {field}. As a fellow scientist specializing in 
-    PhD thesis optimization and academic consulting, I offer professional services 
-    to help manuscripts pass high-impact peer review.
+    I noticed your recent work in {field}. As an academic consultant specializing 
+    in PhD thesis optimization and clinical publishing, I offer professional 
+    services to ensure your work meets high-impact journal standards.
     
-    Our Focus:
-    - Humanizing AI-generated academic text for better rigor.
-    - Designing segment-specific clinical data panels.
-    - Formatting for Lancet, BMJ, and NEJM standards.
+    Expertise:
+    1. Humanizing AI-generated academic text (Passes rigorous peer review).
+    2. Systematic review and meta-analysis structuring.
+    3. Formatting for Lancet, BMJ, and top-tier biochemistry journals.
     
     Would you be open to a 5-minute sync on increasing your citation h-index?
     """
     
     with open('business_leads.txt', 'w') as f:
-        f.write(f"LEAD: {target_name}\nEMAIL: {target_email}\nFIELD: {field}\n\n{pitch}")
+        f.write(f"LEAD: {selected_name}\nEMAIL: {selected_email}\nFIELD: {field}\n\n{pitch}")
     
-    print(f"✅ Business Agent: Generated lead for {target_name} ({target_email}).")
+    print(f"✅ Business Lead Generated: {selected_name} ({selected_email})")
 
 if __name__ == "__main__":
     hunt_global_leads()
