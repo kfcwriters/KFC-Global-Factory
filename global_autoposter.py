@@ -14,8 +14,8 @@ def post_to_socials():
     payload = {
         "post": content,
         "platforms": ["linkedin", "pinterest"],
-        # Using a ultra-reliable Wikimedia Commons medical image link
-        "mediaUrls": ["https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Magnetite_in_biochemistry.jpg/640px-Magnetite_in_biochemistry.jpg"] 
+        # Professional Medical Image from a verified CDN
+        "mediaUrls": ["https://images.pexels.com/photos/356040/pexels-photo-356040.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"] 
     }
     
     headers = {
