@@ -1,21 +1,55 @@
 import requests
+import random
 import os
 
 API_KEY = os.getenv("AYRSHARE_BRAND_TOKEN")
 
-def find_my_board_id():
+# YOUR VIRAL WEALTH LIBRARY
+viral_library = [
+    {
+        "title": "Clear Skin Secret: Minimalist 10% Niacinamide Serum ✨",
+        "link": "https://amzn.to/4uhA3NP", 
+        "desc": "The #1 serum for 'Glass Skin' and oil control. #ad #SkincareHacks #ViralBeauty #Minimalist",
+        "img": "https://m.media-amazon.com/images/I/71D0A8-v-8L.jpg"
+    },
+    {
+        "title": "Aesthetic Room Upgrade: Smart LED Strips 💡",
+        "link": "https://amzn.to/4wbvqH9",
+        "desc": "Upgrade your vibe instantly for under ₹1000. #ad #RoomMakeover #AestheticHome #Govee",
+        "img": "https://m.media-amazon.com/images/I/81-0X-vU-DL.jpg"
+    },
+    {
+        "title": "Zero-Waste Writing: Digital LCD RuffPad 📝",
+        "link": "https://amzn.to/4tVPLP1",
+        "desc": "The perfect tool for quick notes or kids' sketches. #ad #WorkFromHome #ParentingHacks #Portronics",
+        "img": "https://m.media-amazon.com/images/I/61v-v-9-xLL.jpg"
+    }
+]
+
+def post_viral_pin():
     if not API_KEY:
-        print("Error: API Key missing.")
+        print("Error: AYRSHARE_BRAND_TOKEN not found.")
         return
 
-    # This asks Ayrshare to look at your Pinterest account
-    headers = {'Authorization': f'Bearer {API_KEY}'}
-    r = requests.get('https://api.ayrshare.com/api/profiles', headers=headers)
+    item = random.choice(viral_library)
     
-    print("--- SEARCHING FOR YOUR BOARD ID ---")
+    # NEW LOGIC: This sends the board name; Ayrshare will find the ID for us
+    payload = {
+        "post": f"{item['title']}\n\n{item['desc']}\n\nShop here: {item['link']}",
+        "platforms": ["pinterest"],
+        "mediaUrls": [item['img']],
+        "pinterestOptions": {
+            "title": item['title'],
+            "link": item['link'],
+            "board": "Bansal Lab Approved" 
+        }
+    }
+    
+    headers = {'Authorization': f'Bearer {API_KEY}'}
+    r = requests.post('https://api.ayrshare.com/api/post', json=payload, headers=headers)
+    
+    print(f"Status: {r.status_code}")
     print(f"Server Response: {r.text}")
-    print("-----------------------------------")
-    print("Look for a long 18-digit number in the text above.")
 
 if __name__ == "__main__":
-    find_my_board_id()
+    post_viral_pin()
