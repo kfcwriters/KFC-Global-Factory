@@ -4,23 +4,23 @@ import os
 
 API_KEY = os.getenv("AYRSHARE_BRAND_TOKEN")
 
-# YOUR VIRAL WEALTH LIBRARY
+# THE VIRAL WEALTH LIBRARY (Updated with stable links)
 viral_library = [
     {
         "title": "Clear Skin Secret: Minimalist 10% Niacinamide Serum ✨",
-        "link": "https://amzn.to/4uhA3NP", 
+        "link": "https://www.amazon.in/dp/B08F97NH6P?tag=bansallab01-21", 
         "desc": "The #1 serum for 'Glass Skin' and oil control. #ad #SkincareHacks #ViralBeauty #Minimalist",
         "img": "https://m.media-amazon.com/images/I/71D0A8-v-8L.jpg"
     },
     {
         "title": "Aesthetic Room Upgrade: Smart LED Strips 💡",
-        "link": "https://amzn.to/4wbvqH9",
+        "link": "https://www.amazon.in/dp/B08L7STDM9?tag=bansallab01-21",
         "desc": "Upgrade your vibe instantly for under ₹1000. #ad #RoomMakeover #AestheticHome #Govee",
         "img": "https://m.media-amazon.com/images/I/81-0X-vU-DL.jpg"
     },
     {
         "title": "Zero-Waste Writing: Digital LCD RuffPad 📝",
-        "link": "https://amzn.to/4tVPLP1",
+        "link": "https://www.amazon.in/dp/B08XMS7G1C?tag=bansallab01-21",
         "desc": "The perfect tool for quick notes or kids' sketches. #ad #WorkFromHome #ParentingHacks #Portronics",
         "img": "https://m.media-amazon.com/images/I/61v-v-9-xLL.jpg"
     }
@@ -33,7 +33,6 @@ def post_viral_pin():
 
     item = random.choice(viral_library)
     
-    # NEW LOGIC: This sends the board name; Ayrshare will find the ID for us
     payload = {
         "post": f"{item['title']}\n\n{item['desc']}\n\nShop here: {item['link']}",
         "platforms": ["pinterest"],
@@ -48,8 +47,9 @@ def post_viral_pin():
     headers = {'Authorization': f'Bearer {API_KEY}'}
     r = requests.post('https://api.ayrshare.com/api/post', json=payload, headers=headers)
     
+    print(f"Post Attempt: {item['title']}")
     print(f"Status: {r.status_code}")
-    print(f"Server Response: {r.text}")
+    print(f"Response: {r.text}")
 
 if __name__ == "__main__":
     post_viral_pin()
