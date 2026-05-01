@@ -2,32 +2,22 @@ name: Viral Wealth Engine
 
 on:
   schedule:
-    # 9:00 AM IST
-    - cron: '30 3 * * *'
-    # 2:00 PM IST
-    - cron: '30 8 * * *'
-    # 7:00 PM IST
-    - cron: '30 13 * * *'
-    # 11:00 PM IST
-    - cron: '30 17 * * *'
-  workflow_dispatch: # Allows you to test it manually
+    - cron: '30 3 * * *'  # 9:00 AM IST
+    - cron: '30 8 * * *'  # 2:00 PM IST
+    - cron: '30 13 * * *' # 7:00 PM IST
+    - cron: '30 17 * * *' # 11:00 PM IST
+  workflow_dispatch:
 
 jobs:
-  build:
+  post_viral:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Execute script
+      - run: pip install requests
+      - name: Run Script
         env:
           AYRSHARE_BRAND_TOKEN: ${{ secrets.AYRSHARE_BRAND_TOKEN }}
         run: python viral_poster.py
