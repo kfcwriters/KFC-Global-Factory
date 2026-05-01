@@ -1,45 +1,37 @@
-name: 24-7 PhD & Business Factory
+name: 24-7 Medical Business Lead Factory
 
 on:
   workflow_dispatch:
 
 jobs:
-  emperor-pipeline:
+  lead-generation:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Media & Dev Suite
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
-          pip install manim gtts requests
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-      - name: VIDEO TRACK: Run Scholar & Master
-        run: |
-          python3 scholar_agent.py
-          xvfb-run -a python3 master_agent.py
+      - name: Install Dependencies
+        run: pip install requests
 
-      - name: BUSINESS TRACK: Run Lead Hunter Global
+      - name: Run Global Lead Hunter
         run: python3 lead_hunter_global.py
 
-      - name: Deliver Assets
+      - name: Deliver Lead to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # 1. Video Fusion (Finding the MP4 from master_agent.py)
-          VIDEO=$(find . -name "*.mp4" | head -n 1)
-          if [ -n "$VIDEO" ]; then
-            ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -shortest final_module.mp4
-            python3 -c "import requests, os; f=open('final_module.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW GLOBAL MEDICAL MODULE READY'}, files={'video': f})"
-          fi
-          
-          # 2. Business Lead Delivery
           if [ -f "business_leads.txt" ]; then
             LEAD_DATA=$(cat business_leads.txt)
             python3 -c "import requests, os; requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendMessage', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'text': os.getenv('LEAD_DATA')})"
+          else
+            echo "❌ No lead file found."
+            exit 1
           fi
         env:
-          LEAD_DATA: ${{ steps.business_hunter.outputs.lead }}
+          LEAD_DATA: ${{ steps.lead_hunter.outputs.lead }}
