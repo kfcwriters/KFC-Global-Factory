@@ -8,13 +8,14 @@ def post_to_socials():
         "Diagnostic Audit: Clinical lab report analysis is the first step in precision nutrition."
     ]
     
-    # Branding is now institutional only
+    # Strictly Institutional Branding - No Names
     content = f"🔬 Clinical Insight from Bansal Metabolic Lab:\n\n{random.choice(insights)}\n\n✅ Evidence-Based Protocol. ✅ PhD-Led Research.\n📩 Professional Consultation: bansallab@outlook.com"
     
     payload = {
         "post": content,
         "platforms": ["linkedin", "pinterest"],
-        "mediaUrls": ["https://images.unsplash.com/photo-1579152276503-6175b96143c7?q=80&w=1000&auto=format&fit=crop"] 
+        # Using a ultra-reliable Wikimedia Commons medical image link
+        "mediaUrls": ["https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Magnetite_in_biochemistry.jpg/640px-Magnetite_in_biochemistry.jpg"] 
     }
     
     headers = {
