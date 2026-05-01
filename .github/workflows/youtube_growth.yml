@@ -1,0 +1,39 @@
+name: YouTube Subs & Views Booster
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 3,9,15,21 * * *' # Runs 4 times a day, between your main strikes
+
+jobs:
+  growth-strike:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev
+          pip install manim requests gtts
+
+      - name: Create Viral Short
+        run: |
+          # Generate a quick human-focused audio tip
+          python3 -c "from gtts import gTTS; gTTS('Expert medical research requires manual human logic, not just AI.', lang='en').save('short_voice.mp3')"
+          # Render the vertical visuals
+          xvfb-run -a manim -ql shorts_agent.py YouTubeShorts
+          # Find and fuse
+          VIDEO=$(find . -name "YouTubeShorts.mp4" | head -n 1)
+          ffmpeg -y -i "$VIDEO" -i short_voice.mp3 -c:v libx264 -shortest final_short.mp4
+
+      - name: Upload to YouTube Shorts
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          # Use your existing uploader logic
+          mv final_short.mp4 final_module.mp4
+          python3 youtube_uploader.py
