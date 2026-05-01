@@ -1,4 +1,4 @@
-name: 24-7 PhD Dynamic Factory
+name: 24-7 PhD Multi-Agent Factory
 
 on:
   workflow_dispatch:
@@ -6,20 +6,26 @@ on:
 jobs:
   emperor-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Install Academic Media Suite
+        # These libraries are essential for Manim to handle large fonts and high-res rendering
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg xvfb libcairo2-dev libpango1.0-dev \
           libjpeg-dev zlib1g-dev libfreetype6-dev
           pip install manim gtts requests
 
-      - name: Execute Dynamic Master Agent
-        # Each run generates a different biochemistry topic
-        run: xvfb-run -a python3 master_agent.py
+      - name: Run Multi-Agent Sequence
+        run: |
+          # AGENT 1: The Scholar writes the dynamic script (Thesis/CBME/MLT)
+          python3 scholar_agent.py
+          
+          # AGENT 2: The Master Architect renders visuals with audio sync
+          xvfb-run -a python3 master_agent.py
 
       - name: Deliver Masterclass
         env:
@@ -27,14 +33,17 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           sleep 10
+          # FINDER: Search for the MP4 produced by the Architect
           VIDEO=$(find . -name "PhDMasterclass.mp4" | head -n 1)
           
           if [ -z "$VIDEO" ]; then
-            echo "❌ ERROR: Render failed."
+            echo "❌ ERROR: Master Agent failed to produce a video file."
             exit 1
           fi
           
-          # Perfect sync fusion
-          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_video.mp4
+          # FUSION: Merge the visual slides with the generated voiceover
+          # -shortest ensures they end exactly at the same millisecond
+          ffmpeg -y -i "$VIDEO" -i phd_voice.mp3 -c:v libx264 -crf 28 -c:a aac -shortest final_masterclass.mp4
           
-          python3 -c "import requests, os; f=open('final_video.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW PHD MODULE: DYNAMIC SYNC SUCCESS'}, files={'video': f})"
+          # DISPATCH: Send the final academic module to Telegram
+          python3 -c "import requests, os; f=open('final_masterclass.mp4','rb'); requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_TOKEN\")}/sendVideo', data={'chat_id': os.getenv(\"TELEGRAM_CHAT_ID\"), 'caption': '🔬 NEW PHD ACADEMIC MODULE READY'}, files={'video': f})"
