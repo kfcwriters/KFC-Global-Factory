@@ -5,7 +5,7 @@ import os
 # Safely pull your key from GitHub Secrets
 API_KEY = os.getenv("AYRSHARE_BRAND_TOKEN")
 
-# YOUR NEW VIRAL WEALTH LIBRARY
+# YOUR VIRAL WEALTH LIBRARY
 viral_library = [
     {
         "title": "Clear Skin Secret: Minimalist 10% Niacinamide Serum ✨",
@@ -33,18 +33,27 @@ def post_viral_pin():
         return
 
     item = random.choice(viral_library)
+    
+    # Updated Payload with Pinterest Board requirement
     payload = {
         "post": f"{item['title']}\n\n{item['desc']}\n\nShop here: {item['link']}",
         "platforms": ["pinterest"],
         "mediaUrls": [item['img']],
         "pinterestOptions": {
             "title": item['title'],
-            "link": item['link']
+            "link": item['link'],
+            "boardId": "BansalLab_Wealth" # Ensure this board exists on your Pinterest
         }
     }
+    
     headers = {'Authorization': f'Bearer {API_KEY}'}
     r = requests.post('https://api.ayrshare.com/api/post', json=payload, headers=headers)
-    print(f"Posted: {item['title']} - Status: {r.status_code}")
+    
+    if r.status_code == 200:
+        print(f"Success! Posted: {item['title']}")
+    else:
+        print(f"Failed: {item['title']} - Status: {r.status_code}")
+        print(f"Response: {r.text}")
 
 if __name__ == "__main__":
     post_viral_pin()
