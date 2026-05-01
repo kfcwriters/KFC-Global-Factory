@@ -1,7 +1,7 @@
 from manim import *
 import os
 
-# MASTER CONFIG: 720p for Stability
+# MASTER CONFIG: 720p Stability
 config.pixel_height = 720 
 config.pixel_width = 1280
 config.frame_rate = 15
@@ -11,23 +11,22 @@ class PhDArchitect(Scene):
     def construct(self):
         self.camera.background_color = "#0B1D3A" # Navy
         
-        # Load the pre-wrapped scripts from Agent 1
-        script_file = 'phd_script.txt'
-        if not os.path.exists(script_file):
-            return
+        # HEARTBEAT CHECK
+        script_path = 'phd_script.txt'
+        if not os.path.exists(script_path):
+            # Fallback so it doesn't crash in 2 seconds
+            chunks = ["Script synchronization in progress...", "Please wait for Agent 1."]
+        else:
+            with open(script_path, 'r') as f:
+                chunks = f.read().split('\n\n')
 
-        with open(script_file, 'r') as f:
-            # We split by double newlines to create distinct "Slides"
-            chunks = f.read().split('\n\n')
-
-        # Total duration for a PhD module (720 seconds / 12 mins)
+        # Timing for 12-minute lecture (720s)
         time_per_slide = 720 / len(chunks) if chunks else 10
 
         for chunk in chunks:
-            if not chunk.strip(): continue
-            
-            # THE BIG FONT: font_size 45 on 720p is physically massive
-            # alignment="center" ensures it fills the horizontal plane
+            # THE BIG FONT FIX: 
+            # - font_size 45 is giant.
+            # - alignment="center" uses the whole horizontal plane.
             text = Text(
                 chunk.strip(), 
                 font_size=45, 
@@ -35,11 +34,10 @@ class PhDArchitect(Scene):
                 color=WHITE, 
                 alignment="center"
             )
-            
             self.add(text)
             self.wait(time_per_slide)
             self.remove(text)
 
 if __name__ == "__main__":
-    # Force render to current directory so Agent 4 can find it
+    # Force render to current directory
     os.system("manim -ql render_agent.py PhDArchitect --media_dir .")
