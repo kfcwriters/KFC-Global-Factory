@@ -1,4 +1,4 @@
-name: Zero-Touch AI Music Factory
+name: Zero-Touch AI Factory
 
 on:
   workflow_dispatch:
@@ -10,50 +10,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Agent 0: Install AI Brain
+      - name: Install System Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl python3-pip
-          # Installing the actual AI Music Generation library
-          pip install git+https://github.com/facebookresearch/audiocraft.git
+          pip install scipy torch git+https://github.com/facebookresearch/audiocraft.git
 
-      - name: Agent 1: The AI Composer (Self-Generating)
-        run: |
-          # This Python script tells the AI to create a romantic song
-          # It generates the file 'ai_song.wav' completely automatically
-          python3 - <<EOF
-          from audiocraft.models import MusicGen
-          import scipy.io.wavfile
-          import torch
-          
-          model = MusicGen.get_pretrained('facebook/musicgen-small')
-          model.set_generation_params(duration=25)
-          
-          descriptions = ['romantic haryanvi beat with soft flute and lo-fi aesthetic']
-          wav = model.generate(descriptions)
-          
-          # Saving the generated AI audio
-          scipy.io.wavfile.write('ai_song.wav', rate=32000, data=wav[0, 0].cpu().numpy())
-          EOF
+      - name: Run Music Composer Agent
+        run: python3 composer.py
 
-      - name: Agent 2: Visual Aesthetic Specialist
-        run: |
-          curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
+      - name: Download Visuals
+        run: curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
 
-      - name: Agent 3: The Emperor Merge
+      - name: Emperor Merge
         run: |
-          # Merging the freshly 'hallucinated' AI song with the photo
           ffmpeg -y -loop 1 -i bg.jpg -i ai_song.wav \
           -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" \
           -c:a aac -b:a 192k -af "loudnorm=I=-16:TP=-1.5:LRA=11,volume=2.0" \
-          -shortest final_ai_short.mp4
+          -shortest final_video.mp4
 
-      - name: Agent 4: Telegram Delivery
+      - name: Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_ai_short.mp4" \
-               -F caption="🤖 ZERO-TOUCH SUCCESS: The AI built this song from scratch!" \
+               -F video=@"final_video.mp4" \
+               -F caption="🤖 AUTO-GEN SUCCESS: Pure AI Music & Visuals." \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
