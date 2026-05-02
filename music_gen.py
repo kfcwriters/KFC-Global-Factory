@@ -3,27 +3,24 @@ import os
 
 class NeonLyrics(Scene):
     def construct(self):
-        # 1. TRIPLE CHECK AUDIO
-        # This forces Manim to read the audio file before starting
-        audio_file = "haryanvi_beat.mp3"
-        if os.path.exists(audio_file):
-            self.add_sound(audio_file)
+        # 1. Look for the pre-made 15-second track
+        if os.path.exists("short_audio.mp3"):
+            self.add_sound("short_audio.mp3")
 
-        # 2. PREMIUM BACKGROUND
+        # 2. Premium Aesthetic (Deep Black & Gold)
         bg = FullScreenRectangle(fill_opacity=1).set_color("#000000")
         self.add(bg)
 
-        # 3. FONT FIX
-        # We use 'Sans' which is the safest global font for Hindi
+        # 3. Hindi Text with Proper Font Support
         text_str = "तेरा यो नशा, मेरी जान ले गया..." 
         
         main_text = Text(text_str, font="Sans", weight=BOLD).scale(0.8).set_color(WHITE)
         glow = Text(text_str, font="Sans", weight=BOLD).scale(0.8)
-        glow.set_stroke(color="#D4AF37", width=10, opacity=0.3)
+        glow.set_stroke(color="#D4AF37", width=12, opacity=0.3)
         
         group = VGroup(glow, main_text).center()
         
-        # 4. ANIMATION
-        self.play(Write(main_text), FadeIn(glow), run_time=3)
-        self.play(group.animate.scale(1.1), rate_func=there_and_back, run_time=4)
-        self.wait(8) # Ensuring the music plays for the full short
+        # 4. Fast, High-Energy Animation for Shorts
+        self.play(Write(main_text), FadeIn(glow), run_time=2)
+        self.play(group.animate.scale(1.2), rate_func=wiggle, run_time=4)
+        self.wait(9) # Total scene duration: 15 seconds
