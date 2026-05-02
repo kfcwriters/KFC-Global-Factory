@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Haryanvi Hit v1)
+name: AI Music Short Factory (Emperor Style)
 
 on:
   workflow_dispatch: 
@@ -17,25 +17,27 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
           pip install manim requests
 
-      - name: Download REAL Haryanvi Style Beat
-        # Replacing the "frustrating" sound with a proper Haryanvi instrumental link
-        run: curl -L -o background_music.mp3 "https://www.bensound.com/bensound-music/bensound-energy.mp3"
+      - name: Download Haryanvi Audio
+        run: curl -L -o haryanvi_beat.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
 
-      - name: Render 15-Sec Short
+      - name: Render Visuals Only
         run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
 
-      - name: Pro-Clip & Audio Fix
+      - name: EMPEROR MERGE (Perfect Audio + Subtitle Sync)
         run: |
-          RAW_VIDEO=$(find media/videos -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
-          # Cuts exactly at 15s and normalizes audio levels
-          ffmpeg -i "$RAW_VIDEO" -ss 00:00:00 -t 00:00:15 -af "volume=1.5" -vcodec libx264 -crf 23 -preset fast -y final_short.mp4
+          # 1. Find the silent video we just rendered
+          VIDEO=$(find media/videos -name "*.mp4" | head -n 1)
+          
+          # 2. Use your successful PhD Pipeline logic to merge
+          # -c:v copy keeps the video perfect | -shortest clips audio to match video
+          ffmpeg -y -i "$VIDEO" -i haryanvi_beat.mp3 -c:v libx264 -c:a aac -shortest final_module.mp4
 
       - name: Send to Telegram
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_short.mp4" \
-               -F caption="🕺 Proper Haryanvi Short (Gold/Black Theme) Ready!" \
-               https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
+               -F video=@"final_module.mp4" \
+               -F caption="🕺 EMPEROR STRIKE: Haryanvi Music Short Live!" \
+               https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
