@@ -2,9 +2,8 @@ name: AI Music Shorts Factory
 
 on:
   schedule:
-    # Runs at 7:30 AM and 7:30 PM IST (02:00 and 14:00 UTC)
     - cron: '0 2,14 * * *'
-  workflow_dispatch: # Allows you to click "Run Workflow" manually
+  workflow_dispatch: 
 
 jobs:
   build-and-upload:
@@ -20,7 +19,6 @@ jobs:
           python-version: '3.10'
 
       - name: Install System Dependencies
-        # This installs the "Virtual Display" and Graphics libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
@@ -30,12 +28,11 @@ jobs:
           pip install manim google-api-python-client google-auth-oauthlib requests
 
       - name: Render Romantic Short (Manim)
-        # FIXED: Using xvfb-run and the correct resolution flag (-r)
-        run: xvfb-run manim -ql -r 1080,1920 music_gen.py NeonLyrics
+        # -qm flag ensures 720p resolution
+        run: xvfb-run manim -qm -r 1080,1920 music_gen.py NeonLyrics
 
       - name: Execute Auto-Upload to New ID
         env:
-          # These must match your GitHub Secrets exactly
           NEW_YT_CLIENT_ID: ${{ secrets.NEW_YT_CLIENT_ID }}
           NEW_YT_CLIENT_SECRET: ${{ secrets.NEW_YT_CLIENT_SECRET }}
           NEW_YT_REFRESH_TOKEN: ${{ secrets.NEW_YT_REFRESH_TOKEN }}
