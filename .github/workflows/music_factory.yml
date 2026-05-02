@@ -1,4 +1,4 @@
-name: Studio Producer Song Factory
+name: Deep Soul Song Factory
 
 on:
   workflow_dispatch:
@@ -18,39 +18,39 @@ jobs:
 
       - name: Step 3 Lyric & Vocal Agent
         run: |
-          # Writing lyrics that are long enough for 20-25 seconds
-          echo "Dil mein teri yaad hai, sadiyon ka saath hai. In the moonlight, stay with me tonight. Tu hi meri pyas hai, dil ke paas hai." > lyrics.txt
-          # Generating the raw voice
-          gtts-cli -f lyrics.txt --lang hi --output raw_vocals.mp3
+          # Writing a long, rhythmic romantic verse
+          echo "Teri aankhya ka noor, dil gaya mera choor. Tu hi meri zindagani, tu hi mera suroor." > lyrics.txt
+          # Generating the voice
+          gtts-cli -f lyrics.txt --lang hi --output voice.mp3
 
-      - name: Step 4 Audio Engineer (Vocal Processing)
+      - name: Step 4 Melodic Producer Agent
         run: |
-          # This agent adds 'Chorus' and 'Reverb' to the voice so it sounds like singing
-          # 'rubberband' effect (chorus) makes the voice musical
-          ffmpeg -i raw_vocals.mp3 -af "aecho=0.8:0.88:60:0.4,aecho=0.8:0.88:40:0.2,volume=3.0" singing_vocals.wav
+          # This is the MAGIC: 
+          # 1. It loops the voice so it doesn't end at 10 seconds.
+          # 2. 'vibrato' and 'chorus' turn the speech into a 'singing' tone.
+          ffmpeg -stream_loop 3 -i voice.mp3 -af "vibrato=f=7:d=0.5,chorus=0.5:0.9:50:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=3.5" -t 25 vocals_master.wav
 
-      - name: Step 5 Music Composer (Continuous Beat)
+      - name: Step 5 Haryanvi Folk-Pop Beat
         run: |
-          # Creating a 25-second continuous romantic lo-fi pulse
+          # Creating a continuous, high-energy romantic heartbeat beat
           ffmpeg -f lavfi -i "sine=f=110:d=25" -f lavfi -i "sine=f=165:d=25" \
-          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,tremolo=f=3:d=0.5,aecho=0.8:0.9:1000:0.3,volume=5.0" \
+          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,tremolo=f=4:d=0.6,aecho=0.8:0.9:1000:0.3,lowpass=f=450,volume=5.0" \
           beat.wav
 
-      - name: Step 6 Emperor Merge (The Master Mix)
+      - name: Step 6 Emperor Merge (Final Mastering)
         run: |
-          # Mixing the 'Singing' voice with the beat
-          # -shortest is removed to ensure the video doesn't cut off early
-          ffmpeg -i beat.wav -i singing_vocals.wav -filter_complex "[0:a]volume=0.7[a0];[1:a]volume=2.5[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
+          # Mixing the voice (Agent 4) and the beat (Agent 5) for the FULL 25 seconds
+          ffmpeg -i beat.wav -i vocals_master.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.2[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
           
-          # Downloading Visuals
+          # Visual Download
           curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
           
-          # Creating Video (Locked to 25 seconds)
-          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_video.mp4
+          # Final Video Render (Locked to 25 seconds)
+          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_short.mp4
 
-      - name: Step 7 Delivery
+      - name: Step 7 Delivery Agent
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_video.mp4" -F caption="🎵 STUDIO SUCCESS: Full 25-Sec Song with Singing Effects!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_short.mp4" -F caption="🎵 SUCCESS: 25-Second Haryanvi Romantic Song!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
