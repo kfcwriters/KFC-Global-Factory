@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Emperor Fix)
+name: AI Music Short Factory (Emperor Fix v2)
 
 on:
   workflow_dispatch: 
@@ -25,17 +25,19 @@ jobs:
 
       - name: EMPEROR MERGE (Force Path Sync)
         run: |
-          # Find the video file anywhere in the media directory
-          VIDEO_FILE=$(find media -name "*.mp4" | head -n 1)
+          # The "Wildcard Force": Finds ANY video file in the media directory
+          VIDEO_FILE=$(find media -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
           
           if [ -z "$VIDEO_FILE" ]; then
             echo "CRITICAL ERROR: Visuals not found!"
+            # List files to debug if it fails again
+            ls -R media
             exit 1
           fi
           
-          echo "Found visual at: $VIDEO_FILE"
+          echo "Success! Found visual at: $VIDEO_FILE"
           
-          # Perfect Merge: Combining the visuals with the real beat
+          # Force the merge using your successful Emperor Pipeline logic
           ffmpeg -y -i "$VIDEO_FILE" -i haryanvi_beat.mp3 -c:v libx264 -c:a aac -shortest final_short.mp4
 
       - name: Send to Telegram
@@ -43,7 +45,12 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_short.mp4" \
-               -F caption="✅ EMPEROR SUCCESS: Proper Haryanvi Short Delivered!" \
-               https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          if [ -f "final_short.mp4" ]; then
+            curl -F chat_id=$TELEGRAM_CHAT_ID \
+                 -F video=@"final_short.mp4" \
+                 -F caption="✅ EMPEROR SUCCESS: Proper Haryanvi Short Delivered!" \
+                 https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          else
+            echo "Error: final_short.mp4 not created!"
+            exit 1
+          fi
