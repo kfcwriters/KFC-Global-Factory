@@ -6,13 +6,13 @@ class NeonLyrics(Scene):
         bg = FullScreenRectangle(fill_opacity=0.1).set_color(BLACK)
         self.add(bg)
 
-        # Romantic Lyric
+        # Romantic Lyric (This can be updated daily)
         text_str = "Lost in the melody of us..."
         
         # Main Text
         line = Text(text_str, font="Georgia", weight=BOLD).scale(0.8)
         
-        # Neon Glow Effect - Using Hex Code to avoid NameError
+        # Neon Glow Effect
         glow = Text(text_str, font="Georgia", weight=BOLD).scale(0.8)
         glow.set_stroke(color="#FF00FF", width=10, opacity=0.4)
         
