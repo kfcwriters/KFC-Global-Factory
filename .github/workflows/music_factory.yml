@@ -2,9 +2,9 @@ name: AI Music Shorts Factory
 
 on:
   schedule:
-    # Runs at 7:00 AM and 7:00 PM IST (1:30 AM & 1:30 PM UTC)
-    - cron: '30 1,13 * * *'
-  workflow_dispatch: # Allows you to run it manually for testing
+    # Runs at 7:30 AM and 7:30 PM IST (02:00 and 14:00 UTC)
+    - cron: '0 2,14 * * *'
+  workflow_dispatch: # Allows you to click "Run Workflow" manually
 
 jobs:
   build-and-upload:
@@ -20,6 +20,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install System Dependencies
+        # This installs the "Virtual Display" and Graphics libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
@@ -29,13 +30,13 @@ jobs:
           pip install manim google-api-python-client google-auth-oauthlib requests
 
       - name: Render Romantic Short (Manim)
-        # This uses the Manim script we discussed earlier
-        run: manim -ql --pixel_height 1920 --pixel_width 1080 music_gen.py NeonLyrics
+        # FIXED: Using xvfb-run and the correct resolution flag (-r)
+        run: xvfb-run manim -ql -r 1080,1920 music_gen.py NeonLyrics
 
-      - name: Execute Auto-Upload
+      - name: Execute Auto-Upload to New ID
         env:
-          # Using the new credentials from your screenshot
-          YT_CLIENT_ID: ${{ secrets.NEW_YT_CLIENT_ID }}
-          YT_CLIENT_SECRET: ${{ secrets.NEW_YT_CLIENT_SECRET }}
-          YT_REFRESH_TOKEN: ${{ secrets.NEW_YT_REFRESH_TOKEN }}
+          # These must match your GitHub Secrets exactly
+          NEW_YT_CLIENT_ID: ${{ secrets.NEW_YT_CLIENT_ID }}
+          NEW_YT_CLIENT_SECRET: ${{ secrets.NEW_YT_CLIENT_SECRET }}
+          NEW_YT_REFRESH_TOKEN: ${{ secrets.NEW_YT_REFRESH_TOKEN }}
         run: python uploader.py
