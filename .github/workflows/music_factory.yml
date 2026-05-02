@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Emperor Style)
+name: AI Music Short Factory (Emperor Fix)
 
 on:
   workflow_dispatch: 
@@ -23,14 +23,20 @@ jobs:
       - name: Render Visuals Only
         run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
 
-      - name: EMPEROR MERGE (Perfect Audio + Subtitle Sync)
+      - name: EMPEROR MERGE (Force Path Sync)
         run: |
-          # 1. Find the silent video we just rendered
-          VIDEO=$(find media/videos -name "*.mp4" | head -n 1)
+          # Find the video file anywhere in the media directory
+          VIDEO_FILE=$(find media -name "*.mp4" | head -n 1)
           
-          # 2. Use your successful PhD Pipeline logic to merge
-          # -c:v copy keeps the video perfect | -shortest clips audio to match video
-          ffmpeg -y -i "$VIDEO" -i haryanvi_beat.mp3 -c:v libx264 -c:a aac -shortest final_module.mp4
+          if [ -z "$VIDEO_FILE" ]; then
+            echo "CRITICAL ERROR: Visuals not found!"
+            exit 1
+          fi
+          
+          echo "Found visual at: $VIDEO_FILE"
+          
+          # Perfect Merge: Combining the visuals with the real beat
+          ffmpeg -y -i "$VIDEO_FILE" -i haryanvi_beat.mp3 -c:v libx264 -c:a aac -shortest final_short.mp4
 
       - name: Send to Telegram
         env:
@@ -38,6 +44,6 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_module.mp4" \
-               -F caption="🕺 EMPEROR STRIKE: Haryanvi Music Short Live!" \
+               -F video=@"final_short.mp4" \
+               -F caption="✅ EMPEROR SUCCESS: Proper Haryanvi Short Delivered!" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
