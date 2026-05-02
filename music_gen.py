@@ -1,26 +1,29 @@
 from manim import *
+import os
 
 class NeonLyrics(Scene):
-    def construct(self):
-        # 1. Load the Audio (Hindi/Haryanvi track)
-        self.add_sound("background_music.mp3")
+    # Set the 720p vertical config inside the script for safety
+    config.pixel_height = 1280
+    config.pixel_width = 720
+    config.frame_rate = 30
 
-        # Background aesthetic
-        bg = FullScreenRectangle(fill_opacity=0.2).set_color(BLACK)
+    def construct(self):
+        if os.path.exists("background_music.mp3"):
+            self.add_sound("background_music.mp3")
+
+        bg = FullScreenRectangle(fill_opacity=0.15).set_color(BLACK)
         self.add(bg)
 
-        # Romantic Lyric
-        text_str = "तू चीज़ लाजवाब, तेरा कोई ना जवाब..." # Example Haryanvi Lyric
+        # Haryanvi Lyric - Scaled for 720p
+        text_str = "तेरा यो नशा, मेरी जान ले गया..." 
         
-        # Main Text & Neon Glow
-        line = Text(text_str, font="sans-serif", weight=BOLD).scale(0.7)
-        glow = Text(text_str, font="sans-serif", weight=BOLD).scale(0.7)
-        glow.set_stroke(color="#FF00FF", width=12, opacity=0.3)
+        line = Text(text_str, font="sans-serif", weight=BOLD).scale(0.6) # Reduced scale for 720p
+        glow = Text(text_str, font="sans-serif", weight=BOLD).scale(0.6)
+        glow.set_stroke(color="#FF00FF", width=10, opacity=0.3) # Slightly thinner glow for lower res
         
         lyric_group = VGroup(glow, line)
         
-        # Animation timed to the music
-        self.play(Write(line), FadeIn(glow), run_time=3)
-        self.play(lyric_group.animate.scale(1.2), rate_func=there_and_back, run_time=2)
-        self.wait(5) # Keeps the music playing for 5 more seconds
+        self.play(Write(line), FadeIn(glow), run_time=2)
+        self.play(lyric_group.animate.scale(1.1), rate_func=there_and_back, run_time=3)
+        self.wait(4)
         self.play(FadeOut(lyric_group))
