@@ -1,4 +1,4 @@
-name: Zero-Touch Fast AI Factory
+name: Zero-Touch Master Factory
 
 on:
   workflow_dispatch:
@@ -7,39 +7,28 @@ jobs:
   production:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Step 1 Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Agent 0: Quick Install
+      - name: Step 2 Install System Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
 
-      - name: Agent 1: Music Composer (Fast Generative)
-        # This uses FFmpeg to generate a complex, multi-layered romantic ambient track
-        # It creates 'ai_song.wav' in less than 5 seconds
+      - name: Step 3 AI Music Composer
         run: |
-          ffmpeg -f lavfi -i "sine=f=220:d=25,aecho=0.8:0.88:60:0.4" \
-                 -f lavfi -i "sine=f=330:d=25,aecho=0.8:0.9:1000:0.3" \
-                 -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,lowpass=f=600,vibrato=f=4:d=0.5,volume=2.5" \
-                 ai_song.wav
+          ffmpeg -f lavfi -i "sine=f=220:d=25,aecho=0.8:0.88:60:0.4" -f lavfi -i "sine=f=330:d=25,aecho=0.8:0.9:1000:0.3" -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,lowpass=f=600,vibrato=f=4:d=0.5,volume=2.5" ai_song.wav
 
-      - name: Agent 2: Visual Specialist
+      - name: Step 4 Visual Specialist
         run: curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
 
-      - name: Agent 3: Emperor Merge
+      - name: Step 5 Emperor Merge
         run: |
-          ffmpeg -y -loop 1 -i bg.jpg -i ai_song.wav \
-          -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" \
-          -c:a aac -b:a 192k -af "loudnorm=I=-16:TP=-1.5:LRA=11,volume=1.8" \
-          -shortest final_video.mp4
+          ffmpeg -y -loop 1 -i bg.jpg -i ai_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 192k -af "loudnorm=I=-16:TP=-1.5:LRA=11,volume=1.8" -shortest final_video.mp4
 
-      - name: Agent 4: Telegram Delivery
+      - name: Step 6 Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_video.mp4" \
-               -F caption="⚡ FAST AUTO SUCCESS: Video generated in under 1 minute!" \
-               https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"final_video.mp4" -F caption="🎼 SUCCESS: Fully Autonomous Romantic AI Short!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
