@@ -1,4 +1,4 @@
-name: AI Music Review Factory (Compressed 720p)
+name: AI Music Short Factory (Romantic 15-Sec)
 
 on:
   workflow_dispatch: 
@@ -22,29 +22,34 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
           pip install manim requests
 
-      - name: Download Audio
+      - name: Download High Quality Audio
+        # Downloads the background beat
         run: curl -L -o background_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
-      - name: Render 15-Second Short
+      - name: Render Romantic Visuals
+        # Generates the 720p vertical video
         run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
 
-      - name: Compress for Telegram
+      - name: Clip and Compress (The 15-Sec Scissors)
         run: |
+          # Find the raw render
           RAW_VIDEO=$(find media/videos -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
-          # This command compresses the video to a much smaller size
-          ffmpeg -i "$RAW_VIDEO" -vcodec libx264 -crf 28 -preset faster -y compressed_short.mp4
+          
+          # Force cut at 15 seconds and compress to keep it under Telegram limits
+          # -ss 0 = start at beginning | -t 15 = stop at 15s | -crf 28 = high quality compression
+          ffmpeg -i "$RAW_VIDEO" -ss 00:00:00 -t 00:00:15 -vcodec libx264 -crf 28 -preset faster -y final_short.mp4
 
       - name: Send to Telegram Review
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f "compressed_short.mp4" ]; then
+          if [ -f "final_short.mp4" ]; then
             curl -F chat_id=$TELEGRAM_CHAT_ID \
-                 -F video=@"compressed_short.mp4" \
-                 -F caption="✅ 720p Short (Compressed for Telegram)" \
+                 -F video=@"final_short.mp4" \
+                 -F caption="💖 Romantic Haryanvi Short Ready! (15 Seconds / 720p)" \
                  https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
           else
-            echo "Error: Compressed file not found!"
+            echo "Error: Clipping failed!"
             exit 1
           fi
