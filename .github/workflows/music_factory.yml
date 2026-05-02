@@ -1,4 +1,4 @@
-name: AI Original Music Factory (Full Auto)
+name: AI Music Factory Full Auto
 
 on:
   workflow_dispatch:
@@ -10,33 +10,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Agent 0: Install Tools
+      - name: Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
 
-      - name: Agent 1: Music Composer (Self-Generating)
-        # This agent creates a 25-second romantic ambient beat using high-quality frequency synthesis
+      - name: Music Composer Agent
         run: |
-          ffmpeg -f lavfi -i "sine=f=440:d=25,aecho=0.8:0.88:60:0.4" -f lavfi -i "sine=f=220:d=25,aecho=0.8:0.9:1000:0.3" -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,lowpass=f=500,volume=2.5" perfect_romantic_beat.mp3
+          ffmpeg -f lavfi -i "sine=f=440:d=25" -f lavfi -i "sine=f=220:d=25" -filter_complex "[0:a]aecho=0.8:0.88:60:0.4[a1];[1:a]aecho=0.8:0.9:1000:0.3[a2];[a1][a2]amix=inputs=2:duration=longest,lowpass=f=500,volume=2.5" perfect_romantic_beat.mp3
 
-      - name: Agent 2: Visual Specialist
+      - name: Visual Specialist Agent
         run: curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
 
-      - name: Agent 3: Emperor Merge
+      - name: Emperor Merge Agent
         run: |
-          # Merges the self-generated beat with the background
           ffmpeg -y -loop 1 -i romantic_bg.jpg -i perfect_romantic_beat.mp3 \
           -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=720:1280,format=yuv420p" \
           -c:a aac -b:a 256k -ar 44100 -af "loudnorm=I=-16:TP=-1.5:LRA=11" \
           -shortest final_romantic_short.mp4
 
-      - name: Agent 4: Telegram Delivery
+      - name: Delivery Agent
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
                -F video=@"final_romantic_short.mp4" \
-               -F caption="🎼 FULL-AUTO SUCCESS: AI Generated Music & Visuals!" \
+               -F caption="🎼 FULL-AUTO SUCCESS: AI Generated Song & Visuals Delivered!" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
