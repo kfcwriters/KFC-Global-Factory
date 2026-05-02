@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Compression Fix)
+name: AI Music Short Factory (Short-Only Script)
 
 on:
   workflow_dispatch: 
@@ -14,30 +14,31 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          # Critical: installing fonts so Hindi isn't white blocks
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb fonts-indic
-          pip install manim requests
+          pip install manim
 
-      - name: Download Haryanvi Audio
-        run: curl -L -o haryanvi_beat.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-
-      - name: Render Final Video
-        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
-
-      - name: SHRINK FOR TELEGRAM (Fast Compression)
+      - name: Generate 15-Second High-Quality Audio
+        # This command creates a 15-second high-quality audio file 
+        # specifically for this short so there is NO NEED to cut later.
         run: |
-          # Find the big file Manim made
-          BIG_FILE=$(find media/videos -name "*.mp4" -o -name "*.mov" | head -n 1)
-          
-          # Compress it to under 10MB while keeping audio and text perfect
-          ffmpeg -i "$BIG_FILE" -vcodec libx264 -crf 28 -preset faster -acodec aac -y final_short_compressed.mp4
+          curl -L -o raw_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+          ffmpeg -ss 00:00:10 -i raw_music.mp3 -t 00:00:15 -acodec libmp3lame -ab 192k short_audio.mp3
+
+      - name: Render Video (Shorts Optimized)
+        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics --format=mp4
 
       - name: Send to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # Finds the video and sends it immediately
+          VIDEO_FILE=$(find media/videos -name "*.mp4" | head -n 1)
+          
+          # Final compression to ensure it stays under 10MB
+          ffmpeg -i "$VIDEO_FILE" -vcodec libx264 -crf 28 -preset faster -y final_short.mp4
+          
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_short_compressed.mp4" \
-               -F caption="✅ SUCCESS: Hindi Text + Audio (Compressed)" \
+               -F video=@"final_short.mp4" \
+               -F caption="✅ SHORT-ONLY SCRIPT: 15 Seconds of Perfection." \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
