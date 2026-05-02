@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Final Emperor Strike)
+name: AI Music Short Factory (Romantic Image Edition)
 
 on:
   workflow_dispatch: 
@@ -14,38 +14,29 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb fonts-indic libcairo2-dev libpango1.0-dev pkg-config
-          pip install manim
+          sudo apt-get install -y ffmpeg curl
 
-      - name: STEP 1 Audio Agent - Prepare 15s Song
+      - name: STEP 1: Download Romantic AI Photo
+        # Grabs a high-quality romantic aesthetic image
+        run: curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
+
+      - name: STEP 2: Download Haryanvi Song
+        run: curl -L -o haryanvi_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+
+      - name: STEP 3: The Emperor Merge (Image + Audio)
         run: |
-          curl -L -o raw_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-          ffmpeg -ss 00:00:05 -i raw_song.mp3 -t 15 -af "volume=2.5" -acodec libmp3lame -y perfect_audio.mp3
+          # This command takes the 1 photo and stretches it across 15 seconds of audio
+          # -loop 1: Loops the image
+          # -vf scale=720:1280: Forces vertical "Shorts" resolution
+          # -af volume=2.5: Makes the song loud
+          ffmpeg -y -loop 1 -i romantic_bg.jpg -i haryanvi_song.mp3 -c:v libx264 -t 15 -pix_fmt yuv420p -vf "scale=720:1280,format=yuv420p" -c:a aac -b:a 192k -af "volume=2.5" -shortest final_romantic_short.mp4
 
-      - name: STEP 2 Visual Agent - Render Silent 15s Video
-        run: xvfb-run manim -ql -r 720,1280 visual_agent.py VisualLyrics -t 15 --format=mp4
-
-      - name: STEP 3 The Emperor Merge - Final Marriage
-        run: |
-          # Targeting the specific file found in your debug logs
-          RAW_VIDEO=$(find media -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
-          
-          if [ -z "$RAW_VIDEO" ]; then
-            echo "CRITICAL ERROR: VisualLyrics not found!"
-            exit 1
-          fi
-          
-          echo "Found visual at: $RAW_VIDEO"
-          
-          # Force Merge: Converting .mov to .mp4 and adding the high-volume song
-          ffmpeg -y -i "$RAW_VIDEO" -i perfect_audio.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 23 -preset fast -c:a aac -b:a 192k -shortest final_hit.mp4
-
-      - name: STEP 4 Delivery Agent - Send to Telegram
+      - name: STEP 4: Delivery Agent
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_hit.mp4" \
-               -F caption="🏆 EMPEROR TRIUMPH: Haryanvi Short with LOUD AUDIO!" \
+               -F video=@"final_romantic_short.mp4" \
+               -F caption="💖 ROMANTIC SUCCESS: No Subtitles, Just Music & Visuals." \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
