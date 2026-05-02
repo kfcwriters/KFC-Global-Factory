@@ -10,31 +10,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Agent Tools
+      - name: Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
 
-      - name: Agent 1: Background Specialist
-        # Downloads a beautiful, high-quality romantic aesthetic image
-        run: |
-          curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
+      - name: Download Background
+        run: curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
 
-      - name: Agent 2: Emperor Merge
+      - name: Emperor Merge
         run: |
-          # Takes your 'romantic_song.mp3' and loops the image for 25 seconds
-          # 'loudnorm' ensures the AI song sounds professional and clear
           ffmpeg -y -loop 1 -i romantic_bg.jpg -i romantic_song.mp3 \
           -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=720:1280,format=yuv420p" \
           -c:a aac -b:a 256k -ar 44100 -af "loudnorm=I=-16:TP=-1.5:LRA=11,volume=2.0" \
           -shortest final_romantic_hit.mp4
 
-      - name: Agent 3: Telegram Delivery
+      - name: Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
                -F video=@"final_romantic_hit.mp4" \
-               -F caption="🎼 NEW ORIGINAL HIT: Created with AI Audio Specialist." \
+               -F caption="🎼 SUCCESS: Original AI Song & Romantic Visuals!" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
