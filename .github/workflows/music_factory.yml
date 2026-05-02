@@ -15,29 +15,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
 
-      - name: Step 3 AI Music Composer (Lo-Fi Pulse)
+      - name: Step 3 AI Music Composer
+        # This creates a rhythmic 'Heartbeat' pulse (100Hz and 150Hz)
+        # We use tremolo to create a 'thumping' romantic rhythm
         run: |
-          # This generates a layered romantic beat:
-          # 1. Low frequency pulse (110Hz)
-          # 2. Vinyl texture/noise for 'mood'
-          # 3. Vibrato and Echo for rhythm
-          ffmpeg -f lavfi -i "sine=f=110:d=25" -f lavfi -i "noise=alls=0.01:allf=t:allp=1" \
-          -filter_complex "[0:a]vibrato=f=6:d=0.8,aecho=0.8:0.9:1000:0.3,lowpass=f=400[m];[1:a]highpass=f=2000,volume=0.05[n];[m][n]amix=inputs=2:duration=longest,volume=5.0" \
+          ffmpeg -f lavfi -i "sine=f=100:d=25" -f lavfi -i "sine=f=150:d=25" \
+          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,tremolo=f=3:d=0.9,aecho=0.8:0.9:1000:0.3,lowpass=f=500,volume=10.0" \
           ai_song.wav
 
       - name: Step 4 Visual Specialist
         run: curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
 
-      - name: Step 5 Emperor Merge (Loud Stereo Fix)
+      - name: Step 5 Emperor Merge
         run: |
-          # Increased volume to 3.0x and forced Stereo AAC
+          # We push the volume to the absolute limit (volume=4.0) 
           ffmpeg -y -loop 1 -i bg.jpg -i ai_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p \
           -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k -ar 44100 -ac 2 \
-          -af "loudnorm=I=-14:TP=-1:LRA=11,volume=3.0" -shortest final_video.mp4
+          -af "loudnorm=I=-14:TP=-1:LRA=11,volume=4.0" -shortest final_video.mp4
 
       - name: Step 6 Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"final_video.mp4" -F caption="🎼 SUCCESS: The LOUD Lo-Fi Romantic Short is Here!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"final_video.mp4" -F caption="🎼 SUCCESS: The Heartbeat Romantic Short is Ready!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
