@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Direct Internal)
+name: AI Music Short Factory (Compression Fix)
 
 on:
   workflow_dispatch: 
@@ -14,26 +14,30 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          # Critical: installing 'fonts-indic' so Hindi is not white blocks
+          # Critical: installing fonts so Hindi isn't white blocks
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb fonts-indic
           pip install manim requests
 
       - name: Download Haryanvi Audio
         run: curl -L -o haryanvi_beat.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
 
-      - name: Render Final Video (Audio Included)
-        # We use -p to preview the audio inclusion and force mp4
+      - name: Render Final Video
         run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
+
+      - name: SHRINK FOR TELEGRAM (Fast Compression)
+        run: |
+          # Find the big file Manim made
+          BIG_FILE=$(find media/videos -name "*.mp4" -o -name "*.mov" | head -n 1)
+          
+          # Compress it to under 10MB while keeping audio and text perfect
+          ffmpeg -i "$BIG_FILE" -vcodec libx264 -crf 28 -preset faster -acodec aac -y final_short_compressed.mp4
 
       - name: Send to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Find the video Manim just made
-          VIDEO_FILE=$(find media/videos -name "*.mp4" -o -name "*.mov" | head -n 1)
-          
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"$VIDEO_FILE" \
-               -F caption="✅ DIRECT STRIKE: Hindi Text & Audio Verified!" \
+               -F video=@"final_short_compressed.mp4" \
+               -F caption="✅ SUCCESS: Hindi Text + Audio (Compressed)" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
