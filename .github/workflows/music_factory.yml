@@ -1,37 +1,37 @@
 name: AI Original Music Factory
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   production:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Agent 0: Install Tools
+      - name: Agent 0 Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg xvfb fonts-indic
           pip install manim
 
-      - name: Agent 1: Visual Artist
+      - name: Agent 1 Visual Artist
         run: xvfb-run manim -ql -r 720,1280 visual_agent.py VisualShort -t 25 --format=mp4
 
-      - name: Agent 2: Emperor Merge
+      - name: Agent 2 Emperor Merge
         run: |
+          # Finds the silent video rendered by Agent 1
           VIDEO=$(find media -name "*.mp4" | head -n 1)
-          # Merges your NEW AI song with the visuals
-          ffmpeg -y -i "$VIDEO" -i romantic_song.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -c:a aac -b:a 256k -af "volume=2.0" -shortest final_romantic_hit.mp4
+          # Merges with the NEW romantic song you upload to your repo
+          ffmpeg -y -i "$VIDEO" -i romantic_song.mp3 -c:v copy -c:a aac -b:a 256k -af "volume=2.0" -shortest final_romantic_hit.mp4
 
-      - name: Agent 3: Telegram Delivery
+      - name: Agent 3 Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
                -F video=@"final_romantic_hit.mp4" \
-               -F caption="🎼 NEW ORIGINAL ROMANTIC HIT: Created by AI & Multi-Agent Factory." \
+               -F caption="🎼 NEW ORIGINAL HIT: Created by Multi-Agent Factory." \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
