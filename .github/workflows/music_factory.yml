@@ -1,4 +1,4 @@
-name: AI Music Review Factory (Fixed Format)
+name: AI Music Review Factory (Compressed 720p)
 
 on:
   workflow_dispatch: 
@@ -26,25 +26,25 @@ jobs:
         run: curl -L -o background_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
       - name: Render 15-Second Short
-        # --format=mp4 forces the correct extension
-        # -t 15 stops the render at 15 seconds
         run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
+
+      - name: Compress for Telegram
+        run: |
+          RAW_VIDEO=$(find media/videos -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
+          # This command compresses the video to a much smaller size
+          ffmpeg -i "$RAW_VIDEO" -vcodec libx264 -crf 28 -preset faster -y compressed_short.mp4
 
       - name: Send to Telegram Review
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Finds any video file in the media folder, regardless of extension
-          VIDEO_PATH=$(find media/videos -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
-          
-          if [ -n "$VIDEO_PATH" ]; then
-            echo "Uploading: $VIDEO_PATH"
+          if [ -f "compressed_short.mp4" ]; then
             curl -F chat_id=$TELEGRAM_CHAT_ID \
-                 -F video=@"$VIDEO_PATH" \
-                 -F caption="✅ 15-Sec Haryanvi Short Rendered Successfully!" \
+                 -F video=@"compressed_short.mp4" \
+                 -F caption="✅ 720p Short (Compressed for Telegram)" \
                  https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
           else
-            echo "Error: No video file found!"
+            echo "Error: Compressed file not found!"
             exit 1
           fi
