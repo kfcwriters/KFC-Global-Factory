@@ -1,7 +1,7 @@
-name: AI Music Review Factory (720p Telegram)
+name: AI Music Review Factory (720p 15-Sec)
 
 on:
-  workflow_dispatch: # Manual trigger for your testing
+  workflow_dispatch: 
 
 jobs:
   build-and-send:
@@ -22,30 +22,28 @@ jobs:
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
           pip install manim requests
 
-      - name: Download Haryanvi Audio Beat
-        # This downloads a sample Haryanvi style beat. 
-        # You can change this URL later to any .mp3 link you prefer.
+      - name: Download Audio
+        # Grabs a beat to use as background
         run: curl -L -o background_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
-      - name: Render Video (720p Vertical)
-        # -ql = Low Quality (Fastest)
-        # -r 720,1280 = 720p Vertical Resolution
-        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics
+      - name: Render 15-Second Short
+        # -ql = Low Quality / Fast
+        # -r 720,1280 = Vertical 720p
+        # -t 15 = Forces the video to stop at 15 seconds
+        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15
 
       - name: Send to Telegram Review
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Finds the rendered video in the Manim output folder
           VIDEO_PATH=$(find media/videos -name "*.mp4" | head -n 1)
-          
           if [ -f "$VIDEO_PATH" ]; then
             curl -F chat_id=$TELEGRAM_CHAT_ID \
                  -F video=@"$VIDEO_PATH" \
-                 -F caption="🎵 720p Music Short Rendered! Check lyrics and beat match." \
+                 -F caption="✅ 15-Second Haryanvi Short Ready! Reviewing for lyrics..." \
                  https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
           else
-            echo "Error: Video file not found!"
+            echo "Error: Video not found!"
             exit 1
           fi
