@@ -17,22 +17,20 @@ jobs:
           sudo apt-get install -y ffmpeg xvfb fonts-indic
           pip install manim
 
-      - name: STEP 1: Audio Agent - Prepare 15s Song
+      - name: STEP 1 Audio Agent - Prepare 15s Song
         run: |
           curl -L -o raw_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-          # Cuts song to exactly 15s and boosts volume so you can hear it
           ffmpeg -ss 00:00:05 -i raw_song.mp3 -t 15 -af "volume=2.0" -acodec libmp3lame -y perfect_audio.mp3
 
-      - name: STEP 2: Visual Agent - Render Silent 15s Video
+      - name: STEP 2 Visual Agent - Render Silent 15s Video
         run: xvfb-run manim -ql -r 720,1280 visual_agent.py VisualLyrics -t 15 --format=mp4
 
-      - name: STEP 3: The Emperor Merge - Final Marriage
+      - name: STEP 3 The Emperor Merge - Final Marriage
         run: |
           VIDEO=$(find media -name "*.mp4" | head -n 1)
-          # -map 0:v -map 1:a forces Video from Visual Agent and Audio from Audio Agent
           ffmpeg -y -i "$VIDEO" -i perfect_audio.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 28 -c:a aac -b:a 192k -shortest final_hit.mp4
 
-      - name: STEP 4: Delivery Agent - Send to Telegram
+      - name: STEP 4 Delivery Agent - Send to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
