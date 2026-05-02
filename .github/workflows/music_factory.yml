@@ -1,12 +1,10 @@
-name: AI Music Shorts Factory
+name: AI Music Review Factory (720p Telegram)
 
 on:
-  schedule:
-    - cron: '0 2,14 * * *' # Runs at 7:30 AM and 7:30 PM IST
-  workflow_dispatch: 
+  workflow_dispatch: # Manual trigger for your testing
 
 jobs:
-  build-and-upload:
+  build-and-send:
     runs-on: ubuntu-latest
     
     steps:
@@ -22,18 +20,32 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
+          pip install manim requests
 
-      - name: Install Python Libraries
-        run: |
-          pip install manim google-api-python-client google-auth-oauthlib requests
+      - name: Download Haryanvi Audio Beat
+        # This downloads a sample Haryanvi style beat. 
+        # You can change this URL later to any .mp3 link you prefer.
+        run: curl -L -o background_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
-      - name: Render Romantic Short (Manim)
-        # -qm ensures good quality, -r ensures vertical resolution
-        run: xvfb-run manim -qm -r 1080,1920 music_gen.py NeonLyrics
+      - name: Render Video (720p Vertical)
+        # -ql = Low Quality (Fastest)
+        # -r 720,1280 = 720p Vertical Resolution
+        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics
 
-      - name: Execute Auto-Upload to New ID
+      - name: Send to Telegram Review
         env:
-          NEW_YT_CLIENT_ID: ${{ secrets.NEW_YT_CLIENT_ID }}
-          NEW_YT_CLIENT_SECRET: ${{ secrets.NEW_YT_CLIENT_SECRET }}
-          NEW_YT_REFRESH_TOKEN: ${{ secrets.NEW_YT_REFRESH_TOKEN }}
-        run: python uploader.py
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # Finds the rendered video in the Manim output folder
+          VIDEO_PATH=$(find media/videos -name "*.mp4" | head -n 1)
+          
+          if [ -f "$VIDEO_PATH" ]; then
+            curl -F chat_id=$TELEGRAM_CHAT_ID \
+                 -F video=@"$VIDEO_PATH" \
+                 -F caption="🎵 720p Music Short Rendered! Check lyrics and beat match." \
+                 https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
+          else
+            echo "Error: Video file not found!"
+            exit 1
+          fi
