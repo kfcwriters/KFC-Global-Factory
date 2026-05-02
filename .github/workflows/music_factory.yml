@@ -1,4 +1,4 @@
-name: AI Music Factory (YouTube Ready)
+name: Zero-Touch AI Music Factory
 
 on:
   workflow_dispatch:
@@ -7,75 +7,53 @@ jobs:
   production:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repo
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Agent 0: Install AI Brain
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg curl jq timidity
+          sudo apt-get install -y ffmpeg curl python3-pip
+          # Installing the actual AI Music Generation library
+          pip install git+https://github.com/facebookresearch/audiocraft.git
 
-      - name: ✍️ Lyrics Writer Agent
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Agent 1: The AI Composer (Self-Generating)
         run: |
-          curl https://api.openai.com/v1/chat/completions \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "model":"gpt-4o-mini",
-              "messages":[
-                {"role":"system","content":"You are a romantic songwriter. Write 4 lines of Hindi-English lyrics."},
-                {"role":"user","content":"Create a romantic verse."}
-              ]
-            }' | jq -r '.choices[0].message.content' > lyrics.txt
-
-      - name: 🎤 Vocal Singer Agent
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          # Clean text for JSON
-          CLEAN_TEXT=$(cat lyrics.txt | tr -d '"' | tr '\n' ' ')
+          # This Python script tells the AI to create a romantic song
+          # It generates the file 'ai_song.wav' completely automatically
+          python3 - <<EOF
+          from audiocraft.models import MusicGen
+          import scipy.io.wavfile
+          import torch
           
-          curl https://api.openai.com/v1/audio/speech \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"model\": \"tts-1\",
-              \"voice\": \"alloy\",
-              \"input\": \"$CLEAN_TEXT\"
-            }" --output vocals.mp3
+          model = MusicGen.get_pretrained('facebook/musicgen-small')
+          model.set_generation_params(duration=25)
+          
+          descriptions = ['romantic haryanvi beat with soft flute and lo-fi aesthetic']
+          wav = model.generate(descriptions)
+          
+          # Saving the generated AI audio
+          scipy.io.wavfile.write('ai_song.wav', rate=32000, data=wav[0, 0].cpu().numpy())
+          EOF
 
-      - name: 🎼 Music Composer Agent
+      - name: Agent 2: Visual Aesthetic Specialist
         run: |
-          # Generating a high-quality ambient romantic pad since MIDI text is unstable
-          ffmpeg -f lavfi -i "sine=f=220:d=25" -f lavfi -i "sine=f=330:d=25" \
-          -filter_complex "[0:a]aecho=0.8:0.88:60:0.4[a1];[1:a]aecho=0.8:0.9:1000:0.3[a2];[a1][a2]amix=inputs=2:duration=longest,lowpass=f=800,volume=1.5" \
-          perfect_romantic_beat.mp3
+          curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
 
-      - name: 🎚️ Producer Mixing Agent
+      - name: Agent 3: The Emperor Merge
         run: |
-          ffmpeg -i perfect_romantic_beat.mp3 -i vocals.mp3 \
-          -filter_complex "[0:a]volume=0.5[a0];[1:a]volume=1.5[a1];[a0][a1]amix=inputs=2:duration=first,loudnorm" \
-          -ar 44100 -ac 2 final_song.wav
+          # Merging the freshly 'hallucinated' AI song with the photo
+          ffmpeg -y -loop 1 -i bg.jpg -i ai_song.wav \
+          -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" \
+          -c:a aac -b:a 192k -af "loudnorm=I=-16:TP=-1.5:LRA=11,volume=2.0" \
+          -shortest final_ai_short.mp4
 
-      - name: 🖼️ Visual Agent
-        run: |
-          curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
-
-      - name: 🎬 Create YouTube Video
-        run: |
-          ffmpeg -y -loop 1 -i romantic_bg.jpg -i final_song.wav \
-          -c:v libx264 -t 20 -pix_fmt yuv420p \
-          -vf "scale=1080:1920,format=yuv420p" \
-          -c:a aac -b:a 192k -shortest youtube_song.mp4
-
-      - name: 🤖 Delivery Agent
+      - name: Agent 4: Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -v -F chat_id=$TELEGRAM_CHAT_ID \
-          -F video=@"youtube_song.mp4" \
-          -F caption="🎵 New Original AI Song Delivered!" \
-          "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo"
+          curl -F chat_id=$TELEGRAM_CHAT_ID \
+               -F video=@"final_ai_short.mp4" \
+               -F caption="🤖 ZERO-TOUCH SUCCESS: The AI built this song from scratch!" \
+               https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
