@@ -3,28 +3,33 @@ import os
 
 class NeonLyrics(Scene):
     def construct(self):
-        # Add the audio file
+        # 1. Add Sound (Automatically clipped to video length)
         if os.path.exists("background_music.mp3"):
             self.add_sound("background_music.mp3")
 
-        # Dark aesthetic background
-        bg = FullScreenRectangle(fill_opacity=0.3).set_color(BLACK)
+        # 2. Add Romantic Background Image
+        # I am adding a rectangle with a gradient to look "Romantic" 
+        # since we don't have an image file yet.
+        bg = Rectangle(
+            width=config.frame_width, 
+            height=config.frame_height,
+            fill_color=[PINK, DARK_BROWN], # Romantic gradient
+            fill_opacity=0.5,
+            stroke_width=0
+        )
         self.add(bg)
 
-        # Haryanvi / Hindi Romantic Lyric
-        text_str = "तेरा यो नशा..." 
+        # 3. Haryanvi / Hindi Lyric
+        text_str = "तेरा यो नशा, मेरी जान ले गया..." 
         
-        # Create the text layers
-        line = Text(text_str, font="sans-serif", weight=BOLD).scale(0.9)
-        glow = Text(text_str, font="sans-serif", weight=BOLD).scale(0.9)
+        line = Text(text_str, font="sans-serif", weight=BOLD).scale(0.8)
+        glow = Text(text_str, font="sans-serif", weight=BOLD).scale(0.8)
+        glow.set_stroke(color=WHITE, width=15, opacity=0.3) # White glow for romance
         
-        # Neon Pink Glow effect
-        glow.set_stroke(color="#FF00FF", width=12, opacity=0.4)
+        lyric_group = VGroup(glow, line).center()
         
-        lyric_group = VGroup(glow, line)
-        
-        # Animation sequence (Total 10-12 seconds)
+        # 4. Animation
+        self.play(FadeIn(bg), run_time=2)
         self.play(Write(line), FadeIn(glow), run_time=3)
-        self.play(lyric_group.animate.scale(1.2), rate_func=there_and_back, run_time=4)
-        self.wait(3) # Wait while music plays
-        self.play(FadeOut(lyric_group), run_time=2)
+        self.play(lyric_group.animate.scale(1.1).set_color(YELLOW), rate_func=there_and_back, run_time=5)
+        self.wait(5) # Keeps the romantic vibe on screen
