@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Final Path Fix)
+name: AI Music Short Factory (Final Emperor Strike)
 
 on:
   workflow_dispatch: 
@@ -20,38 +20,32 @@ jobs:
       - name: STEP 1 Audio Agent - Prepare 15s Song
         run: |
           curl -L -o raw_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-          ffmpeg -ss 00:00:05 -i raw_song.mp3 -t 15 -af "volume=2.0" -acodec libmp3lame -y perfect_audio.mp3
+          ffmpeg -ss 00:00:05 -i raw_song.mp3 -t 15 -af "volume=2.5" -acodec libmp3lame -y perfect_audio.mp3
 
       - name: STEP 2 Visual Agent - Render Silent 15s Video
         run: xvfb-run manim -ql -r 720,1280 visual_agent.py VisualLyrics -t 15 --format=mp4
 
       - name: STEP 3 The Emperor Merge - Final Marriage
         run: |
-          # The "Hunter" Command: Looks everywhere for the mp4 file
-          VIDEO_PATH=$(find media -name "*.mp4" | head -n 1)
+          # Targeting the specific file found in your debug logs
+          RAW_VIDEO=$(find media -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
           
-          if [ -z "$VIDEO_PATH" ]; then
-            echo "CRITICAL ERROR: Video not found in media folder!"
-            ls -R media # Debugging: show us the whole folder tree
+          if [ -z "$RAW_VIDEO" ]; then
+            echo "CRITICAL ERROR: VisualLyrics not found!"
             exit 1
           fi
           
-          echo "Found video at: $VIDEO_PATH"
+          echo "Found visual at: $RAW_VIDEO"
           
-          # Force Merge with Audio
-          ffmpeg -y -i "$VIDEO_PATH" -i perfect_audio.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 28 -c:a aac -b:a 192k -shortest final_hit.mp4
+          # Force Merge: Converting .mov to .mp4 and adding the high-volume song
+          ffmpeg -y -i "$RAW_VIDEO" -i perfect_audio.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 23 -preset fast -c:a aac -b:a 192k -shortest final_hit.mp4
 
       - name: STEP 4 Delivery Agent - Send to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f "final_hit.mp4" ]; then
-            curl -F chat_id=$TELEGRAM_CHAT_ID \
-                 -F video=@"final_hit.mp4" \
-                 -F caption="✅ EMPEROR SUCCESS: Proper Haryanvi Short with Audio!" \
-                 https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
-          else
-            echo "Error: final_hit.mp4 was never created!"
-            exit 1
-          fi
+          curl -F chat_id=$TELEGRAM_CHAT_ID \
+               -F video=@"final_hit.mp4" \
+               -F caption="🏆 EMPEROR TRIUMPH: Haryanvi Short with LOUD AUDIO!" \
+               https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
