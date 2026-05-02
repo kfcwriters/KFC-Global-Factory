@@ -1,47 +1,37 @@
-name: AI Music Short Factory (Final Audio Success)
+name: AI Original Music Factory
 
 on:
   workflow_dispatch: 
 
 jobs:
-  production-line:
+  production:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Agent 0: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg curl
+          sudo apt-get install -y ffmpeg xvfb fonts-indic
+          pip install manim
 
-      - name: STEP 1 Download Romantic AI Photo
+      - name: Agent 1: Visual Artist
+        run: xvfb-run manim -ql -r 720,1280 visual_agent.py VisualShort -t 25 --format=mp4
+
+      - name: Agent 2: Emperor Merge
         run: |
-          curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
+          VIDEO=$(find media -name "*.mp4" | head -n 1)
+          # Merges your NEW AI song with the visuals
+          ffmpeg -y -i "$VIDEO" -i romantic_song.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -c:a aac -b:a 256k -af "volume=2.0" -shortest final_romantic_hit.mp4
 
-      - name: STEP 2 Download GUARANTEED Audio
-        # Using a specialized SoundHelix link that is famous for working with FFmpeg
-        run: |
-          curl -L -o haryanvi_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-
-      - name: STEP 3 The Emperor Merge (Final Codec Fix)
-        run: |
-          # We use -vcodec libx264 for the photo and -acodec aac for the sound
-          # 'loudnorm' filter fixes the "frustrating" sound by balancing the audio
-          ffmpeg -y -loop 1 -i romantic_bg.jpg -i haryanvi_song.mp3 \
-          -t 15 -pix_fmt yuv420p \
-          -vf "scale=720:1280,format=yuv420p" \
-          -c:v libx264 -c:a aac -b:a 192k -ar 44100 \
-          -af "loudnorm=I=-16:TP=-1.5:LRA=11,volume=2.0" \
-          -shortest final_perfect_short.mp4
-
-      - name: STEP 4 Delivery Agent
+      - name: Agent 3: Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_perfect_short.mp4" \
-               -F caption="🎼 SUCCESS: Crystal Clear Audio & Romantic Visuals!" \
+               -F video=@"final_romantic_hit.mp4" \
+               -F caption="🎼 NEW ORIGINAL ROMANTIC HIT: Created by AI & Multi-Agent Factory." \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
