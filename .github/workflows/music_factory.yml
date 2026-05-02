@@ -1,44 +1,43 @@
-name: AI Music Short Factory (Short-Only Script)
+name: AI Music Short Factory (Multi-Agent Setup)
 
 on:
   workflow_dispatch: 
 
 jobs:
-  build-and-send:
+  production-line:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb fonts-indic
+          sudo apt-get install -y ffmpeg xvfb fonts-indic
           pip install manim
 
-      - name: Generate 15-Second High-Quality Audio
-        # This command creates a 15-second high-quality audio file 
-        # specifically for this short so there is NO NEED to cut later.
+      - name: STEP 1: Audio Agent - Prepare 15s Song
         run: |
-          curl -L -o raw_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-          ffmpeg -ss 00:00:10 -i raw_music.mp3 -t 00:00:15 -acodec libmp3lame -ab 192k short_audio.mp3
+          curl -L -o raw_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+          # Cuts song to exactly 15s and boosts volume so you can hear it
+          ffmpeg -ss 00:00:05 -i raw_song.mp3 -t 15 -af "volume=2.0" -acodec libmp3lame -y perfect_audio.mp3
 
-      - name: Render Video (Shorts Optimized)
-        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics --format=mp4
+      - name: STEP 2: Visual Agent - Render Silent 15s Video
+        run: xvfb-run manim -ql -r 720,1280 visual_agent.py VisualLyrics -t 15 --format=mp4
 
-      - name: Send to Telegram
+      - name: STEP 3: The Emperor Merge - Final Marriage
+        run: |
+          VIDEO=$(find media -name "*.mp4" | head -n 1)
+          # -map 0:v -map 1:a forces Video from Visual Agent and Audio from Audio Agent
+          ffmpeg -y -i "$VIDEO" -i perfect_audio.mp3 -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 28 -c:a aac -b:a 192k -shortest final_hit.mp4
+
+      - name: STEP 4: Delivery Agent - Send to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Finds the video and sends it immediately
-          VIDEO_FILE=$(find media/videos -name "*.mp4" | head -n 1)
-          
-          # Final compression to ensure it stays under 10MB
-          ffmpeg -i "$VIDEO_FILE" -vcodec libx264 -crf 28 -preset faster -y final_short.mp4
-          
           curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_short.mp4" \
-               -F caption="✅ SHORT-ONLY SCRIPT: 15 Seconds of Perfection." \
+               -F video=@"final_hit.mp4" \
+               -F caption="🕺 MULTI-AGENT SUCCESS: 15-Sec Short with LOUD AUDIO!" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
