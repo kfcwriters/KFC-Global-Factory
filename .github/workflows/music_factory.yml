@@ -1,4 +1,4 @@
-name: Deep Soul Song Factory
+name: Full Composition Song Factory
 
 on:
   workflow_dispatch:
@@ -16,41 +16,49 @@ jobs:
           sudo apt-get install -y ffmpeg curl
           pip install gTTS
 
-      - name: Step 3 Lyric & Vocal Agent
+      - name: Step 3 Lyric Agent (Full Songwriting)
         run: |
-          # Writing a long, rhythmic romantic verse
-          echo "Teri aankhya ka noor, dil gaya mera choor. Tu hi meri zindagani, tu hi mera suroor." > lyrics.txt
-          # Generating the voice
+          # Writing a full 25-second set of unique lyrics
+          echo "Teri aankhon ka noor hai nirala,
+          Dil ko mere tune hi sambhala.
+          In the moonlight, your face is glowing,
+          Like a river, our love is flowing.
+          Har pal mein tera hi ehsaas hai,
+          Tu mere dil ke sabse paas hai." > lyrics.txt
+          
+          # Generating the voice (Natural Speed)
           gtts-cli -f lyrics.txt --lang hi --output voice.mp3
 
-      - name: Step 4 Melodic Producer Agent
+      - name: Step 4 AI Music Composer (3-Layer Orchestra)
         run: |
-          # This is the MAGIC: 
-          # 1. It loops the voice so it doesn't end at 10 seconds.
-          # 2. 'vibrato' and 'chorus' turn the speech into a 'singing' tone.
-          ffmpeg -stream_loop 3 -i voice.mp3 -af "vibrato=f=7:d=0.5,chorus=0.5:0.9:50:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=3.5" -t 25 vocals_master.wav
-
-      - name: Step 5 Haryanvi Folk-Pop Beat
-        run: |
-          # Creating a continuous, high-energy romantic heartbeat beat
-          ffmpeg -f lavfi -i "sine=f=110:d=25" -f lavfi -i "sine=f=165:d=25" \
-          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,tremolo=f=4:d=0.6,aecho=0.8:0.9:1000:0.3,lowpass=f=450,volume=5.0" \
-          beat.wav
-
-      - name: Step 6 Emperor Merge (Final Mastering)
-        run: |
-          # Mixing the voice (Agent 4) and the beat (Agent 5) for the FULL 25 seconds
-          ffmpeg -i beat.wav -i vocals_master.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.2[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
+          # Layer 1: Deep Romantic Bass (Heartbeat)
+          ffmpeg -f lavfi -i "sine=f=110:d=25,tremolo=f=2:d=0.5" -f lavfi -i "sine=f=55:d=25,tremolo=f=2:d=0.3" -filter_complex "amix=inputs=2" bass.wav
           
-          # Visual Download
+          # Layer 2: Rhythmic Shaker (Percussion)
+          ffmpeg -f lavfi -i "noise=alls=0.01:allf=t:allp=1" -filter_complex "highpass=f=5000,tremolo=f=8:d=0.9,volume=0.2" -t 25 percussion.wav
+          
+          # Layer 3: High Melody (Lead)
+          ffmpeg -f lavfi -i "sine=f=440:d=25,vibrato=f=5:d=0.5" -f lavfi -i "sine=f=660:d=25,vibrato=f=4:d=0.4" -filter_complex "amix=inputs=2,volume=0.3" melody.wav
+          
+          # Mix all instruments together
+          ffmpeg -i bass.wav -i percussion.wav -i melody.wav -filter_complex "[0:a]volume=1.0[a0];[1:a]volume=0.5[a1];[2:a]volume=0.3[a2];[a0][a1][a2]amix=inputs=3:duration=longest,aecho=0.8:0.9:1000:0.3" beat.wav
+
+      - name: Step 5 Producer Mastering (Voice + Music)
+        run: |
+          # Processing voice with singing-style 'Chorus' and 'Room Reverb'
+          ffmpeg -i voice.mp3 -af "vibrato=f=6:d=0.4,chorus=0.5:0.9:50:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=3.5" processed_voice.wav
+          
+          # Final Master Mix
+          ffmpeg -i beat.wav -i processed_voice.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.5[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
+
+      - name: Step 6 Create Vertical Video
+        run: |
           curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
-          
-          # Final Video Render (Locked to 25 seconds)
-          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_short.mp4
+          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_ready.mp4
 
-      - name: Step 7 Delivery Agent
+      - name: Step 7 Telegram Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_short.mp4" -F caption="🎵 SUCCESS: 25-Second Haryanvi Romantic Song!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_ready.mp4" -F caption="🎼 MASTER SUCCESS: Full Composition Romantic Song!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
