@@ -1,4 +1,4 @@
-name: AI Music Review Factory (720p 15-Sec)
+name: AI Music Review Factory (Fixed Format)
 
 on:
   workflow_dispatch: 
@@ -23,27 +23,28 @@ jobs:
           pip install manim requests
 
       - name: Download Audio
-        # Grabs a beat to use as background
         run: curl -L -o background_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
       - name: Render 15-Second Short
-        # -ql = Low Quality / Fast
-        # -r 720,1280 = Vertical 720p
-        # -t 15 = Forces the video to stop at 15 seconds
-        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15
+        # --format=mp4 forces the correct extension
+        # -t 15 stops the render at 15 seconds
+        run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
 
       - name: Send to Telegram Review
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          VIDEO_PATH=$(find media/videos -name "*.mp4" | head -n 1)
-          if [ -f "$VIDEO_PATH" ]; then
+          # Finds any video file in the media folder, regardless of extension
+          VIDEO_PATH=$(find media/videos -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
+          
+          if [ -n "$VIDEO_PATH" ]; then
+            echo "Uploading: $VIDEO_PATH"
             curl -F chat_id=$TELEGRAM_CHAT_ID \
                  -F video=@"$VIDEO_PATH" \
-                 -F caption="✅ 15-Second Haryanvi Short Ready! Reviewing for lyrics..." \
+                 -F caption="✅ 15-Sec Haryanvi Short Rendered Successfully!" \
                  https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
           else
-            echo "Error: Video not found!"
+            echo "Error: No video file found!"
             exit 1
           fi
