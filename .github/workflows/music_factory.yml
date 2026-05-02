@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Multi-Agent Setup)
+name: AI Music Short Factory (Pango Fix)
 
 on:
   workflow_dispatch: 
@@ -14,7 +14,7 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg xvfb fonts-indic
+          sudo apt-get install -y ffmpeg xvfb fonts-indic libcairo2-dev libpango1.0-dev pkg-config
           pip install manim
 
       - name: STEP 1 Audio Agent - Prepare 15s Song
@@ -37,5 +37,5 @@ jobs:
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
                -F video=@"final_hit.mp4" \
-               -F caption="🕺 MULTI-AGENT SUCCESS: 15-Sec Short with LOUD AUDIO!" \
+               -F caption="🕺 PRODUCTION LINE SUCCESS: Check your Telegram!" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
