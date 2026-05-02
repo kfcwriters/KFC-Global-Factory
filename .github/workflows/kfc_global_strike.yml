@@ -32,6 +32,13 @@ jobs:
           GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
         run: python3 email_sender.py
 
+      # --- NEW DETECTIVE STEP ADDED HERE ---
+      - name: IDENTITY CHECK (Reveal Client ID Fingerprint)
+        run: |
+          echo "MATCHING HELP: Compare these parts with your Google Cloud list."
+          echo "The ID starts with: $(echo ${{ secrets.CLIENT_ID }} | cut -c1-15)"
+          echo "The ID ends with: $(echo ${{ secrets.CLIENT_ID }} | rev | cut -c1-10 | rev)"
+
       - name: STEP 4 YouTube Upload
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
