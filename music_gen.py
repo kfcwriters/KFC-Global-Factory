@@ -11,9 +11,10 @@ class NeonLyrics(Scene):
         
         # Main Text
         line = Text(text_str, font="Georgia", weight=BOLD).scale(0.8)
-        # Neon Glow Effect
+        
+        # Neon Glow Effect - Using Hex Code to avoid NameError
         glow = Text(text_str, font="Georgia", weight=BOLD).scale(0.8)
-        glow.set_stroke(color=MAGENTA, width=10, opacity=0.4)
+        glow.set_stroke(color="#FF00FF", width=10, opacity=0.4)
         
         lyric_group = VGroup(glow, line)
         
