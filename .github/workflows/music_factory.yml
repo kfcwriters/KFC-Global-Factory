@@ -1,4 +1,4 @@
-name: AI Music Factory Full Auto
+name: AI Music Factory (YouTube Ready)
 
 on:
   workflow_dispatch:
@@ -7,34 +7,75 @@ jobs:
   production:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Repo
         uses: actions/checkout@v4
 
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg curl
+          sudo apt-get install -y ffmpeg curl jq timidity
 
-      - name: Music Composer Agent
+      - name: ✍️ Lyrics Writer Agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          ffmpeg -f lavfi -i "sine=f=440:d=25" -f lavfi -i "sine=f=220:d=25" -filter_complex "[0:a]aecho=0.8:0.88:60:0.4[a1];[1:a]aecho=0.8:0.9:1000:0.3[a2];[a1][a2]amix=inputs=2:duration=longest,lowpass=f=500,volume=2.5" perfect_romantic_beat.mp3
+          curl https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model":"gpt-4o-mini",
+              "messages":[
+                {"role":"system","content":"You are a romantic songwriter. Write 4 lines of Hindi-English lyrics."},
+                {"role":"user","content":"Create a romantic verse."}
+              ]
+            }' | jq -r '.choices[0].message.content' > lyrics.txt
 
-      - name: Visual Specialist Agent
-        run: curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
-
-      - name: Emperor Merge Agent
+      - name: 🎤 Vocal Singer Agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          ffmpeg -y -loop 1 -i romantic_bg.jpg -i perfect_romantic_beat.mp3 \
-          -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=720:1280,format=yuv420p" \
-          -c:a aac -b:a 256k -ar 44100 -af "loudnorm=I=-16:TP=-1.5:LRA=11" \
-          -shortest final_romantic_short.mp4
+          # Clean text for JSON
+          CLEAN_TEXT=$(cat lyrics.txt | tr -d '"' | tr '\n' ' ')
+          
+          curl https://api.openai.com/v1/audio/speech \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"model\": \"tts-1\",
+              \"voice\": \"alloy\",
+              \"input\": \"$CLEAN_TEXT\"
+            }" --output vocals.mp3
 
-      - name: Delivery Agent
+      - name: 🎼 Music Composer Agent
+        run: |
+          # Generating a high-quality ambient romantic pad since MIDI text is unstable
+          ffmpeg -f lavfi -i "sine=f=220:d=25" -f lavfi -i "sine=f=330:d=25" \
+          -filter_complex "[0:a]aecho=0.8:0.88:60:0.4[a1];[1:a]aecho=0.8:0.9:1000:0.3[a2];[a1][a2]amix=inputs=2:duration=longest,lowpass=f=800,volume=1.5" \
+          perfect_romantic_beat.mp3
+
+      - name: 🎚️ Producer Mixing Agent
+        run: |
+          ffmpeg -i perfect_romantic_beat.mp3 -i vocals.mp3 \
+          -filter_complex "[0:a]volume=0.5[a0];[1:a]volume=1.5[a1];[a0][a1]amix=inputs=2:duration=first,loudnorm" \
+          -ar 44100 -ac 2 final_song.wav
+
+      - name: 🖼️ Visual Agent
+        run: |
+          curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
+
+      - name: 🎬 Create YouTube Video
+        run: |
+          ffmpeg -y -loop 1 -i romantic_bg.jpg -i final_song.wav \
+          -c:v libx264 -t 20 -pix_fmt yuv420p \
+          -vf "scale=1080:1920,format=yuv420p" \
+          -c:a aac -b:a 192k -shortest youtube_song.mp4
+
+      - name: 🤖 Delivery Agent
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID \
-               -F video=@"final_romantic_short.mp4" \
-               -F caption="🎼 FULL-AUTO SUCCESS: AI Generated Song & Visuals Delivered!" \
-               https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -v -F chat_id=$TELEGRAM_CHAT_ID \
+          -F video=@"youtube_song.mp4" \
+          -F caption="🎵 New Original AI Song Delivered!" \
+          "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo"
