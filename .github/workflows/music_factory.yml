@@ -16,27 +16,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
 
-      - name: STEP 1: Download Romantic AI Photo
-        # Grabs a high-quality romantic aesthetic image
-        run: curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
-
-      - name: STEP 2: Download Haryanvi Song
-        run: curl -L -o haryanvi_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-
-      - name: STEP 3: The Emperor Merge (Image + Audio)
+      - name: STEP 1 Download Romantic AI Photo
         run: |
-          # This command takes the 1 photo and stretches it across 15 seconds of audio
-          # -loop 1: Loops the image
-          # -vf scale=720:1280: Forces vertical "Shorts" resolution
-          # -af volume=2.5: Makes the song loud
+          curl -L -o romantic_bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=720&h=1280&auto=format&fit=crop"
+
+      - name: STEP 2 Download Haryanvi Song
+        run: |
+          curl -L -o haryanvi_song.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+
+      - name: STEP 3 The Emperor Merge Image and Audio
+        run: |
+          # This command creates a 15-second video from the image and audio
           ffmpeg -y -loop 1 -i romantic_bg.jpg -i haryanvi_song.mp3 -c:v libx264 -t 15 -pix_fmt yuv420p -vf "scale=720:1280,format=yuv420p" -c:a aac -b:a 192k -af "volume=2.5" -shortest final_romantic_short.mp4
 
-      - name: STEP 4: Delivery Agent
+      - name: STEP 4 Delivery Agent
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -F chat_id=$TELEGRAM_CHAT_ID \
                -F video=@"final_romantic_short.mp4" \
-               -F caption="💖 ROMANTIC SUCCESS: No Subtitles, Just Music & Visuals." \
+               -F caption="💖 ROMANTIC SUCCESS: 15-Sec Music Visual Ready!" \
                https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
