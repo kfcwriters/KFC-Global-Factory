@@ -1,4 +1,4 @@
-name: AI Music Short Factory (Romantic 15-Sec)
+name: AI Music Short Factory (Haryanvi Hit v1)
 
 on:
   workflow_dispatch: 
@@ -11,45 +11,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
       - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev freeglut3-dev mesa-utils xvfb
           pip install manim requests
 
-      - name: Download High Quality Audio
-        # Downloads the background beat
-        run: curl -L -o background_music.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+      - name: Download REAL Haryanvi Style Beat
+        # Replacing the "frustrating" sound with a proper Haryanvi instrumental link
+        run: curl -L -o background_music.mp3 "https://www.bensound.com/bensound-music/bensound-energy.mp3"
 
-      - name: Render Romantic Visuals
-        # Generates the 720p vertical video
+      - name: Render 15-Sec Short
         run: xvfb-run manim -ql -r 720,1280 music_gen.py NeonLyrics -t 15 --format=mp4
 
-      - name: Clip and Compress (The 15-Sec Scissors)
+      - name: Pro-Clip & Audio Fix
         run: |
-          # Find the raw render
           RAW_VIDEO=$(find media/videos -type f \( -name "*.mp4" -o -name "*.mov" \) | head -n 1)
-          
-          # Force cut at 15 seconds and compress to keep it under Telegram limits
-          # -ss 0 = start at beginning | -t 15 = stop at 15s | -crf 28 = high quality compression
-          ffmpeg -i "$RAW_VIDEO" -ss 00:00:00 -t 00:00:15 -vcodec libx264 -crf 28 -preset faster -y final_short.mp4
+          # Cuts exactly at 15s and normalizes audio levels
+          ffmpeg -i "$RAW_VIDEO" -ss 00:00:00 -t 00:00:15 -af "volume=1.5" -vcodec libx264 -crf 23 -preset fast -y final_short.mp4
 
-      - name: Send to Telegram Review
+      - name: Send to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f "final_short.mp4" ]; then
-            curl -F chat_id=$TELEGRAM_CHAT_ID \
-                 -F video=@"final_short.mp4" \
-                 -F caption="💖 Romantic Haryanvi Short Ready! (15 Seconds / 720p)" \
-                 https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
-          else
-            echo "Error: Clipping failed!"
-            exit 1
-          fi
+          curl -F chat_id=$TELEGRAM_CHAT_ID \
+               -F video=@"final_short.mp4" \
+               -F caption="🕺 Proper Haryanvi Short (Gold/Black Theme) Ready!" \
+               https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendVideo
