@@ -16,21 +16,17 @@ def get_service():
 def upload_video():
     youtube = get_service()
     
-    # Path updated for 720p30 output folder created by -qm flag
-    video_path = "media/videos/music_gen/720p30/NeonLyrics.mp4"
+    # Path verified from GitHub Action logs
+    video_path = "media/videos/music_gen/1920p30/NeonLyrics.mp4"
     
     if not os.path.exists(video_path):
         print(f"Error: Video file not found at {video_path}")
-        # List files to help debug if it fails again
-        print("Existing files in media directory:")
-        for root, dirs, files in os.walk("media"):
-            print(f"Directory: {root}, Files: {files}")
         return
 
     body = {
         'snippet': {
             'title': 'Soulful AI Melodies #Shorts #Romantic',
-            'description': 'Automated AI Romantic Vibes.',
+            'description': 'Automated AI Romantic Vibes. New Channel Launch!',
             'tags': ['Romantic', 'AISongs', 'Shorts'],
             'categoryId': '10'
         },
@@ -40,7 +36,7 @@ def upload_video():
         }
     }
 
-    print("Starting upload...")
+    print("Starting upload to New ID...")
     insert_request = youtube.videos().insert(
         part='snippet,status',
         body=body,
