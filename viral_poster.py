@@ -5,24 +5,27 @@ import os
 # Safely pull your key from GitHub Secrets
 API_KEY = os.getenv("AYRSHARE_BRAND_TOKEN")
 
-# YOUR VIRAL WEALTH LIBRARY (Fixed for URL Accessibility)
+# VIRAL WEALTH LIBRARY (Fixed with Non-Amazon Hosted Images)
 viral_library = [
     {
         "title": "Clear Skin Secret: Minimalist 10% Niacinamide Serum ✨",
         "link": "https://www.amazon.in/dp/B08F97NH6P?tag=bansallab01-21", 
-        "desc": "The #1 serum for 'Glass Skin' and oil control. A must-have for your 2026 routine! #ad #SkincareHacks #ViralBeauty #Minimalist",
+        "desc": "The #1 serum for 'Glass Skin' and oil control. #ad #SkincareHacks #ViralBeauty #Minimalist",
+        # Using a direct link from the official Minimalist site CDN
         "img": "https://be-minimalist.com/cdn/shop/products/Niacinamide10_1.jpg"
     },
     {
         "title": "Aesthetic Room Upgrade: Smart LED Strips 💡",
         "link": "https://www.amazon.in/dp/B08L7STDM9?tag=bansallab01-21",
-        "desc": "Upgrade your vibe instantly for under ₹1000. App-controlled with 16M colors. #ad #RoomMakeover #AestheticHome #Govee",
-        "img": "https://m.media-amazon.com/images/I/81-0X-vU-DL.jpg"
+        "desc": "Upgrade your vibe instantly for under ₹1000. #ad #RoomMakeover #AestheticHome #Govee",
+        # Using a high-quality lifestyle image from Unsplash (Pinterest loves these)
+        "img": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80"
     },
     {
         "title": "Zero-Waste Writing: Digital LCD RuffPad 📝",
         "link": "https://www.amazon.in/dp/B08XMS7G1C?tag=bansallab01-21",
-        "desc": "The perfect tool for quick notes or kids' sketches. Portable and eco-friendly! #ad #WorkFromHome #ParentingHacks #Portronics",
+        "desc": "The perfect tool for quick notes or kids' sketches. #ad #WorkFromHome #ParentingHacks #Portronics",
+        # Using the official product image from Portronics CDN
         "img": "https://www.portronics.com/cdn/shop/products/Ruffpad15M1.jpg"
     }
 ]
