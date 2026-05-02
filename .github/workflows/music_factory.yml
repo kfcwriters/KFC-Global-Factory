@@ -1,4 +1,4 @@
-name: Full Composition Song Factory
+name: Final Orchestra Success Factory
 
 on:
   workflow_dispatch:
@@ -10,46 +10,42 @@ jobs:
       - name: Step 1 Checkout
         uses: actions/checkout@v4
 
-      - name: Step 2 Install Studio Tools
+      - name: Step 2 Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
           pip install gTTS
 
-      - name: Step 3 Lyric Agent (Full Songwriting)
+      - name: Step 3 Lyric & Singer Agent
         run: |
-          # Writing a full 25-second set of unique lyrics
+          # Writing long, unique lyrics to ensure the song lasts the full duration
           echo "Teri aankhon ka noor hai nirala,
           Dil ko mere tune hi sambhala.
           In the moonlight, your face is glowing,
           Like a river, our love is flowing.
           Har pal mein tera hi ehsaas hai,
           Tu mere dil ke sabse paas hai." > lyrics.txt
-          
-          # Generating the voice (Natural Speed)
           gtts-cli -f lyrics.txt --lang hi --output voice.mp3
 
-      - name: Step 4 AI Music Composer (3-Layer Orchestra)
+      - name: Step 4 The Music Composer (Guaranteed)
         run: |
-          # Layer 1: Deep Romantic Bass (Heartbeat)
-          ffmpeg -f lavfi -i "sine=f=110:d=25,tremolo=f=2:d=0.5" -f lavfi -i "sine=f=55:d=25,tremolo=f=2:d=0.3" -filter_complex "amix=inputs=2" bass.wav
+          # Layer 1: Deep Bass Pulse
+          ffmpeg -f lavfi -i "sine=f=80:d=25,tremolo=f=2:d=0.5" -t 25 bass.wav
+          # Layer 2: Rhythmic High-Hat (Using high-freq sine instead of noise to prevent crashes)
+          ffmpeg -f lavfi -i "sine=f=8000:d=25,tremolo=f=8:d=0.9" -t 25 percussion.wav
+          # Layer 3: Melodic Lead
+          ffmpeg -f lavfi -i "sine=f=440:d=25,vibrato=f=4:d=0.5" -t 25 melody.wav
           
-          # Layer 2: Rhythmic Shaker (Percussion)
-          ffmpeg -f lavfi -i "noise=alls=0.01:allf=t:allp=1" -filter_complex "highpass=f=5000,tremolo=f=8:d=0.9,volume=0.2" -t 25 percussion.wav
-          
-          # Layer 3: High Melody (Lead)
-          ffmpeg -f lavfi -i "sine=f=440:d=25,vibrato=f=5:d=0.5" -f lavfi -i "sine=f=660:d=25,vibrato=f=4:d=0.4" -filter_complex "amix=inputs=2,volume=0.3" melody.wav
-          
-          # Mix all instruments together
-          ffmpeg -i bass.wav -i percussion.wav -i melody.wav -filter_complex "[0:a]volume=1.0[a0];[1:a]volume=0.5[a1];[2:a]volume=0.3[a2];[a0][a1][a2]amix=inputs=3:duration=longest,aecho=0.8:0.9:1000:0.3" beat.wav
+          # Mix all instruments together with a professional echo
+          ffmpeg -i bass.wav -i percussion.wav -i melody.wav -filter_complex "[0:a]volume=1.2[a0];[1:a]volume=0.3[a1];[2:a]volume=0.4[a2];[a0][a1][a2]amix=inputs=3:duration=longest,aecho=0.8:0.9:1000:0.3" beat.wav
 
-      - name: Step 5 Producer Mastering (Voice + Music)
+      - name: Step 5 The Producer (Mastering)
         run: |
-          # Processing voice with singing-style 'Chorus' and 'Room Reverb'
-          ffmpeg -i voice.mp3 -af "vibrato=f=6:d=0.4,chorus=0.5:0.9:50:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=3.5" processed_voice.wav
+          # Giving the voice a professional singing 'Chorus' and 'Vibrato'
+          ffmpeg -i voice.mp3 -af "vibrato=f=6:d=0.5,chorus=0.5:0.9:50:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=3.5" processed_voice.wav
           
-          # Final Master Mix
-          ffmpeg -i beat.wav -i processed_voice.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.5[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
+          # Merge Voice + Music (Mastering for 25 seconds)
+          ffmpeg -i beat.wav -i processed_voice.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.8[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
 
       - name: Step 6 Create Vertical Video
         run: |
@@ -61,4 +57,4 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_ready.mp4" -F caption="🎼 MASTER SUCCESS: Full Composition Romantic Song!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_ready.mp4" -F caption="🏆 MASTER COMPOSITION: Full Lyrics + 3-Layer Music!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
