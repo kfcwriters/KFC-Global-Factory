@@ -1,4 +1,4 @@
-name: Zero-Touch Audio Success Factory
+name: Two-Agent Lyric & Song Factory
 
 on:
   workflow_dispatch:
@@ -7,35 +7,42 @@ jobs:
   production:
     runs-on: ubuntu-latest
     steps:
-      - name: Step 1 Checkout Repo
+      - name: Step 1 Checkout
         uses: actions/checkout@v4
 
-      - name: Step 2 Install System Tools
+      - name: Step 2 Install Agents
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
+          pip install gTTS
 
-      - name: Step 3 AI Music Composer
-        # This creates a rhythmic 'Heartbeat' pulse (100Hz and 150Hz)
-        # We use tremolo to create a 'thumping' romantic rhythm
+      - name: Step 3 Lyric Agent (The Writer)
+        run: python3 lyric_agent.py
+
+      - name: Step 4 Vocal Agent (The Singer)
         run: |
+          # Turns the lyrics.txt into a Hindi-English voice file
+          gtts-cli -f lyrics.txt --lang hi --output vocals.mp3
+
+      - name: Step 5 Music Composer (The Beat)
+        run: |
+          # Generating a heavy romantic heartbeat beat
           ffmpeg -f lavfi -i "sine=f=100:d=25" -f lavfi -i "sine=f=150:d=25" \
-          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,tremolo=f=3:d=0.9,aecho=0.8:0.9:1000:0.3,lowpass=f=500,volume=10.0" \
-          ai_song.wav
+          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,tremolo=f=3:d=0.9,aecho=0.8:0.9:1000:0.3,lowpass=f=500,volume=5.0" \
+          beat.wav
 
-      - name: Step 4 Visual Specialist
-        run: curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
-
-      - name: Step 5 Emperor Merge
+      - name: Step 6 Emperor Merge (Final Mastering)
         run: |
-          # We push the volume to the absolute limit (volume=4.0) 
-          ffmpeg -y -loop 1 -i bg.jpg -i ai_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p \
-          -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k -ar 44100 -ac 2 \
-          -af "loudnorm=I=-14:TP=-1:LRA=11,volume=4.0" -shortest final_video.mp4
+          # Mixing the voice (Agent 4) and the beat (Agent 5)
+          ffmpeg -i beat.wav -i vocals.mp3 -filter_complex "[0:a]volume=0.6[a0];[1:a]volume=3.0[a1];[a0][a1]amix=inputs=2:duration=first,loudnorm" final_song.wav
+          
+          # Creating the Final Video
+          curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
+          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 20 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k -shortest final_video.mp4
 
-      - name: Step 6 Telegram Delivery
+      - name: Step 7 Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"final_video.mp4" -F caption="🎼 SUCCESS: The Heartbeat Romantic Short is Ready!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"final_video.mp4" -F caption="🎼 TWO-AGENT SUCCESS: Lyrics + Song Generated!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
