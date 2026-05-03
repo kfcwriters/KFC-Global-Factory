@@ -1,4 +1,4 @@
-name: High-Quality Remix Factory
+name: Deep Harmony Song Factory
 
 on:
   workflow_dispatch:
@@ -18,39 +18,38 @@ jobs:
 
       - name: Step 3 Lyric & Vocal Agent
         run: |
-          # Writing high-quality, long-form lyrics
-          echo "Teri aankhon ka noor hai nirala, Dil ko mere tune hi sambhala. 
-          In the moonlight, your face is glowing, Like a river, our love is flowing. 
-          Har pal mein tera hi ehsaas hai, Tu mere dil ke sabse paas hai." > lyrics.txt
-          # Generating the clear voice
+          # Writing upbeat, romantic lyrics
+          echo "Teri aankhon ka noor, sabse haseen. Dil mera dhadke, tere hi kareeb. Moonlight magic, love in the air. Saath tera ho, everywhere." > lyrics.txt
+          # Generating a calm, clear voice (Hindi)
           gtts-cli -f lyrics.txt --lang hi --output raw_vocals.mp3
 
-      - name: Step 4 Vocal 'Singing' Processor
+      - name: Step 4 Vocal 'Harmonizer' Agent
         run: |
-          # This agent turns the 'speech' into a 'song' voice using Chorus and Flanger
-          ffmpeg -i raw_vocals.mp3 -af "aecho=0.8:0.88:60:0.4,aecho=0.8:0.88:40:0.2,vibrato=f=7:d=0.5,flanger=delay=2:regen=50:width=70,volume=3.5" processed_vocals.wav
+          # We REMOVE vibrato (the fear sound) and add Chorus/Echo
+          # This makes the voice sound wide and musical like a pop song
+          ffmpeg -i raw_vocals.mp3 -af "chorus=0.5:0.9:50:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=3.0" singing_vocals.wav
 
-      - name: Step 5 Pro Instrumental Agent
+      - name: Step 5 High-Energy Romantic Beat
         run: |
-          # Creating a 3-layer professional romantic beat (Bass + Synth + Rhythm)
-          ffmpeg -f lavfi -i "sine=f=110:d=25,tremolo=f=2:d=0.5" \
-                 -f lavfi -i "sine=f=440:d=25,vibrato=f=4:d=0.5" \
-                 -f lavfi -i "sine=f=880:d=25,tremolo=f=8:d=0.3" \
-                 -filter_complex "[0:a]volume=1.2[b];[1:a]volume=0.4[s];[2:a]volume=0.2[r];[b][s][r]amix=inputs=3:duration=longest,aecho=0.8:0.9:1000:0.3" \
-                 pro_beat.wav
+          # Creating a 'Modern Pop' beat:
+          # Layer 1: Deep House Bass (110Hz)
+          # Layer 2: Rhythmic Pulse (220Hz)
+          ffmpeg -f lavfi -i "sine=f=110:d=25,tremolo=f=2:d=0.5" -f lavfi -i "sine=f=220:d=25,tremolo=f=4:d=0.3" \
+          -filter_complex "[0:a][1:a]amix=inputs=2:duration=longest,aecho=0.8:0.9:1000:0.3,lowpass=f=1000,volume=4.0" \
+          pro_beat.wav
 
-      - name: Step 6 Emperor Merge (The Master Mix)
+      - name: Step 6 Emperor Merge (Final Mastering)
         run: |
-          # Mixing the voice and the professional beat
-          ffmpeg -i pro_beat.wav -i processed_vocals.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.5[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
+          # Mixing the 'Harmonized' voice with the 'Pop' beat
+          ffmpeg -i pro_beat.wav -i singing_vocals.wav -filter_complex "[0:a]volume=0.8[a0];[1:a]volume=2.2[a1];[a0][a1]amix=inputs=2:duration=longest,loudnorm" final_song.wav
           
           # Visual & Video Render
           curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
-          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_ready.mp4
+          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 192k youtube_ready.mp4
 
       - name: Step 7 Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_ready.mp4" -F caption="🎵 REMIX SUCCESS: Clear Song, Clear Voice!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_ready.mp4" -F caption="🎵 SUCCESS: Clear Harmonized Song (No 'Fear' Effects!)" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
