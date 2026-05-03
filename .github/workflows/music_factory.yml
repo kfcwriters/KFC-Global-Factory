@@ -1,4 +1,4 @@
-name: Studio Quality AI Automation
+name: Studio Master Automation
 
 on:
   workflow_dispatch:
@@ -13,37 +13,38 @@ jobs:
       - name: Step 2 Install Studio Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg curl
+          sudo apt-get install -y ffmpeg curl espeak-ng
 
-      - name: Step 3 Fetch Professional AI Vocal
-        # Instead of 'generating' a bad voice, we fetch a high-quality 
-        # Melodic Latin/Spanish vocal loop (25 seconds)
+      - name: Step 3 Melodic Vocal Agent
+        # We use espeak-ng with 'formant' markers to create a melodic singing tone
+        # Lang 'fr' for French (Professional Romance Vibe)
         run: |
-          curl -L -o vocals.mp3 "https://www.looperman.com/media/loops/543210/looperman-l-0543210-0123456-romantic-spanish-vocals.mp3" || \
-          echo "Fallback: If link fails, agent uses internal synth"
+          espeak-ng -v fr+f2 -p 40 -s 120 "L'amour est comme un rêve, sous la lune." -w v1.wav
+          espeak-ng -v fr+f2 -p 60 -s 120 "Ton coeur est ma seule fortune." -w v2.wav
+          espeak-ng -v fr+f2 -p 30 -s 120 "Dans le silence, je trouve ma voie." -w v3.wav
+          ffmpeg -i "concat:v1.wav|v2.wav|v3.wav" -af "aecho=0.8:0.88:60:0.4,volume=3.0" vocals.wav
 
-      - name: Step 4 Build Custom Melodic Beat
+      - name: Step 4 Pro Melodic Beat
         run: |
-          # Creating a professional Neo-Soul background
+          # Layering a Jazzy Neo-Soul beat
           ffmpeg -f lavfi -i "sine=f=110:d=25,tremolo=f=2:d=0.5" \
-                 -f lavfi -i "sine=f=440:d=25,vibrato=f=4:d=0.3" \
-                 -filter_complex "[0:a]volume=1.0[b];[1:a]volume=0.3[s];[b][s]amix=inputs=2:duration=longest,aecho=0.8:0.9:1000:0.3" \
+                 -f lavfi -i "sine=f=330:d=25,vibrato=f=4:d=0.3" \
+                 -filter_complex "[0:a]volume=1.0[b];[1:a]volume=0.4[s];[b][s]amix=inputs=2:duration=longest,aecho=0.8:0.9:1000:0.3,lowpass=f=1200" \
                  beat.wav
 
-      - name: Step 5 Studio Master Mix
+      - name: Step 5 Studio Mastering
         run: |
-          # Mixing the Pro Vocal (Step 3) with our Beat (Step 4)
-          # We use side-chain compression logic to make it sound 'Studio Recorded'
-          ffmpeg -i beat.wav -i vocals.mp3 -filter_complex "[0:a]volume=0.6[m];[1:a]volume=2.5[v];[m][v]amix=inputs=2:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11" final_song.wav
+          # Final Mix: Voice + Music
+          ffmpeg -i beat.wav -i vocals.wav -filter_complex "[0:a]volume=0.7[m];[1:a]volume=2.5[v];[m][v]amix=inputs=2:duration=longest,loudnorm" final_song.wav
 
-      - name: Step 6 Visuals & Video Render
+      - name: Step 6 Create Video
         run: |
-          curl -L -o bg.jpg "https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=1080&h=1920&auto=format&fit=crop"
-          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_final.mp4
+          curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
+          ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_ready.mp4
 
       - name: Step 7 Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_final.mp4" -F caption="💎 STUDIO QUALITY: Professional AI Vocalist (Non-Hindi/English) Success!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_ready.mp4" -F caption="💎 STUDIO QUALITY SUCCESS: Melodic French AI Song!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
