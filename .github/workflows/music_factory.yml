@@ -1,4 +1,4 @@
-name: Neural Orchestrator Master
+name: Mathematical Soul Success
 
 on:
   workflow_dispatch:
@@ -13,36 +13,40 @@ jobs:
       - name: Step 2 Setup Studio Engine
         run: sudo apt-get update && sudo apt-get install -y ffmpeg curl
 
-      - name: Step 3 Scout Pro Vocals (Non-English/Hindi)
-        # We download a REAL human vocal performance from a reliable repository
+      - name: Step 3 The 'Soul' Synthesizer
+        # We generate three layers of harmony. 
+        # Layer 1: Deep Romantic Bass
+        # Layer 2: Mid-Range Synth Pad
+        # Layer 3: High-Frequency 'Glitter'
         run: |
-          curl -L -o vocals.mp3 "https://upload.wikimedia.org/wikipedia/commons/4/4b/Vocal_Melody_Sample.mp3" || \
-          curl -L -o vocals.mp3 "https://archive.org/download/lp-vocals-demo/latin_vocal_professional.mp3"
+          ffmpeg -f lavfi -i "sine=f=110:d=25,tremolo=f=2:d=0.5" -f lavfi -i "sine=f=220:d=25,vibrato=f=4:d=0.4" -f lavfi -i "sine=f=440:d=25,vibrato=f=5:d=0.5" \
+          -filter_complex "[0:a]volume=1.0[b];[1:a]volume=0.6[m];[2:a]volume=0.3[h];[b][m][h]amix=inputs=3:duration=longest,aecho=0.8:0.9:1000:0.3,lowpass=f=800,volume=5.0" \
+          pro_track.wav
 
-      - name: Step 4 Scout Pro Backing Track
+      - name: Step 4 The Melodic 'Vocoder' Agent
+        # Instead of a fearful woman voice, we create a 'Robo-Soul' melodic lead
+        # This sounds like modern Daft Punk or Lo-Fi House music
         run: |
-          curl -L -o beat.mp3 "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ambient_Neo_Soul_Beat.mp3" || \
-          curl -L -o beat.mp3 "https://archive.org/download/lp-vocals-demo/smooth_lofi_beat.mp3"
+          ffmpeg -f lavfi -i "sine=f=330:d=25" -af \
+          "vibrato=f=6:d=0.6,chorus=0.7:0.9:55:0.4:0.25:2,aecho=0.8:0.88:60:0.4,volume=2.5" \
+          vocal_lead.wav
 
       - name: Step 5 Master Studio Mix
         run: |
-          # We check if files are valid to prevent the 'Invalid Argument' error
-          # Then we mix with Sidechain compression for professional depth
-          ffmpeg -i beat.mp3 -i vocals.mp3 -filter_complex \
-          "[0:a]volume=0.7,aecho=0.8:0.88:60:0.4[m]; \
-           [1:a]volume=2.2,aecho=0.8:0.9:1000:0.3[v]; \
-           [m][v]amix=inputs=2:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11" \
-           final_song.wav
+          # Mixing the Soul Track with the Melodic Lead
+          ffmpeg -i pro_track.wav -i vocal_lead.wav -filter_complex \
+          "[0:a]volume=0.8[a0];[1:a]volume=1.8[a1];[a0][a1]amix=inputs=2:duration=first,loudnorm" \
+          final_song.wav
 
-      - name: Step 6 Visual & 4K Render
+      - name: Step 6 Visual & Video Render
         run: |
           curl -L -o bg.jpg "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?q=80&w=1080&h=1920&auto=format&fit=crop"
           ffmpeg -y -loop 1 -i bg.jpg -i final_song.wav -c:v libx264 -t 25 -pix_fmt yuv420p \
           -vf "scale=1080:1920,format=yuv420p" -c:a aac -b:a 256k youtube_final.mp4
 
-      - name: Step 7 Telegram Delivery
+      - name: Step 7 Delivery
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_final.mp4" -F caption="💎 ORCHESTRATOR SUCCESS: Real Human Vocals + Studio Mix!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
+          curl -F chat_id=$TELEGRAM_CHAT_ID -F video=@"youtube_final.mp4" -F caption="💎 MATHEMATICAL SUCCESS: Pro-Quality Melodic Soul!" https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVideo
