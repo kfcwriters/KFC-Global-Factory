@@ -1,119 +1,99 @@
 """
 image_gen.py
-Generates images via HuggingFace Inference API (SDXL).
-Falls back to a Pillow-drawn gradient if the API fails.
+Generates images using the official huggingface_hub InferenceClient.
+Falls back to a Pillow-drawn gradient if generation fails.
 """
 
 import io
 import time
 import random
-import requests
+from huggingface_hub import InferenceClient
 from PIL import Image, ImageDraw
 
 
-HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-MAX_RETRIES = 4
-RETRY_SLEEP  = 35   # seconds
+# Models to try in order (first one that works is used)
+IMAGE_MODELS = [
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "stabilityai/stable-diffusion-2-1",
+    "runwayml/stable-diffusion-v1-5",
+]
 
-# Visual style modifiers — appended to every prompt for variety
 STYLE_TAGS = [
     "cinematic lighting, 4k, atmospheric, ultra detailed",
     "oil painting style, vibrant colors, rich texture, artstation",
     "watercolor art, soft pastel tones, dreamy, ethereal",
-    "digital art, neon accent, dramatic shadows, photorealistic",
-    "pencil sketch with color wash, artistic, detailed linework",
+    "digital art, dramatic shadows, photorealistic",
     "golden hour photography, warm tones, shallow depth of field",
     "moody dark fantasy, deep shadows, mystical atmosphere",
 ]
 
-# Gradient palette for fallback images
 FALLBACK_PALETTES = [
-    [(20, 0, 50), (80, 0, 120)],
-    [(0, 20, 60), (0, 80, 160)],
-    [(40, 10, 0), (140, 60, 0)],
-    [(5, 30, 10), (20, 100, 40)],
-    [(30, 0, 0), (110, 20, 20)],
+    [(20, 0, 50),  (80, 0, 120)],
+    [(0, 20, 60),  (0, 80, 160)],
+    [(40, 10, 0),  (140, 60, 0)],
+    [(5, 30, 10),  (20, 100, 40)],
+    [(30, 0, 0),   (110, 20, 20)],
 ]
 
 
 def generate_images(prompts: list[str], hf_token: str) -> list[bytes]:
     """
-    Generate one image per prompt.
+    Generate one image per prompt using HuggingFace InferenceClient.
 
     Args:
         prompts  : List of image description strings.
         hf_token : HuggingFace API token.
 
     Returns:
-        List of raw JPEG/PNG bytes (one per prompt).
-        Failed slots are replaced with a gradient fallback.
+        List of JPEG bytes. Failed slots become gradient fallbacks.
     """
-    headers = {"Authorization": f"Bearer {hf_token}"}
+    client  = InferenceClient(token=hf_token)
     results = []
 
     for idx, prompt in enumerate(prompts):
-        style   = random.choice(STYLE_TAGS)
-        full_q  = f"{prompt}, {style}"
-        payload = {
-            "inputs": full_q,
-            "parameters": {"width": 1280, "height": 720}
-        }
+        style      = random.choice(STYLE_TAGS)
+        full_prompt = f"{prompt}, {style}"
+        img_bytes  = None
 
-        success = False
-        for attempt in range(1, MAX_RETRIES + 1):
-            print(f"  [image {idx + 1}/{len(prompts)}] attempt {attempt} …")
+        for model in IMAGE_MODELS:
+            print(f"  [image {idx+1}/{len(prompts)}] trying {model.split('/')[-1]} …")
             try:
-                resp = requests.post(
-                    HF_MODEL, headers=headers, json=payload, timeout=90
+                pil_img = client.text_to_image(
+                    full_prompt,
+                    model=model,
+                    width=1280,
+                    height=720,
                 )
-            except requests.exceptions.Timeout:
-                print("  [image] timeout, retrying …")
-                time.sleep(10)
-                continue
-
-            if resp.status_code == 200:
-                results.append(resp.content)
-                print(f"  [image {idx + 1}] OK ({len(resp.content) // 1024} KB)")
-                success = True
+                # text_to_image returns a PIL Image object
+                buf = io.BytesIO()
+                pil_img.save(buf, format="JPEG", quality=90)
+                img_bytes = buf.getvalue()
+                print(f"  [image {idx+1}] OK ({len(img_bytes)//1024} KB)")
                 break
 
-            if resp.status_code == 503:
-                try:
-                    wait = float(resp.json().get("estimated_time", RETRY_SLEEP))
-                except Exception:
-                    wait = RETRY_SLEEP
-                wait = min(wait, 90)
-                print(f"  [image] model loading — waiting {wait:.0f}s …")
-                time.sleep(wait)
-                continue
+            except Exception as exc:
+                print(f"  [image {idx+1}] {model.split('/')[-1]} failed: {str(exc)[:120]}")
+                time.sleep(10)
 
-            print(f"  [image] HTTP {resp.status_code} — skipping")
-            break
+        if img_bytes is None:
+            print(f"  [image {idx+1}] all models failed — using gradient fallback")
+            img_bytes = _gradient_fallback(idx)
 
-        if not success:
-            print(f"  [image {idx + 1}] using gradient fallback")
-            results.append(_gradient_fallback(idx))
-
-        time.sleep(2)   # polite rate-limiting
+        results.append(img_bytes)
+        time.sleep(3)   # polite rate-limiting between images
 
     return results
 
 
-# ─────────────────────────────────────────────
-# Fallback: generate a simple gradient in memory
-# ─────────────────────────────────────────────
-
 def _gradient_fallback(seed: int, w: int = 1280, h: int = 720) -> bytes:
-    """Return JPEG bytes of a vertical gradient."""
+    """Return JPEG bytes of a simple vertical gradient."""
     c1, c2 = FALLBACK_PALETTES[seed % len(FALLBACK_PALETTES)]
-    img  = Image.new("RGB", (w, h))
-    draw = ImageDraw.Draw(img)
-
+    img    = Image.new("RGB", (w, h))
+    draw   = ImageDraw.Draw(img)
     for y in range(h):
         t   = y / h
         rgb = tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
         draw.line([(0, y), (w, y)], fill=rgb)
-
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=90)
     return buf.getvalue()
