@@ -1,0 +1,96 @@
+name: 🎵 Daily AI Music Upload
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Triggers
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  schedule:
+    # Every day at 10:00 AM UTC  →  3:30 PM IST
+    - cron: "0 10 * * *"
+
+  # Allow manual runs from the GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      niche_index:
+        description: "Niche index to use (0-5). Leave blank for daily rotation."
+        required: false
+        default: ""
+      test_mode:
+        description: "Set to 'true' to skip YouTube upload (generate only)"
+        required: false
+        default: "false"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Job
+# ──────────────────────────────────────────────────────────────────────────────
+jobs:
+  generate-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90          # generous timeout for model warm-up
+
+    steps:
+
+      # 1. Checkout ─────────────────────────────────────────────────────────────
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Python ───────────────────────────────────────────────────────────────
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # 3. System deps (ffmpeg + fonts) ─────────────────────────────────────────
+      - name: 🔧 Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg \
+            fonts-dejavu-core \
+            fonts-liberation
+
+      # 4. Python deps ──────────────────────────────────────────────────────────
+      - name: 📥 Install Python dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      # 5. Run pipeline ─────────────────────────────────────────────────────────
+      - name: 🚀 Run AI Music Pipeline
+        env:
+          HF_TOKEN:            ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+        run: |
+          ARGS=""
+
+          # Manual override: test mode
+          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            ARGS="$ARGS --test"
+          fi
+
+          # Manual override: niche index
+          if [ -n "${{ github.event.inputs.niche_index }}" ]; then
+            ARGS="$ARGS --niche ${{ github.event.inputs.niche_index }}"
+          fi
+
+          python pipeline.py $ARGS
+
+      # 6. Upload test output as artifact (test mode only) ──────────────────────
+      - name: 💾 Save output (test mode)
+        if: ${{ github.event.inputs.test_mode == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-music-output
+          path: output/
+          retention-days: 3
+
+      # 7. Upload logs on failure ────────────────────────────────────────────────
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-failure-logs
+          path: |
+            output/
+            *.log
+          retention-days: 7
