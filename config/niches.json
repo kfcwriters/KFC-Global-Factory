@@ -1,0 +1,112 @@
+{
+  "niches": [
+    {
+      "name": "lofi study music",
+      "music_prompts": [
+        "calm lofi hip hop with soft piano and gentle rain, 80 bpm, warm vinyl crackle",
+        "jazzy lofi beats with muted trumpet and soft keys, late night study vibes",
+        "mellow acoustic lofi with guitar fingerpicking and distant birds, morning coffee"
+      ],
+      "image_prompts": [
+        "cozy study room with warm lamp, open books, and rain on window at night",
+        "anime style student at desk with city skyline and glowing screen at midnight",
+        "coffee shop corner with laptop, latte art, and potted plant in soft light",
+        "minimalist wooden desk with succulents, notebook, and warm yellow lamp",
+        "library interior with tall bookshelves, golden hour light, dust particles",
+        "person in cozy sweater studying by fireplace with hot drink",
+        "night city rooftop with string lights and a student reading outdoors",
+        "autumn park with fallen leaves and a student on a bench with headphones"
+      ]
+    },
+    {
+      "name": "meditation music",
+      "music_prompts": [
+        "tibetan singing bowls with gentle bamboo flute, deep meditation, slow breath",
+        "binaural 10hz alpha waves with soft ambient synth pad for mindfulness",
+        "zen koto harp with ocean waves and distant monks chanting"
+      ],
+      "image_prompts": [
+        "zen rock garden with raked sand patterns and mossy stones at dawn",
+        "lotus flower floating on perfectly still water at sunrise, mist rising",
+        "tibetan monastery perched on Himalayan cliff with morning clouds",
+        "silhouette meditating on mountain peak with golden sunset behind",
+        "circular mandala glowing with intricate golden sacred geometry patterns",
+        "ancient forest path with sun beams filtering through tall cedar trees",
+        "dark still lake reflecting a full moon and northern lights",
+        "stone Buddha head overgrown with vines in tropical jungle temple"
+      ]
+    },
+    {
+      "name": "sleep music",
+      "music_prompts": [
+        "soft delta wave ambient drone with rainfall and distant thunder for deep sleep",
+        "gentle piano lullaby with soft cello and white noise for babies",
+        "deep space ambient soundscape with floating synth pads and sleep binaural beats"
+      ],
+      "image_prompts": [
+        "starry night sky with milky way reflected perfectly in a calm alpine lake",
+        "cozy bedroom with moonlight streaming through curtains onto soft bed",
+        "enchanted night forest with glowing fireflies and blue mist",
+        "soft purple twilight cloudscape with a glowing crescent moon",
+        "old lighthouse beam sweeping over calm moonlit ocean at night",
+        "sleeping cat curled up by rain-streaked window with soft lamp glow",
+        "celestial dreamscape with floating planets, moons, and star clusters",
+        "lavender field under a deep blue starry sky with soft mist"
+      ]
+    },
+    {
+      "name": "focus work music",
+      "music_prompts": [
+        "deep focus electronic music with subtle binaural beats and minimal percussion",
+        "cinematic orchestral swell for deep concentration, no lyrics, epic flow state",
+        "minimalist piano arpeggios with soft white noise texture for productive work"
+      ],
+      "image_prompts": [
+        "futuristic workspace with holographic displays showing data visualizations",
+        "sleek modern office with floor-to-ceiling glass walls and Tokyo skyline",
+        "coder at multiple monitors late at night with neon keyboard glow",
+        "aerial view of a person writing in a minimalist all-white studio",
+        "abstract blue neural network visualization with glowing data streams",
+        "clockwork gears mechanism in golden light representing precision and order",
+        "lone person silhouetted against a giant glowing screen in a dark room",
+        "overhead flat-lay of organised desk with notebook, pen, and minimal objects"
+      ]
+    },
+    {
+      "name": "healing music",
+      "music_prompts": [
+        "432 hz healing frequency with crystal singing bowls and harp glissandos",
+        "528 hz solfeggio frequency with soft choir pads for cellular healing",
+        "chakra balancing tones layered over gentle nature sounds and wind chimes"
+      ],
+      "image_prompts": [
+        "golden healing light rays beaming through hands in gentle gesture",
+        "glowing DNA double helix surrounded by soft golden frequency waves",
+        "seven chakra energy centers glowing along human silhouette in meditation",
+        "crystal healing stones arranged in geometric mandala on white background",
+        "sunrise over calm ocean with golden healing light across water",
+        "human energy field aura glowing with soft rainbow light gradient",
+        "ancient redwood forest with mystical golden rays between massive trunks",
+        "tropical waterfall into clear blue pool surrounded by lush green ferns"
+      ]
+    },
+    {
+      "name": "wellness music",
+      "music_prompts": [
+        "uplifting acoustic guitar with soft strings for morning healthy routine",
+        "gentle piano and nature sounds for mindful eating and metabolic wellness",
+        "soothing cello with soft harp for hormonal balance and thyroid health music"
+      ],
+      "image_prompts": [
+        "morning yoga on wooden deck overlooking misty green mountains",
+        "colorful fresh organic fruits and vegetables arranged as flat-lay art",
+        "woman stretching peacefully in sunlit minimal white room at dawn",
+        "herbal tea steaming in ceramic cup with fresh herbs and morning light",
+        "healthy Mediterranean meal bowl with vegetables and warm natural light",
+        "runner silhouette on foggy coastal path at sunrise",
+        "person journaling with healthy green smoothie in bright minimal kitchen",
+        "nature spa stones and greenery with soft candle light and water drops"
+      ]
+    }
+  ]
+}
