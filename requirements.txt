@@ -1,5 +1,5 @@
-# HuggingFace — official client (handles API endpoints automatically)
-huggingface_hub>=0.23.0
+# HuggingFace — pin to 0.30+ which has text_to_audio and correct routing
+huggingface_hub>=0.30.0
 
 # Image processing
 Pillow>=10.2.0
@@ -10,5 +10,5 @@ google-auth>=2.28.0
 google-auth-oauthlib>=1.2.0
 google-auth-httplib2>=0.2.0
 
-# HTTP (still needed by other modules)
+# HTTP
 requests>=2.31.0
