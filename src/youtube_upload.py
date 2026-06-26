@@ -59,6 +59,7 @@ def upload_to_youtube(
             "privacyStatus"            : "public",
             "selfDeclaredMadeForKids"  : False,
             "madeForKids"              : False,
+            "containsSyntheticMedia"   : False,
         },
     }
 
