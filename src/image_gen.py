@@ -39,47 +39,47 @@ FALLBACK_PALETTES = [
 ]
 
 
-def generate_images(prompts: list, hf_token: str) -> list:
+def _fetch_image(prompt: str, hf_token: str) -> bytes | None:
+    """Try every endpoint + model combination. Return JPEG bytes or None."""
     headers = {"Authorization": f"Bearer {hf_token}"}
+    payload = {"inputs": prompt, "parameters": {"width": 1280, "height": 720}}
+
+    for base_url in HF_ENDPOINTS:
+        for model in IMAGE_MODELS:
+            url = base_url.format(model=model)
+            print(f"    trying {model.split('/')[-1]} via {url.split('/')[2]} …")
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=90)
+                if resp.status_code == 200:
+                    pil_img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+                    buf = io.BytesIO()
+                    pil_img.save(buf, format="JPEG", quality=90)
+                    return buf.getvalue()
+                elif resp.status_code == 503:
+                    time.sleep(35)
+                else:
+                    print(f"    HTTP {resp.status_code} — next model")
+            except Exception as exc:
+                print(f"    error: {str(exc)[:80]}")
+                time.sleep(10)
+    return None
+
+
+def generate_images(prompts: list, hf_token: str) -> list:
     results = []
 
     for idx, prompt in enumerate(prompts):
         style       = random.choice(STYLE_TAGS)
         full_prompt = f"{prompt}, {style}"
-        img_bytes   = None
+        print(f"  [image {idx+1}/{len(prompts)}] generating …")
 
-        # Try each endpoint × each model
-        outer:
-        for base_url in HF_ENDPOINTS:
-            for model in IMAGE_MODELS:
-                url     = base_url.format(model=model)
-                payload = {
-                    "inputs": full_prompt,
-                    "parameters": {"width": 1280, "height": 720}
-                }
-                print(f"  [image {idx+1}/{len(prompts)}] {model.split('/')[-1]} …")
-                try:
-                    resp = requests.post(url, headers=headers, json=payload, timeout=90)
-                    if resp.status_code == 200:
-                        pil_img = Image.open(io.BytesIO(resp.content)).convert("RGB")
-                        buf = io.BytesIO()
-                        pil_img.save(buf, format="JPEG", quality=90)
-                        img_bytes = buf.getvalue()
-                        print(f"  [image {idx+1}] OK ({len(img_bytes)//1024} KB) ✓")
-                        break
-                    elif resp.status_code == 503:
-                        time.sleep(35)
-                    else:
-                        print(f"  [image {idx+1}] HTTP {resp.status_code}")
-                except Exception as exc:
-                    print(f"  [image {idx+1}] {str(exc)[:80]}")
-                    time.sleep(10)
-            if img_bytes:
-                break
+        img_bytes = _fetch_image(full_prompt, hf_token)
 
         if img_bytes is None:
             print(f"  [image {idx+1}] all endpoints failed — gradient fallback")
             img_bytes = _gradient_fallback(idx)
+        else:
+            print(f"  [image {idx+1}] OK ({len(img_bytes)//1024} KB) ✓")
 
         results.append(img_bytes)
         time.sleep(3)
