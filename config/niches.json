@@ -1,6 +1,26 @@
 {
   "niches": [
     {
+      "name": "romantic songs",
+      "music_prompts": [
+        "soft romantic piano with gentle strings, slow love ballad, Bollywood style",
+        "acoustic guitar with sitar, warm romantic evening, Hindi film music style",
+        "smooth romantic violin with piano, passionate love theme, cinematic",
+        "soft flute with tabla and strings, romantic Indian classical fusion",
+        "gentle piano ballad with cello, emotional love story, slow and tender"
+      ],
+      "image_prompts": [
+        "romantic couple holding hands walking on beach at golden sunset, warm glow, cinematic",
+        "couple slow dancing in candlelit room with rose petals, soft bokeh lights",
+        "two lovers sitting on rooftop under stars, city lights below, romantic night",
+        "couple under cherry blossom tree in spring, petals falling, dreamy soft light",
+        "man surprising woman with roses in a garden full of flowers, romantic evening",
+        "couple sharing umbrella in gentle rain on empty street, romantic mood",
+        "silhouette of couple kissing at sunset on a hill, golden hour, dramatic sky",
+        "couple sitting by a lake at twilight, reflections on water, fairy lights around them"
+      ]
+    },
+    {
       "name": "lofi study music",
       "music_prompts": [
         "calm lofi hip hop with soft piano and gentle rain, 80 bpm, warm vinyl crackle",
@@ -63,7 +83,7 @@
       ],
       "image_prompts": [
         "futuristic workspace with holographic displays showing data visualizations",
-        "sleek modern office with floor-to-ceiling glass walls and Tokyo skyline",
+        "sleek modern office with floor-to-ceiling glass walls and city skyline",
         "coder at multiple monitors late at night with neon keyboard glow",
         "aerial view of a person writing in a minimalist all-white studio",
         "abstract blue neural network visualization with glowing data streams",
