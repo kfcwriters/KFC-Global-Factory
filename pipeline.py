@@ -56,7 +56,7 @@ def pick_niche(niches: list[dict], override: int | None = None) -> dict:
     """Rotate through niches by day-of-year, or use override index."""
     if override is not None:
         return niches[override % len(niches)]
-    day_index = datetime.utcnow().timetuple().tm_yday % len(niches)
+    day_index = random.randint(0, len(niches) - 1)
     return niches[day_index]
 
 
