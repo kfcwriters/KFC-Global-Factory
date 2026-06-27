@@ -1,0 +1,62 @@
+name: 🎵 Daily Hindi-English Lyric Video
+
+# ── Schedule ──────────────────────────────────────────────────────────────────
+# Pipeline 1 (Shorts)   : 10:00 AM UTC  = 3:30 PM IST
+# Pipeline 2 (Romantic) : 14:00 PM UTC  = 7:30 PM IST
+# Pipeline 3 (Lyrics)   : 17:30 PM UTC  = 11:00 PM IST  ← this one
+
+on:
+  schedule:
+    - cron: "30 17 * * *"    # 11:00 PM IST every day
+
+  workflow_dispatch:          # Manual trigger for testing
+    inputs:
+      test_mode:
+        description: "true = skip upload"
+        required: false
+        default: "false"
+
+jobs:
+  lyrics-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 🔧 System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg fonts-dejavu-core fonts-liberation
+
+      - name: 📥 Python dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: 🎵 Run Lyric Video Pipeline
+        env:
+          HF_TOKEN:            ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+        run: |
+          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            echo "Test mode — skipping upload"
+          else
+            python lyrics_pipeline.py
+          fi
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lyrics-failure-logs
+          path: "*.log"
+          retention-days: 7
