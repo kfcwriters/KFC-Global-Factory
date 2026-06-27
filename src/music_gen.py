@@ -154,19 +154,23 @@ def _synthesise(prompt: str, duration_sec: int = 45) -> bytes:
     n     = int(SR * duration_sec)
     audio = np.zeros(n, np.float32)
 
-    # ── Section lengths (bars) ──────────────────
-    # Intro:4 | Verse:8 | Chorus:8 | Verse:8 | Chorus:8 | Outro:4
-    sections = []
-    t = beat * 2        # start after 2-beat silence (intro space)
+    # ── Dynamic sections — fills FULL duration, no silence ──────────
+    # Pattern: Intro → [Verse → Chorus] × N → Outro
+    # N is calculated automatically so music plays for entire duration_sec
+    t = beat * 2   # short opening silence
 
-    for section_bars, section_type in [
-        (4,  "intro"),
-        (8,  "verse"),
-        (8,  "chorus"),
-        (8,  "verse"),
-        (8,  "chorus"),
-        (4,  "outro"),
-    ]:
+    fixed_bars  = 4 + 4          # intro + outro
+    repeat_bars = 8 + 8          # one verse+chorus pair
+    repeats     = max(1, int((duration_sec / bar - fixed_bars) / repeat_bars))
+    print(f"  [music] {repeats} verse+chorus cycles to fill {duration_sec}s")
+
+    section_list = [(4, "intro")]
+    for _ in range(repeats):
+        section_list.append((8, "verse"))
+        section_list.append((8, "chorus"))
+    section_list.append((4, "outro"))
+
+    for section_bars, section_type in section_list:
         for bar_i in range(section_bars):
             if t >= duration_sec - bar: break
             chord_idx = (bar_i // 2) % len(chords)
