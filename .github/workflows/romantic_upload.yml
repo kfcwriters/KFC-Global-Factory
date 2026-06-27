@@ -1,0 +1,61 @@
+name: 🌹 Daily Romantic Song Upload
+
+# ── Completely separate from daily_upload.yml ──────────────────────────────
+# Main pipeline   : runs at 10:00 AM UTC (3:30 PM IST)
+# Romantic pipeline: runs every Friday at 14:00 UTC (7:30 PM IST)
+
+on:
+  schedule:
+    - cron: "0 14 * * 5"    # Every Friday at 7:30 PM IST
+
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "true = skip YouTube upload (for testing)"
+        required: false
+        default: "false"
+
+jobs:
+  romantic-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 🔧 System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg fonts-dejavu-core fonts-liberation
+
+      - name: 📥 Python dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: 🌹 Run Romantic Song Pipeline
+        env:
+          HF_TOKEN:            ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+        run: |
+          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            echo "Test mode — pipeline would run here"
+          else
+            python romantic_pipeline.py
+          fi
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: romantic-failure-logs
+          path: "*.log"
+          retention-days: 7
