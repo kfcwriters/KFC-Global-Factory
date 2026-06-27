@@ -124,7 +124,7 @@ def run(test_mode: bool = False, niche_override: int | None = None) -> str | Non
 
         # ── Step 2: Images ────────────────────────────────────────────────────
         print("\n🖼️   Step 2/6 — Generating images …")
-        image_bytes_list = generate_images(image_prompts, HF_TOKEN)
+        image_bytes_list = generate_images(image_prompts, HF_TOKEN, vertical=True)
 
         image_paths = []
         for i, img_bytes in enumerate(image_bytes_list):
@@ -147,7 +147,7 @@ def run(test_mode: bool = False, niche_override: int | None = None) -> str | Non
         # ── Step 5: Video ─────────────────────────────────────────────────────
         print("\n🎬  Step 5/6 — Assembling video …")
         video_path = str(workdir / "output.mp4")
-        create_video(str(mp3_path), image_paths, video_path)
+        create_video(str(mp3_path), image_paths, video_path, vertical=True)
 
         # ── Step 6: Upload (or save) ──────────────────────────────────────────
         if test_mode:
