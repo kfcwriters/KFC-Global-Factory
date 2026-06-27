@@ -130,10 +130,9 @@ def _place(audio: np.ndarray, note: np.ndarray, start_sec: float, amp: float = 1
 
 # ── Song generator ────────────────────────────────────────────────────────────
 def _synthesise(prompt: str, duration_sec: int = 45) -> bytes:
-    # Pick style — use prompt to bias toward romantic minor for romantic songs
     p = prompt.lower()
-    if "romantic" in p or "love" in p or "bollywood" in p:
-        style = random.choice(STYLES[:3])   # romantic styles
+    if "romantic" in p or "love" in p or "bollywood" in p or "bansuri" in p or "sitar" in p:
+        style = random.choice(STYLES[:3])
     elif "lofi" in p or "chill" in p:
         style = STYLES[4]
     elif "sad" in p or "emotional" in p:
@@ -141,80 +140,78 @@ def _synthesise(prompt: str, duration_sec: int = 45) -> bytes:
     else:
         style = random.choice(STYLES)
 
-    print(f"  [music] style={style['name']}  tempo={style['tempo']} BPM")
+    print(f"  [music] style={style['name']}  tempo={style['tempo']} BPM  duration={duration_sec}s")
 
-    tempo     = style["tempo"]
-    beat      = 60.0 / tempo          # seconds per beat
-    bar       = beat * 4              # seconds per 4-beat bar
-    chords    = style["chords"]
-    bass_f    = style["bass"]
-    melody_f  = style["melody"]
-    decay     = style["decay"]
+    tempo   = style["tempo"]
+    beat    = 60.0 / tempo
+    bar     = beat * 4
+    chords  = style["chords"]
+    bass_f  = style["bass"]
+    melody_f = style["melody"]
+    decay   = style["decay"]
 
     n     = int(SR * duration_sec)
     audio = np.zeros(n, np.float32)
 
-    # ── Dynamic sections — fills FULL duration, no silence ──────────
-    # Pattern: Intro → [Verse → Chorus] × N → Outro
-    # N is calculated automatically so music plays for entire duration_sec
-    t = beat * 2   # short opening silence
+    # ── While loop: keeps generating bars until full duration reached ──────
+    # Never pre-calculates — runs until t >= duration_sec, guaranteed no silence
+    t         = beat * 2    # brief opening silence
+    bar_count = 0
 
-    fixed_bars  = 4 + 4          # intro + outro
-    repeat_bars = 8 + 8          # one verse+chorus pair
-    repeats     = max(1, int((duration_sec / bar - fixed_bars) / repeat_bars))
-    print(f"  [music] {repeats} verse+chorus cycles to fill {duration_sec}s")
+    while t < duration_sec - beat:
+        # Section type by position in song
+        progress = t / duration_sec
+        if progress < 0.08:
+            section_type = "intro"
+        elif progress > 0.88:
+            section_type = "outro"
+        else:
+            section_type = "chorus" if (bar_count // 8) % 2 == 1 else "verse"
 
-    section_list = [(4, "intro")]
-    for _ in range(repeats):
-        section_list.append((8, "verse"))
-        section_list.append((8, "chorus"))
-    section_list.append((4, "outro"))
+        chord_idx = (bar_count // 2) % len(chords)
+        chord     = chords[chord_idx]
+        bass      = bass_f[chord_idx]
+        is_chorus = section_type == "chorus"
 
-    for section_bars, section_type in section_list:
-        for bar_i in range(section_bars):
-            if t >= duration_sec - bar: break
-            chord_idx = (bar_i // 2) % len(chords)
-            chord     = chords[chord_idx]
-            bass      = bass_f[chord_idx]
+        # Bass (beats 1 and 3)
+        _place(audio, _ks(bass, beat*2.2, decay+0.001), t,        amp=0.50)
+        _place(audio, _ks(bass, beat*2.2, decay+0.001), t+beat*2, amp=0.40)
 
-            # ── Bass note (beat 1 and 3) ──────────
-            _place(audio, _ks(bass, beat*2.2, decay+0.001), t,         amp=0.50)
-            _place(audio, _ks(bass, beat*2.2, decay+0.001), t+beat*2,  amp=0.40)
+        # Chord arpeggio
+        for b, note_f in enumerate(chord[:4]):
+            _place(audio, _ks(note_f, beat*1.8, decay), t + b*beat, amp=0.28)
 
-            # ── Chord arpeggio (all 4 beats) ──────
-            for b, note_f in enumerate(chord[:4]):
-                _place(audio, _ks(note_f, beat*1.8, decay), t + b*beat, amp=0.28)
+        # Melody
+        m_amp         = 0.65 if is_chorus else 0.45
+        m_pattern     = [0,2,4,3,1,5,3,2] if is_chorus else [0,1,3,2,4,2,1,0]
+        notes_per_bar = 8 if is_chorus else 4
+        step_dur      = bar / notes_per_bar
 
-            # ── Melody (chorus louder, verse softer) ─
-            is_chorus  = section_type == "chorus"
-            m_amp      = 0.65 if is_chorus else 0.45
-            m_pattern  = [0, 2, 4, 3, 1, 5, 3, 2] if is_chorus else [0, 1, 3, 2, 4, 2, 1, 0]
-            notes_per_bar = 4 if not is_chorus else 8
-            step_dur   = bar / notes_per_bar
+        for step in range(notes_per_bar):
+            m_idx  = m_pattern[step % len(m_pattern)] % len(melody_f)
+            m_freq = melody_f[m_idx]
+            if random.random() < 0.15:
+                m_freq *= 0.5
+            _place(audio, _ks(m_freq, step_dur*1.6, decay-0.001),
+                   t + step*step_dur, amp=m_amp)
 
-            for step in range(notes_per_bar):
-                m_idx  = m_pattern[step % len(m_pattern)] % len(melody_f)
-                m_freq = melody_f[m_idx]
-                # Occasional octave variation for interest
-                if random.random() < 0.15:
-                    m_freq *= 0.5
-                _place(audio, _ks(m_freq, step_dur*1.6, decay-0.001),
-                       t + step * step_dur, amp=m_amp)
+        t         += bar
+        bar_count += 1
 
-            t += bar
+    print(f"  [music] {bar_count} bars, {t:.1f}s generated ✓")
 
-    # ── Soft room ambience ─────────────────────────────────────────────────
+    # Soft room noise
     noise = np.random.randn(n).astype(np.float32) * 0.012
     for k in range(1, n):
         noise[k] = 0.95 * noise[k-1] + 0.05 * noise[k]
     audio += noise
 
-    # ── Normalise ──────────────────────────────────────────────────────────
+    # Normalise
     peak = np.max(np.abs(audio))
     if peak > 0:
         audio = audio / peak * 0.82
 
-    # ── Fade in / out ──────────────────────────────────────────────────────
+    # Fade in / out
     fade = min(int(SR * 2.5), n // 5)
     audio[:fade]  *= np.linspace(0, 1, fade)
     audio[-fade:] *= np.linspace(1, 0, fade)
@@ -222,11 +219,10 @@ def _synthesise(prompt: str, duration_sec: int = 45) -> bytes:
     buf = io.BytesIO()
     wavfile.write(buf, SR, (audio * 32767).astype(np.int16))
     data = buf.getvalue()
-    print(f"  [music] synthesised ({len(data)//1024} KB) ✓")
+    print(f"  [music] WAV {len(data)//1024} KB ✓")
     return data
 
 
-# ── Public function ────────────────────────────────────────────────────────────
 def generate_music(prompt: str, hf_token: str, duration_sec: int = 45) -> bytes:
     headers = {"Authorization": f"Bearer {hf_token}"}
     payload = {"inputs": prompt,
