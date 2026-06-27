@@ -120,11 +120,13 @@ def _template_metadata(prompt: str, niche: str) -> dict:
         f"00:30 – Main theme\n"
         f"02:00 – Variation\n"
         f"04:00 – Outro\n\n"
-        f"🔔 Subscribe for daily music!\n\n"
+        f"🔔 Subscribe for daily music!
+
+#Shorts\n\n"
         f"#music #{niche.replace(' ', '')} #relaxingmusic #instrumental {tag_str}"
     )
 
-    tags = [
+    tags = ["shorts",
         "music", niche, "relaxing music", "instrumental music",
         "background music", "study music", "sleep music", "meditation music",
         "ambient music", "chill music", "focus music", "calm music",
