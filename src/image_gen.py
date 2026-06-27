@@ -1,7 +1,7 @@
 """
 image_gen.py
-Primary  : Pollinations.ai — FREE, no API key, no rate limit, uses FLUX model
-Fallback : Pillow gradient (always works)
+Generates images via Pollinations.ai — free, no API key.
+Supports both landscape (1280x720) and vertical/Shorts (1080x1920) modes.
 """
 import io, time, random, urllib.parse
 import requests
@@ -27,18 +27,13 @@ FALLBACK_PALETTES = [
 ]
 
 
-def _pollinations(prompt: str, seed: int) -> bytes | None:
-    """
-    Pollinations.ai — completely free, no API key needed.
-    Uses FLUX model, returns 1280×720 JPEG.
-    """
+def _pollinations(prompt: str, seed: int, w: int, h: int) -> bytes | None:
     encoded = urllib.parse.quote(prompt)
     url = (f"https://image.pollinations.ai/prompt/{encoded}"
-           f"?width=1280&height=720&seed={seed}&nologo=true&model=flux")
+           f"?width={w}&height={h}&seed={seed}&nologo=true&model=flux")
     try:
         r = requests.get(url, timeout=90)
         if r.status_code == 200 and len(r.content) > 5000:
-            # Convert to JPEG via Pillow to ensure correct format
             img = Image.open(io.BytesIO(r.content)).convert("RGB")
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=90)
@@ -49,8 +44,16 @@ def _pollinations(prompt: str, seed: int) -> bytes | None:
     return None
 
 
-def generate_images(prompts: list, hf_token: str) -> list:
-    """hf_token kept for API compatibility but not used — Pollinations needs no key."""
+def generate_images(prompts: list, hf_token: str,
+                    vertical: bool = False) -> list:
+    """
+    Args:
+        prompts  : List of image description strings.
+        hf_token : Not used (Pollinations needs no key) — kept for compatibility.
+        vertical : True = 1080x1920 (Shorts), False = 1280x720 (landscape).
+    """
+    w, h    = (1080, 1920) if vertical else (1280, 720)
+    mode    = "vertical 9:16" if vertical else "landscape 16:9"
     results = []
 
     for idx, prompt in enumerate(prompts):
@@ -59,22 +62,21 @@ def generate_images(prompts: list, hf_token: str) -> list:
         seed        = random.randint(1, 99999)
         img_bytes   = None
 
-        print(f"  [image {idx+1}/{len(prompts)}] generating via Pollinations.ai …")
+        print(f"  [image {idx+1}/{len(prompts)}] {mode} via Pollinations.ai …")
 
-        # Try Pollinations up to 3 times (different seeds)
         for attempt in range(3):
-            img_bytes = _pollinations(full_prompt, seed + attempt * 1000)
+            img_bytes = _pollinations(full_prompt, seed + attempt * 1000, w, h)
             if img_bytes:
                 print(f"  [image {idx+1}] OK ({len(img_bytes)//1024} KB) ✓")
                 break
             time.sleep(5)
 
         if img_bytes is None:
-            print(f"  [image {idx+1}] using gradient fallback")
-            img_bytes = _gradient_fallback(idx)
+            print(f"  [image {idx+1}] fallback gradient")
+            img_bytes = _gradient_fallback(idx, w, h)
 
         results.append(img_bytes)
-        time.sleep(2)   # be polite
+        time.sleep(2)
 
     return results
 
