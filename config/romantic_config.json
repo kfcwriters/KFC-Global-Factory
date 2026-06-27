@@ -1,0 +1,34 @@
+{
+  "niches": [
+    {
+      "name": "romantic hindi english songs",
+      "music_prompts": [
+        "soft romantic piano with gentle strings, slow love ballad, Bollywood style, emotional",
+        "acoustic guitar with sitar, warm romantic evening, Hindi film music style, melodic",
+        "smooth romantic violin with piano, passionate love theme, cinematic, slow",
+        "soft bansuri flute with tabla and strings, romantic Indian classical fusion, soulful",
+        "gentle piano ballad with cello, emotional love story, slow and tender, Bollywood",
+        "romantic guitar with light percussion, dreamy love song, soft and warm",
+        "sitar with piano and soft strings, cross cultural romantic fusion, melancholic"
+      ],
+      "image_prompts": [
+        "romantic couple holding hands walking on beach at golden sunset, warm cinematic glow",
+        "couple slow dancing in candlelit room with rose petals on floor, soft bokeh lights",
+        "two lovers sitting on rooftop under stars, city lights below, romantic night sky",
+        "couple under cherry blossom tree, pink petals falling gently, dreamy spring light",
+        "man surprising woman with red roses in a flower garden, romantic golden evening",
+        "couple sharing one umbrella in gentle rain on empty street, warm street lights",
+        "silhouette of couple embracing at sunset on a cliff, dramatic golden sky",
+        "couple sitting by a lake at twilight, fairy lights reflecting on calm water",
+        "woman in saree and man in suit dancing at outdoor wedding, fairy lights everywhere",
+        "couple on a boat in misty river at dawn, mountains in background, serene romantic",
+        "close up of two hands intertwined with wedding rings, soft warm bokeh background",
+        "couple watching stars lying on grass at night, milky way above them, peaceful",
+        "romantic dinner setup on terrace with candles and roses, city lights at night",
+        "couple running through field of sunflowers, golden hour light, joyful and romantic",
+        "woman leaning head on man's shoulder on train, scenic mountains outside window",
+        "couple walking through old city lane with lanterns glowing, romantic evening atmosphere"
+      ]
+    }
+  ]
+}
