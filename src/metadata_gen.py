@@ -1,19 +1,12 @@
 """
 metadata_gen.py
-Generates YouTube title, description, and tags.
-Primary : Claude API (claude-haiku-4-5-20251001) — fast and cheap.
-Fallback : template — works without API key.
+Primary : Claude API — tries multiple models.
+Fallback: template — works without API key.
 """
-
-import json
-import random
-import re
-import requests
-
+import json, random, re, requests
 
 CLAUDE_API = "https://api.anthropic.com/v1/messages"
 
-# Try these models in order — stops at first success
 CLAUDE_MODELS = [
     "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6",
@@ -21,16 +14,16 @@ CLAUDE_MODELS = [
     "claude-3-haiku-20240307",
 ]
 
-EMOJIS = ["🎵", "🌙", "✨", "🎶", "🌊", "🔮", "🌿", "🎸", "🎹", "🌸", "💫", "🎼"]
+EMOJIS = ["🎵","🌙","✨","🎶","🌊","🔮","🌿","🎸","🎹","🌸","💫","🎼"]
 
 HASHTAG_BANKS = {
-    "romantic songs"     : ["#romanticsongs", "#lovesongs", "#bollywood", "#romantic", "#hindisongs"],
-    "lofi study music"   : ["#lofi", "#studymusic", "#lofihiphop", "#chillbeats", "#studywithme"],
-    "meditation music"   : ["#meditation", "#mindfulness", "#healingmusic", "#zenmusic", "#calm"],
-    "sleep music"        : ["#sleepmusic", "#deepsleep", "#relaxingmusic", "#insomnia", "#sleepaid"],
-    "focus work music"   : ["#focusmusic", "#deepwork", "#productivity", "#flowstate", "#concentration"],
-    "healing music"      : ["#healingfrequency", "#432hz", "#528hz", "#soundhealing", "#chakra"],
-    "wellness music"     : ["#wellnessmusic", "#healthylife", "#metabolichealth", "#thyroid", "#hormones"],
+    "romantic hindi english songs": ["#romanticsongs","#lovesongs","#bollywood","#romantic","#hindisongs"],
+    "lofi study music"            : ["#lofi","#studymusic","#lofihiphop","#chillbeats","#studywithme"],
+    "meditation music"            : ["#meditation","#mindfulness","#healingmusic","#zenmusic","#calm"],
+    "sleep music"                 : ["#sleepmusic","#deepsleep","#relaxingmusic","#insomnia","#sleepaid"],
+    "focus work music"            : ["#focusmusic","#deepwork","#productivity","#flowstate","#concentration"],
+    "healing music"               : ["#healingfrequency","#432hz","#528hz","#soundhealing","#chakra"],
+    "wellness music"              : ["#wellnessmusic","#healthylife","#metabolichealth","#thyroid","#hormones"],
 }
 
 
@@ -56,31 +49,23 @@ def _claude_metadata(prompt: str, niche: str, api_key: str) -> dict:
         f"YouTube metadata for a music video.\n"
         f"Music style: {prompt}\n"
         f"Niche: {niche}\n"
-        "Make the title clickable and SEO-friendly. "
-        "Description should feel human, not robotic."
+        "Make the title clickable and SEO-friendly."
     )
-
     headers = {
         "x-api-key"        : api_key,
         "anthropic-version": "2023-06-01",
         "content-type"     : "application/json",
     }
-
     last_error = None
     for model in CLAUDE_MODELS:
         try:
             resp = requests.post(
-                CLAUDE_API,
-                headers=headers,
-                json={
-                    "model"     : model,
-                    "max_tokens": 800,
-                    "system"    : system,
-                    "messages"  : [{"role": "user", "content": user}],
-                },
+                CLAUDE_API, headers=headers,
+                json={"model": model, "max_tokens": 800,
+                      "system": system,
+                      "messages": [{"role": "user", "content": user}]},
                 timeout=30,
             )
-
             if resp.status_code == 200:
                 raw  = resp.json()["content"][0]["text"].strip()
                 raw  = re.sub(r"^```json\s*|```$", "", raw, flags=re.MULTILINE).strip()
@@ -88,19 +73,16 @@ def _claude_metadata(prompt: str, niche: str, api_key: str) -> dict:
                 data["tags"] = [str(t).lstrip("#") for t in data.get("tags", [])][:15]
                 print(f"  [meta] Claude OK (model={model}) ✓")
                 return data
-
             print(f"  [meta] {model} → HTTP {resp.status_code}: {resp.text[:150]}")
             last_error = f"HTTP {resp.status_code}"
-
         except Exception as e:
             print(f"  [meta] {model} → {str(e)[:100]}")
             last_error = str(e)
-
-    raise RuntimeError(f"All Claude models failed. Last error: {last_error}")
+    raise RuntimeError(f"All Claude models failed. Last: {last_error}")
 
 
 def _template_metadata(prompt: str, niche: str) -> dict:
-    e1, e2     = random.sample(EMOJIS, 2)
+    e1, e2      = random.sample(EMOJIS, 2)
     style_words = " ".join(prompt.split()[:6]).title()
     title       = f"{e1} {style_words} — Music {e2}"[:90]
     extra_tags  = HASHTAG_BANKS.get(niche, [])
@@ -109,28 +91,26 @@ def _template_metadata(prompt: str, niche: str) -> dict:
     description = (
         f"{title}\n\n"
         f"Beautiful {niche} to relax, focus, and unwind.\n\n"
-        f"✅ Perfect for:\n"
-        f"  • Studying and deep focus\n"
-        f"  • Relaxation and stress relief\n"
-        f"  • Background music while working\n"
-        f"  • Meditation and sleep\n\n"
-        f"🎵 Style: {prompt.capitalize()}\n\n"
-        f"📌 Timestamps:\n"
-        f"00:00 – Intro\n"
-        f"00:30 – Main theme\n"
-        f"02:00 – Variation\n"
-        f"04:00 – Outro\n\n"
-        f"🔔 Subscribe for daily music!
-
-#Shorts\n\n"
-        f"#music #{niche.replace(' ', '')} #relaxingmusic #instrumental {tag_str}"
+        f"Perfect for:\n"
+        f"  Studying and deep focus\n"
+        f"  Relaxation and stress relief\n"
+        f"  Background music while working\n"
+        f"  Meditation and sleep\n\n"
+        f"Music style: {prompt.capitalize()}\n\n"
+        f"Timestamps:\n"
+        f"00:00 - Intro\n"
+        f"00:30 - Main theme\n"
+        f"02:00 - Variation\n"
+        f"04:00 - Outro\n\n"
+        f"Subscribe for daily music!\n\n"
+        f"#Shorts #music #{niche.replace(' ', '')} #relaxingmusic {tag_str}"
     )
 
-    tags = ["shorts",
-        "music", niche, "relaxing music", "instrumental music",
+    tags = [
+        "shorts", "music", niche, "relaxing music", "instrumental music",
         "background music", "study music", "sleep music", "meditation music",
         "ambient music", "chill music", "focus music", "calm music",
-        "peaceful music", "soothing music", "no copyright music",
+        "peaceful music", "no copyright music",
     ]
 
     return {"title": title, "description": description, "tags": tags[:15]}
