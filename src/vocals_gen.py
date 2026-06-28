@@ -1,11 +1,13 @@
 """
 vocals_gen.py
-Generates AI singing/vocals for song lyrics.
-Primary  : Bark model via HuggingFace — actual AI singing with ♪ notation
-Fallback : Google TTS (gTTS) — clear voice reading lyrics over music
+AI Vocals for lyric videos.
+Priority order:
+  1. Bark (suno/bark) — HuggingFace AI singing
+  2. gTTS            — Google TTS (needs internet)
+  3. espeak-ng       — Offline TTS, ALWAYS works on Ubuntu GitHub Actions
 """
-import io, time, subprocess, requests
-from pathlib import Path
+import io, os, time, subprocess, tempfile, requests
+
 
 HF_ENDPOINTS = [
     "https://router.huggingface.co/hf-inference/models/suno/bark",
@@ -14,41 +16,69 @@ HF_ENDPOINTS = [
 
 
 def generate_vocals(sections: list, hf_token: str) -> bytes:
-    """
-    Generate vocal audio for all lyric sections.
-    Returns audio bytes (MP3/FLAC/WAV).
-    """
-    # Try Bark (AI singing)
-    result = _bark_singing(sections, hf_token)
-    if result:
+    """Try multiple vocal engines in order. Returns audio bytes."""
+
+    # 1. Try Bark (AI singing)
+    print("  [vocals] trying Bark AI singing ...")
+    result = _bark(sections, hf_token)
+    if result and len(result) > 5000:
+        print(f"  [vocals] Bark OK ({len(result)//1024} KB) ✓")
         return result
 
-    # Fallback: Google TTS (spoken voice over music)
-    print("  [vocals] Bark unavailable — using Google TTS voice")
-    return _gtts_voice(sections)
+    # 2. Try gTTS
+    print("  [vocals] trying Google TTS ...")
+    try:
+        result = _gtts(sections)
+        if result and len(result) > 1000:
+            print(f"  [vocals] gTTS OK ({len(result)//1024} KB) ✓")
+            return result
+    except Exception as e:
+        print(f"  [vocals] gTTS failed: {str(e)[:80]}")
+
+    # 3. espeak-ng — OFFLINE, always works on GitHub Actions Ubuntu
+    print("  [vocals] using espeak-ng (offline, guaranteed) ...")
+    result = _espeak(sections)
+    print(f"  [vocals] espeak-ng OK ({len(result)//1024} KB) ✓")
+    return result
 
 
 def mix_vocals_music(vocal_path: str, music_path: str,
                      output_path: str, duration_sec: int = 210):
     """
-    Mix vocal track with instrumental music using ffmpeg.
-    Vocals: primary (boosted + reverb for warmth)
-    Music : soft background layer
+    Mix vocals + instrumental.
+    - Loops vocals to fill full duration
+    - Vocals at high volume so clearly heard
+    - Music soft in background
     """
-    print("  [vocals] mixing vocals + instrumental …")
+    # First: probe vocal file to confirm it has audio
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", vocal_path],
+        capture_output=True, text=True
+    )
+    vocal_dur = float(probe.stdout.strip() or 0)
+    print(f"  [vocals] vocal track duration: {vocal_dur:.1f}s")
+
+    if vocal_dur < 1.0:
+        print("  [vocals] ⚠️  vocal file is empty — regenerating with espeak-ng")
+        # Force espeak fallback and save to vocal_path
+        from pathlib import Path
+        sections_dummy = [{"lines":["Hello, this is a romantic song", "Please enjoy the music"]}]
+        data = _espeak(sections_dummy)
+        Path(vocal_path).write_bytes(data)
+
+    print("  [vocals] mixing vocals + music ...")
     cmd = [
         "ffmpeg", "-y",
-        "-i", vocal_path,
+        "-stream_loop", "-1", "-i", vocal_path,   # loop vocals
         "-i", music_path,
         "-filter_complex",
-        # Vocals — boost + reverb echo for a sung feel
-        "[0:a]volume=1.4,"
-        "aecho=0.85:0.90:50:0.40,"
-        "aecho=0.70:0.80:100:0.25"
+        # Apply musical chorus effect + high volume to vocals
+        "[0:a]volume=4.0,"
+        "chorus=0.7:0.9:55:0.4:0.25:2,"          # chorus = richer voice
+        "aecho=0.8:0.7:40:0.3"                    # slight echo = room feel
         "[v];"
-        # Instrumental — background at 35%
-        "[1:a]volume=0.35[m];"
-        # Merge both tracks
+        "[1:a]volume=0.18[m];"                    # music soft background
         "[v][m]amix=inputs=2:duration=longest",
         "-t", str(duration_sec),
         "-c:a", "libmp3lame", "-q:a", "2",
@@ -56,80 +86,92 @@ def mix_vocals_music(vocal_path: str, music_path: str,
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"ffmpeg mix failed:\n{r.stderr[-500:]}")
-    print("  [vocals] mixed audio saved ✓")
+        raise RuntimeError(f"Mix failed:\n{r.stderr[-400:]}")
+
+    size = os.path.getsize(output_path) // 1024
+    print(f"  [vocals] mixed audio: {size} KB ✓")
 
 
-# ── Bark (AI singing) ─────────────────────────────────────────────────────────
+# ── Engine 1: Bark AI singing ─────────────────────────────────────────────────
 
-def _bark_singing(sections: list, hf_token: str) -> bytes | None:
-    """Submit lyrics to Bark model — generates actual singing."""
-    # Format all lyrics with ♪ notation (tells Bark to sing)
+def _bark(sections: list, hf_token: str) -> bytes | None:
     lines = []
     for sec in sections:
         for line in sec.get("lines", []):
             if line.strip():
                 lines.append(f"♪ {line} ♪")
-        lines.append("")   # blank line = natural pause
-    singing_text = "\n".join(lines[:25])  # Bark token limit
-
+        lines.append("")
+    text    = "\n".join(lines[:20])
     headers = {"Authorization": f"Bearer {hf_token}"}
-    payload  = {"inputs": singing_text}
 
     for url in HF_ENDPOINTS:
-        print(f"  [vocals] Bark via {url.split('/')[2]} …")
-        for attempt in range(3):
+        for attempt in range(2):
             try:
-                resp = requests.post(url, headers=headers,
-                                     json=payload, timeout=120)
-                if resp.status_code == 200 and len(resp.content) > 5000:
-                    print(f"  [vocals] Bark OK ({len(resp.content)//1024} KB) ✓")
-                    return resp.content
-                elif resp.status_code == 503:
-                    try:    wait = float(resp.json().get("estimated_time", 45))
-                    except: wait = 45
-                    print(f"  [vocals] model loading, wait {wait:.0f}s …")
-                    time.sleep(min(wait, 60))
+                r = requests.post(url, headers=headers,
+                                  json={"inputs": text}, timeout=90)
+                if r.status_code == 200:
+                    return r.content
+                elif r.status_code == 503:
+                    time.sleep(40)
                 else:
-                    print(f"  [vocals] HTTP {resp.status_code} — next")
                     break
-            except Exception as e:
-                print(f"  [vocals] attempt {attempt+1}: {str(e)[:80]}")
-                time.sleep(15)
+            except Exception:
+                time.sleep(10)
     return None
 
 
-# ── Google TTS fallback ───────────────────────────────────────────────────────
+# ── Engine 2: Google TTS ──────────────────────────────────────────────────────
 
-def _gtts_voice(sections: list) -> bytes:
-    """
-    Use Google TTS to read lyrics as a voice.
-    English lines: read in English.
-    Hindi/mixed lines: read phonetically in English (close enough for music).
-    Adds pauses between sections for natural flow.
-    """
+def _gtts(sections: list) -> bytes:
     from gtts import gTTS
-
-    all_text_parts = []
-    for section in sections:
-        sec_type = section.get("type", "verse")
-        lines    = section.get("lines", [])
-
-        # Chorus gets emphasis markers
-        if sec_type == "chorus":
-            all_text_parts.append("...")
-        for line in lines:
+    parts = []
+    for sec in sections:
+        for line in sec.get("lines", []):
             if line.strip():
-                all_text_parts.append(line)
-        all_text_parts.append("...")   # pause between sections
-
-    full_text = " ... ".join(all_text_parts)
-    print(f"  [vocals] gTTS generating ({len(full_text)} chars) …")
-
-    # slow=True gives a more dramatic, song-like pace
-    tts = gTTS(text=full_text, lang="en", slow=True)
+                parts.append(line)
+        parts.append("...")
+    tts = gTTS(text=" ... ".join(parts), lang="en", slow=True)
     buf = io.BytesIO()
     tts.write_to_fp(buf)
-    data = buf.getvalue()
-    print(f"  [vocals] gTTS OK ({len(data)//1024} KB) ✓")
-    return data
+    return buf.getvalue()
+
+
+# ── Engine 3: espeak-ng (OFFLINE) ─────────────────────────────────────────────
+
+def _espeak(sections: list) -> bytes:
+    """
+    Uses espeak-ng — available on Ubuntu, completely offline.
+    en+f3 = female voice (more melodic for romantic songs)
+    -s 105 = slow (dramatic, song-like pace)
+    -p 68  = higher pitch (more musical)
+    """
+    parts = []
+    for sec in sections:
+        sec_type = sec.get("type", "verse")
+        for line in sec.get("lines", []):
+            if line.strip():
+                parts.append(line)
+        # Longer pause after chorus
+        parts.append("..." if sec_type != "chorus" else ". . .")
+
+    full_text = ". ".join(parts)
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        wav_path = f.name
+
+    try:
+        subprocess.run(
+            ["espeak-ng",
+             "-v", "en+f3",   # female voice
+             "-s", "105",     # slow speed
+             "-p", "68",      # higher pitch
+             "-g", "8",       # word gap (ms) = slight pauses
+             full_text,
+             "-w", wav_path],
+            check=True, capture_output=True
+        )
+        with open(wav_path, "rb") as f:
+            return f.read()
+    finally:
+        if os.path.exists(wav_path):
+            os.unlink(wav_path)
