@@ -36,7 +36,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            ffmpeg fonts-dejavu-core fonts-liberation
+            ffmpeg fonts-dejavu-core fonts-liberation espeak-ng
 
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
