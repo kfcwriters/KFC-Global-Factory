@@ -1,177 +1,202 @@
 """
 vocals_gen.py
-AI Vocals for lyric videos.
-Priority order:
-  1. Bark (suno/bark) — HuggingFace AI singing
-  2. gTTS            — Google TTS (needs internet)
-  3. espeak-ng       — Offline TTS, ALWAYS works on Ubuntu GitHub Actions
+Vocal engines in priority order:
+  1. Edge TTS  — Microsoft neural voices, free, no API key, very human
+  2. gTTS      — Google TTS, free, no API key
+  3. espeak-ng — offline fallback, always works
 """
-import io, os, time, subprocess, tempfile, requests
+import io, os, subprocess, tempfile, asyncio, requests, time
 
 
-HF_ENDPOINTS = [
-    "https://router.huggingface.co/hf-inference/models/suno/bark",
-    "https://api-inference.huggingface.co/models/suno/bark",
-]
+# ── ENGINE 1: Edge TTS (Microsoft neural voices) ─────────────────────────────
+
+async def _edge_tts_async(text: str, voice: str, out_path: str):
+    import edge_tts
+    communicate = edge_tts.Communicate(text, voice, rate="-15%", pitch="+2Hz")
+    await communicate.save(out_path)
 
 
-def generate_vocals(sections: list, hf_token: str) -> bytes:
-    """Try multiple vocal engines in order. Returns audio bytes."""
-
-    # 1. Try Bark (AI singing)
-    print("  [vocals] trying Bark AI singing ...")
-    result = _bark(sections, hf_token)
-    if result and len(result) > 5000:
-        print(f"  [vocals] Bark OK ({len(result)//1024} KB) ✓")
-        return result
-
-    # 2. Try gTTS
-    print("  [vocals] trying Google TTS ...")
-    try:
-        result = _gtts(sections)
-        if result and len(result) > 1000:
-            print(f"  [vocals] gTTS OK ({len(result)//1024} KB) ✓")
-            return result
-    except Exception as e:
-        print(f"  [vocals] gTTS failed: {str(e)[:80]}")
-
-    # 3. espeak-ng — OFFLINE, always works on GitHub Actions Ubuntu
-    print("  [vocals] using espeak-ng (offline, guaranteed) ...")
-    result = _espeak(sections)
-    print(f"  [vocals] espeak-ng OK ({len(result)//1024} KB) ✓")
-    return result
-
-
-def mix_vocals_music(vocal_path: str, music_path: str,
-                     output_path: str, duration_sec: int = 210):
+def vocals_edge_tts(sections: list) -> bytes:
     """
-    Mix vocals + instrumental.
-    - Loops vocals to fill full duration
-    - Vocals at high volume so clearly heard
-    - Music soft in background
+    Microsoft Edge TTS — neural voices, sounds very human.
+    Uses en-US-JennyNeural (warm, emotional female voice).
+    Free, no API key, no signup needed.
     """
-    # First: probe vocal file to confirm it has audio
-    probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", vocal_path],
-        capture_output=True, text=True
-    )
-    vocal_dur = float(probe.stdout.strip() or 0)
-    print(f"  [vocals] vocal track duration: {vocal_dur:.1f}s")
+    import edge_tts
 
-    if vocal_dur < 1.0:
-        print("  [vocals] ⚠️  vocal file is empty — regenerating with espeak-ng")
-        # Force espeak fallback and save to vocal_path
-        from pathlib import Path
-        sections_dummy = [{"lines":["Hello, this is a romantic song", "Please enjoy the music"]}]
-        data = _espeak(sections_dummy)
-        Path(vocal_path).write_bytes(data)
-
-    print("  [vocals] mixing vocals + music ...")
-    cmd = [
-        "ffmpeg", "-y",
-        "-stream_loop", "-1", "-i", vocal_path,   # loop vocals
-        "-i", music_path,
-        "-filter_complex",
-        # Apply musical chorus effect + high volume to vocals
-        "[0:a]volume=4.0,"
-        "chorus=0.7:0.9:55:0.4:0.25:2,"          # chorus = richer voice
-        "aecho=0.8:0.7:40:0.3"                    # slight echo = room feel
-        "[v];"
-        "[1:a]volume=0.18[m];"                    # music soft background
-        "[v][m]amix=inputs=2:duration=longest",
-        "-t", str(duration_sec),
-        "-c:a", "libmp3lame", "-q:a", "2",
-        output_path,
-    ]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError(f"Mix failed:\n{r.stderr[-400:]}")
-
-    size = os.path.getsize(output_path) // 1024
-    print(f"  [vocals] mixed audio: {size} KB ✓")
-
-
-# ── Engine 1: Bark AI singing ─────────────────────────────────────────────────
-
-def _bark(sections: list, hf_token: str) -> bytes | None:
-    lines = []
-    for sec in sections:
-        for line in sec.get("lines", []):
-            if line.strip():
-                lines.append(f"♪ {line} ♪")
-        lines.append("")
-    text    = "\n".join(lines[:20])
-    headers = {"Authorization": f"Bearer {hf_token}"}
-
-    for url in HF_ENDPOINTS:
-        for attempt in range(2):
-            try:
-                r = requests.post(url, headers=headers,
-                                  json={"inputs": text}, timeout=90)
-                if r.status_code == 200:
-                    return r.content
-                elif r.status_code == 503:
-                    time.sleep(40)
-                else:
-                    break
-            except Exception:
-                time.sleep(10)
-    return None
-
-
-# ── Engine 2: Google TTS ──────────────────────────────────────────────────────
-
-def _gtts(sections: list) -> bytes:
-    from gtts import gTTS
-    parts = []
-    for sec in sections:
-        for line in sec.get("lines", []):
-            if line.strip():
-                parts.append(line)
-        parts.append("...")
-    tts = gTTS(text=" ... ".join(parts), lang="en", slow=True)
-    buf = io.BytesIO()
-    tts.write_to_fp(buf)
-    return buf.getvalue()
-
-
-# ── Engine 3: espeak-ng (OFFLINE) ─────────────────────────────────────────────
-
-def _espeak(sections: list) -> bytes:
-    """
-    Uses espeak-ng — available on Ubuntu, completely offline.
-    en+f3 = female voice (more melodic for romantic songs)
-    -s 105 = slow (dramatic, song-like pace)
-    -p 68  = higher pitch (more musical)
-    """
+    # Build lyrics with pauses
     parts = []
     for sec in sections:
         sec_type = sec.get("type", "verse")
         for line in sec.get("lines", []):
             if line.strip():
                 parts.append(line)
-        # Longer pause after chorus
-        parts.append("..." if sec_type != "chorus" else ". . .")
+        parts.append("..." if sec_type != "chorus" else "... ...")
+    full_text = " ... ".join(parts)
 
-    full_text = ". ".join(parts)
+    print(f"  [vocals] Edge TTS: {len(full_text)} chars ...")
+
+    # Romantic female voices — try in order
+    voices = [
+        "en-US-JennyNeural",     # warm, emotional
+        "en-US-AriaNeural",      # expressive
+        "en-GB-SoniaNeural",     # British, elegant
+        "en-US-MichelleNeural",  # clear, friendly
+    ]
+
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+        out_path = f.name
+
+    for voice in voices:
+        try:
+            asyncio.run(_edge_tts_async(full_text, voice, out_path))
+            size = os.path.getsize(out_path)
+            if size > 1000:
+                print(f"  [vocals] Edge TTS OK — voice={voice} ({size//1024} KB) ✓")
+                with open(out_path, "rb") as f:
+                    return f.read()
+        except Exception as e:
+            print(f"  [vocals] Edge TTS {voice}: {str(e)[:60]}")
+
+    raise RuntimeError("All Edge TTS voices failed")
+
+
+# ── ENGINE 2: gTTS (Google TTS) ──────────────────────────────────────────────
+
+def vocals_gtts(sections: list) -> bytes:
+    """Google TTS — simple, reliable, free."""
+    from gtts import gTTS
+
+    parts = []
+    for sec in sections:
+        for line in sec.get("lines", []):
+            if line.strip():
+                parts.append(line)
+        parts.append("...")
+    full_text = " ... ".join(parts)
+
+    print(f"  [vocals] gTTS: {len(full_text)} chars ...")
+    tts = gTTS(text=full_text, lang="en", slow=True)
+    buf = io.BytesIO()
+    tts.write_to_fp(buf)
+    data = buf.getvalue()
+    print(f"  [vocals] gTTS OK ({len(data)//1024} KB) ✓")
+    return data
+
+
+# ── ENGINE 3: espeak-ng (offline, always works) ───────────────────────────────
+
+def vocals_espeak(sections: list) -> bytes:
+    """espeak-ng — offline fallback, always available on Ubuntu."""
+    parts = []
+    for sec in sections:
+        for line in sec.get("lines", []):
+            if line.strip():
+                parts.append(line)
+        parts.append(".")
+    full_text = " . ".join(parts)
+
+    print(f"  [vocals] espeak-ng: {len(full_text)} chars ...")
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        wav_path = f.name
+        raw_wav = f.name
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        fx_wav = f.name
 
     try:
         subprocess.run(
-            ["espeak-ng",
-             "-v", "en+f3",   # female voice
-             "-s", "105",     # slow speed
-             "-p", "68",      # higher pitch
-             "-g", "8",       # word gap (ms) = slight pauses
-             full_text,
-             "-w", wav_path],
+            ["espeak-ng", "-v", "en+f3", "-s", "100",
+             "-p", "72", "-g", "8", full_text, "-w", raw_wav],
             check=True, capture_output=True
         )
-        with open(wav_path, "rb") as f:
-            return f.read()
+        # Apply musical effects
+        subprocess.run([
+            "ffmpeg", "-y", "-i", raw_wav,
+            "-af", "vibrato=f=5.5:d=0.6,"
+                   "aecho=0.85:0.92:60:0.45,"
+                   "chorus=0.7:0.9:55:0.4:0.25:2",
+            fx_wav
+        ], check=True, capture_output=True)
+
+        with open(fx_wav, "rb") as f:
+            data = f.read()
+        print(f"  [vocals] espeak OK ({len(data)//1024} KB) ✓")
+        return data
     finally:
-        if os.path.exists(wav_path):
-            os.unlink(wav_path)
+        for p in [raw_wav, fx_wav]:
+            if os.path.exists(p): os.unlink(p)
+
+
+# ── MAIN: try engines in order ────────────────────────────────────────────────
+
+def generate_vocals(sections: list, hf_token: str = "") -> tuple[bytes, str]:
+    """
+    Returns (audio_bytes, ext) where ext is '.mp3' or '.wav'.
+    Tries Edge TTS → gTTS → espeak in order.
+    """
+    # 1. Edge TTS
+    try:
+        data = vocals_edge_tts(sections)
+        return data, ".mp3"
+    except Exception as e:
+        print(f"  [vocals] Edge TTS failed: {str(e)[:80]}")
+
+    # 2. gTTS
+    try:
+        data = vocals_gtts(sections)
+        return data, ".mp3"
+    except Exception as e:
+        print(f"  [vocals] gTTS failed: {str(e)[:80]}")
+
+    # 3. espeak-ng (guaranteed)
+    data = vocals_espeak(sections)
+    return data, ".wav"
+
+
+# ── MIXING ────────────────────────────────────────────────────────────────────
+
+def mix_vocals_music(vocal_bytes: bytes, vocal_ext: str,
+                     music_mp3: str, out_mp3: str, duration_sec: int = 210):
+    """Loop vocals to fill duration, mix loudly over soft instrumental."""
+    with tempfile.NamedTemporaryFile(suffix=vocal_ext, delete=False) as f:
+        voc_tmp = f.name
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        looped  = f.name
+
+    try:
+        open(voc_tmp, "wb").write(vocal_bytes)
+
+        # Probe duration
+        pr = subprocess.run(
+            ["ffprobe","-v","error","-show_entries","format=duration",
+             "-of","default=noprint_wrappers=1:nokey=1", voc_tmp],
+            capture_output=True, text=True)
+        dur = float(pr.stdout.strip() or 0)
+        print(f"  [vocals] source duration: {dur:.1f}s → looping to {duration_sec}s")
+
+        # Loop to fill duration
+        subprocess.run([
+            "ffmpeg","-y","-stream_loop","-1","-i", voc_tmp,
+            "-t", str(duration_sec), looped
+        ], check=True, capture_output=True)
+
+        # Mix: vocals loud (5.0), music soft (0.18)
+        subprocess.run([
+            "ffmpeg","-y",
+            "-i", looped,
+            "-i", music_mp3,
+            "-filter_complex",
+            "[0:a]volume=5.0[v];"
+            "[1:a]volume=0.18[m];"
+            "[v][m]amix=inputs=2:duration=shortest",
+            "-t", str(duration_sec),
+            "-c:a","libmp3lame","-q:a","2",
+            out_mp3
+        ], check=True, capture_output=True)
+
+        size = os.path.getsize(out_mp3)//1024
+        print(f"  [vocals] mixed audio: {size} KB ✓")
+
+    finally:
+        for p in [voc_tmp, looped]:
+            if os.path.exists(p): os.unlink(p)
