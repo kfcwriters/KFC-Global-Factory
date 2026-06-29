@@ -1,0 +1,46 @@
+name: 🎵 Daily Suno Romantic Song Video
+
+on:
+  schedule:
+    - cron: "30 17 * * *"    # 11:00 PM IST daily
+  workflow_dispatch:
+
+jobs:
+  suno-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 🔧 System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg fonts-dejavu-core fonts-liberation
+
+      - name: 📥 Python dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: 🎵 Run Suno Pipeline
+        env:
+          HF_TOKEN:            ${{ secrets.HF_TOKEN }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          SUNO_COOKIE:         ${{ secrets.SUNO_COOKIE }}
+          YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+        run: python suno_pipeline.py
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suno-failure-logs
+          path: "*.log"
+          retention-days: 7
