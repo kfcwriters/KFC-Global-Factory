@@ -1,15 +1,9 @@
 name: 🎵 Daily Hindi-English Lyric Video
 
-# ── Schedule ──────────────────────────────────────────────────────────────────
-# Pipeline 1 (Shorts)   : 10:00 AM UTC  = 3:30 PM IST
-# Pipeline 2 (Romantic) : 14:00 PM UTC  = 7:30 PM IST
-# Pipeline 3 (Lyrics)   : 17:30 PM UTC  = 11:00 PM IST  ← this one
-
 on:
   schedule:
     - cron: "30 17 * * *"    # 11:00 PM IST every day
-
-  workflow_dispatch:          # Manual trigger for testing
+  workflow_dispatch:
     inputs:
       test_mode:
         description: "true = skip upload"
@@ -41,11 +35,25 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
+      - name: 🎤 Install Bark AI singing
+        run: |
+          pip install torch torchaudio \
+            --index-url https://download.pytorch.org/whl/cpu --quiet
+          pip install suno-bark --quiet
+
+      - name: 🗂️ Cache Bark models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/suno
+          key: bark-small-models-v1
+
       - name: 🎵 Run Lyric Video Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+          SUNO_USE_SMALL_MODELS: "True"
+          SUNO_OFFLOAD_CPU: "True"
         run: |
           if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
             echo "Test mode — skipping upload"
