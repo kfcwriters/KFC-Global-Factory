@@ -21,8 +21,27 @@ ROMANTIC_PROMPTS = [
 ]
 
 
+def _parse_cookie(raw: str) -> str:
+    """
+    Converts cookie to simple key=value; key=value string.
+    Handles EditThisCookie JSON: [{"name":"x","value":"y",...}]
+    AND plain string: key=value; key=value
+    """
+    raw = raw.strip()
+    if raw.startswith("["):
+        import json
+        items = json.loads(raw)
+        parts = [f"{c['name']}={c['value']}" for c in items
+                 if c.get("name") and c.get("value")]
+        return "; ".join(parts)
+    # Plain string — collapse any newlines/whitespace
+    return " ".join(raw.split())
+
+
 def _get_jwt(cookie: str) -> str:
     """Exchange Suno session cookie for a fresh JWT token."""
+    cookie = _parse_cookie(cookie)
+    print(f"  [suno] cookie parsed: {len(cookie)} chars")
     resp = requests.get(
         f"{CLERK_URL}?_clerk_js_version=4.73.2",
         headers={
@@ -57,6 +76,7 @@ def generate_suno_song(cookie: str, prompt: str | None = None) -> tuple[bytes, s
 
     print(f"  [suno] prompt: {prompt[:60]} ...")
     print(f"  [suno] getting session token ...")
+    cookie = _parse_cookie(cookie)
     jwt = _get_jwt(cookie)
 
     headers = {
