@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 """
-suno_pipeline.py
-================
-Fully automated romantic song lyric video pipeline.
-
-If SUNO_COOKIE is set → generates a FRESH Suno AI song every day automatically.
-If SUNO_COOKIE is not set → picks from saved songs/ folder (manual fallback).
-
-Schedule: Daily at 11:00 PM IST
+suno_pipeline.py — Fully Automatic Romantic Song Video
+Music priority:
+  1. apiframe.ai (300 free credits/month recurring — BEST FREE OPTION)
+  2. SunoAI Python library + your cookie (free, keep-alive built in)
+  3. songs/ folder (manual uploads)
+  4. Local synthesis (always works)
 """
-import os, random, subprocess, sys, tempfile
+import os, random, subprocess, sys, tempfile, json, time, requests
 from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-from suno_gen       import generate_suno_song
 from image_gen      import generate_images
 from lyrics_overlay import add_lyrics
 from video_assembly import create_video
@@ -23,6 +20,7 @@ from thumbnail_gen  import create_thumbnail
 from youtube_upload import upload_to_youtube
 
 SONGS_DIR = Path(__file__).parent / "songs"
+DURATION  = 210
 
 BG_PROMPTS = [
     "romantic couple holding hands at golden sunset on beach, cinematic warm glow",
@@ -43,36 +41,119 @@ BG_PROMPTS = [
     "man holding woman from behind watching sunset over ocean together",
 ]
 
+ROMANTIC_SONGS = [
+    {"prompt": "[Verse]\nIn the quiet of the night\nI reach out for your hand\nEvery star above us shines\n\n[Chorus]\nI will never let you go\nYou're the only love I know\nIn this world of highs and lows\nYou're my reason you're my soul", "tags": "romantic ballad, soft piano, emotional female vocals, slow", "title": "Never Let You Go"},
+    {"prompt": "[Verse]\nThe way you smile at morning light\nThe way you hold me through the night\n\n[Chorus]\nI want all of you\nEvery flaw and every truth\nYou're the best I've ever had", "tags": "romantic love song, acoustic guitar, warm female vocals", "title": "All Of You"},
+    {"prompt": "[Verse]\nBefore you came into my life\nEverything was black and white\n\n[Chorus]\nYou are my world you are my sky\nThe reason that I laugh and cry\nYou are the rhythm of my heartbeat", "tags": "romantic pop ballad, orchestra and piano, powerful female vocals", "title": "You Are My World"},
+    {"prompt": "[Verse]\nI used to think that love was just a word\nBut then you came and changed everything\n\n[Chorus]\nForever is you forever is this\nThe warmth of your hug the touch of your kiss\nForever is you I want you to know", "tags": "romantic love ballad, soft guitar and strings, emotional singer", "title": "Forever Is You"},
+    {"prompt": "[Verse]\nEvery morning when I wake\nThe first thought is of you I take\n\n[Chorus]\nI just want to be close to you\nFeel your heartbeat hear you breathe\nEvery moment that I'm with you\nIs the only place I need to be", "tags": "soft romantic ballad, violin and piano, tender female vocals", "title": "Close To You"},
+]
 
-def probe_duration(path: str) -> float:
-    r = subprocess.run(
-        ["ffprobe","-v","error","-show_entries","format=duration",
-         "-of","default=noprint_wrappers=1:nokey=1", path],
-        capture_output=True, text=True)
+
+def probe_duration(path):
+    r = subprocess.run(["ffprobe","-v","error","-show_entries","format=duration",
+                        "-of","default=noprint_wrappers=1:nokey=1",path],
+                       capture_output=True, text=True)
     return float(r.stdout.strip() or 180)
 
 
-def pick_saved_song() -> Path:
-    """Fallback: pick a song from songs/ folder by day rotation."""
+def get_saved_song():
     songs = sorted(SONGS_DIR.glob("*.mp3"))
-    if not songs:
-        raise FileNotFoundError(
-            "No songs found! Either set SUNO_COOKIE secret for auto-generation, "
-            "or add MP3 files to the songs/ folder."
-        )
-    idx  = datetime.utcnow().timetuple().tm_yday % len(songs)
-    song = songs[idx]
-    print(f"  → Saved song: {song.name} ({idx+1}/{len(songs)})")
-    return song
+    if not songs: return None, None
+    idx = datetime.utcnow().timetuple().tm_yday % len(songs)
+    s   = songs[idx]
+    return str(s), s.stem.replace("_"," ").replace("-"," ").title()
 
 
-def title_from_path(p: Path) -> str:
-    return p.stem.replace("_"," ").replace("-"," ").title()
+# ── apiframe.ai (300 free credits/month) ──────────────────────────────────────
+
+def generate_apiframe(api_key: str) -> tuple[bytes, str]:
+    song = random.choice(ROMANTIC_SONGS)
+    print(f"  [apiframe] Generating: {song['title']} ...")
+    headers = {"Authorization": api_key, "Content-Type": "application/json"}
+    resp = requests.post("https://api.apiframe.pro/suno-create",
+        headers=headers,
+        json={"custom_mode": True, "prompt": song["prompt"],
+              "tags": song["tags"], "title": song["title"],
+              "make_instrumental": False},
+        timeout=30)
+    resp.raise_for_status()
+    task_id = resp.json().get("task_id")
+    print(f"  [apiframe] task: {task_id} — polling ...")
+    for i in range(40):
+        time.sleep(8)
+        poll = requests.post("https://api.apiframe.pro/fetch",
+            headers=headers, json={"task_id": task_id}, timeout=30)
+        data   = poll.json()
+        status = data.get("status","")
+        print(f"  [apiframe] {i+1}: {status}")
+        if status in ("done","completed","success"):
+            clips = data.get("clips") or []
+            url   = (clips[0].get("audio_url") if clips else None) or data.get("audio_url")
+            if not url: raise RuntimeError(f"No audio URL")
+            mp3 = requests.get(url, timeout=120)
+            mp3.raise_for_status()
+            print(f"  [apiframe] {len(mp3.content)//1024} KB ✓")
+            return mp3.content, song["title"]
+        if status in ("failed","error"):
+            raise RuntimeError(f"Failed: {data}")
+    raise RuntimeError("Timeout")
+
+
+# ── SunoAI Python library (cookie-based, keep-alive built-in) ─────────────────
+
+def generate_sunoai_lib(cookie: str) -> tuple[bytes, str]:
+    raw = cookie.strip()
+    if raw.startswith("["):
+        items = json.loads(raw)
+        cookie = "; ".join(f"{c['name']}={c['value']}" for c in items
+                           if c.get("name") and c.get("value"))
+    else:
+        cookie = " ".join(raw.split())
+
+    from suno import Suno, ModelVersions
+    song = random.choice(ROMANTIC_SONGS)
+    print(f"  [sunolib] Generating: {song['title']} ...")
+    client = Suno(cookie=cookie, model_version=ModelVersions.CHIRP_V3_5)
+    clips  = client.generate(prompt=song["prompt"], tags=song["tags"],
+                              title=song["title"], is_custom=True,
+                              make_instrumental=False, wait_audio=True)
+    if not clips: raise RuntimeError("No clips returned")
+    mp3 = requests.get(clips[0].audio_url, timeout=120)
+    mp3.raise_for_status()
+    print(f"  [sunolib] {len(mp3.content)//1024} KB ✓")
+    return mp3.content, song["title"]
+
+
+# ── Local synthesis (always works, no singing) ────────────────────────────────
+
+def make_local(tmp, duration):
+    import numpy as np, scipy.io.wavfile as wf, io, math
+    SR = 44100; n = int(SR*duration)
+    audio = np.zeros(n, np.float32)
+    t_arr = np.linspace(0, duration, n, dtype=np.float32)
+    for freq, amp in [(130,.15),(196,.12),(261,.10),(330,.08)]:
+        mod = .7+.3*np.sin(2*math.pi*.06*t_arr)
+        audio += amp*mod*np.sin(2*math.pi*freq*t_arr)
+    noise = np.random.randn(n).astype(np.float32)*.015
+    for k in range(1,n): noise[k]=.94*noise[k-1]+.06*noise[k]
+    audio += noise
+    peak = np.max(np.abs(audio))
+    if peak>0: audio=audio/peak*.80
+    fade = min(int(SR*3),n//5)
+    audio[:fade]*=np.linspace(0,1,fade); audio[-fade:]*=np.linspace(1,0,fade)
+    buf=io.BytesIO(); wf.write(buf,SR,(audio*32767).astype(np.int16))
+    raw=tmp/"local.wav"; raw.write_bytes(buf.getvalue())
+    mp3=str(tmp/"music.mp3")
+    subprocess.run(["ffmpeg","-y","-i",str(raw),"-codec:a","libmp3lame","-qscale:a","2",mp3],
+                   check=True,capture_output=True)
+    return mp3
 
 
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN","")
     ANTHROPIC_API_KEY   = os.environ.get("ANTHROPIC_API_KEY")
+    APIFRAME_KEY        = os.environ.get("APIFRAME_KEY")
     SUNO_COOKIE         = os.environ.get("SUNO_COOKIE")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
 
@@ -80,89 +161,79 @@ def run():
     if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
 
     print(f"\n{'='*60}")
-    if SUNO_COOKIE:
-        print(f"  Mode     : 🤖 FULLY AUTOMATED (Suno AI generates fresh song)")
-    else:
-        print(f"  Mode     : 📁 SAVED SONGS (add SUNO_COOKIE for full automation)")
+    print(f"  Pipeline : Romantic Song Video (Fully Automated)")
+    if APIFRAME_KEY: print(f"  Music    : apiframe.ai (300 free/month) ★★★★★")
+    elif SUNO_COOKIE: print(f"  Music    : SunoAI Python lib + cookie ★★★★★")
+    else: print(f"  Music    : songs/ folder or local synthesis")
     print(f"{'='*60}\n")
 
-    with tempfile.TemporaryDirectory(prefix="suno_") as tmp:
-        tmp = Path(tmp)
-        song_mp3  = str(tmp / "song.mp3")
-        song_title = "Romantic Song"
+    with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
+        tmp=Path(tmp); song_mp3=None; title="Beautiful Love Song"
 
-        # ── Step 1: Get the song ─────────────────────────────────────────────
-        if SUNO_COOKIE:
-            print("🎵  Step 1/5 — Generating fresh Suno AI song ...")
+        # 1. apiframe.ai (300 free/month recurring)
+        if APIFRAME_KEY and not song_mp3:
             try:
-                mp3_bytes, song_title = generate_suno_song(SUNO_COOKIE)
-                Path(song_mp3).write_bytes(mp3_bytes)
-                print(f"  → Generated: '{song_title}'")
-            except Exception as e:
-                print(f"  ⚠️  Suno failed ({e})")
-                print(f"  → Falling back to saved songs folder ...")
-                saved = pick_saved_song()
-                song_mp3   = str(saved)
-                song_title = title_from_path(saved)
-        else:
-            print("🎵  Step 1/5 — Loading saved song ...")
-            saved      = pick_saved_song()
-            song_mp3   = str(saved)
-            song_title = title_from_path(saved)
+                print("🎵  Generating via apiframe.ai (300 free/month) ...")
+                data, title = generate_apiframe(APIFRAME_KEY)
+                p=tmp/"apiframe.mp3"; p.write_bytes(data); song_mp3=str(p)
+            except Exception as e: print(f"  ⚠️  apiframe: {e}")
 
-        duration = probe_duration(song_mp3)
-        n_images = min(16, max(8, int(duration / 15)))
-        print(f"  → Title: {song_title}")
-        print(f"  → Duration: {duration:.0f}s  |  Images: {n_images}")
+        # 2. SunoAI Python library
+        if SUNO_COOKIE and not song_mp3:
+            try:
+                print("🎵  Generating via SunoAI library ...")
+                data, title = generate_sunoai_lib(SUNO_COOKIE)
+                p=tmp/"suno.mp3"; p.write_bytes(data); song_mp3=str(p)
+            except Exception as e: print(f"  ⚠️  SunoAI lib: {e}")
 
-        # ── Step 2: Generate romantic images ─────────────────────────────────
-        print(f"\n🖼️   Step 2/5 — Generating {n_images} romantic images ...")
-        prompts  = random.sample(BG_PROMPTS, min(n_images, len(BG_PROMPTS)))
-        while len(prompts) < n_images:
-            prompts.append(random.choice(BG_PROMPTS))
-        raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
+        # 3. Saved songs folder
+        if not song_mp3:
+            saved, saved_title = get_saved_song()
+            if saved: song_mp3=saved; title=saved_title; print(f"🎵  Using saved: {title}")
 
-        image_paths = []
-        for i, img in enumerate(raw_imgs):
-            # Show song title on each frame
-            frame = add_lyrics(img, [song_title], "verse", "")
-            p = tmp / f"frame_{i:02d}.jpg"
-            p.write_bytes(frame)
+        # 4. Local synthesis
+        if not song_mp3:
+            print("🎵  Synthesising locally ...")
+            song_mp3=make_local(tmp,DURATION)
+
+        # Loop short songs
+        dur = probe_duration(song_mp3)
+        if dur < DURATION-10:
+            looped=str(tmp/"looped.mp3")
+            subprocess.run(["ffmpeg","-y","-stream_loop","-1","-i",song_mp3,
+                           "-t",str(DURATION),"-c","copy",looped],
+                          check=True,capture_output=True)
+            song_mp3=looped
+        dur=min(dur,DURATION); n_images=min(16,max(8,int(dur/15)))
+
+        print(f"\n🖼️   Generating {n_images} romantic images ...")
+        prompts=[random.choice(BG_PROMPTS) for _ in range(n_images)]
+        raw_imgs=generate_images(prompts,HF_TOKEN,vertical=False)
+
+        image_paths=[]
+        for i,img in enumerate(raw_imgs):
+            frame=add_lyrics(img,[title],"verse","")
+            p=tmp/f"frame_{i:02d}.jpg"; p.write_bytes(frame)
             image_paths.append(str(p))
 
-        # ── Step 3: Metadata ──────────────────────────────────────────────────
-        print("\n📝  Step 3/5 — Generating metadata ...")
-        meta = generate_metadata(
-            f"romantic love song — {song_title}",
-            "romantic songs", ANTHROPIC_API_KEY)
-        meta["title"] = f"🎵 {song_title} | Romantic Song 🌹"[:100]
-        meta["tags"]  = (["romantic song","love song","suno ai","ai music",
-                          "romantic music","love ballad","romantic video",
-                          "beautiful love song"] + meta.get("tags",[]))[:15]
+        print("\n📝  Generating metadata ...")
+        meta=generate_metadata(f"romantic love song — {title}","romantic songs",ANTHROPIC_API_KEY)
+        meta["title"]=f"🎵 {title} | Romantic Song 🌹"[:100]
+        meta["tags"]=(["romantic song","love song","ai music","romantic music",
+                       "love ballad","romantic video"]+meta.get("tags",[]))[:15]
         print(f"  → {meta['title']}")
 
-        # Thumbnail
-        thumb = str(tmp / "thumbnail.jpg")
-        create_thumbnail(raw_imgs[0], meta["title"], thumb)
+        thumb=str(tmp/"thumbnail.jpg")
+        create_thumbnail(raw_imgs[0],meta["title"],thumb)
+        video=str(tmp/"output.mp4")
+        create_video(song_mp3,image_paths,video,vertical=False)
 
-        # ── Step 4: Assemble video ────────────────────────────────────────────
-        print("\n🎬  Step 4/5 — Assembling video ...")
-        video_path = str(tmp / "output.mp4")
-        create_video(song_mp3, image_paths, video_path, vertical=False)
-
-        # ── Step 5: Upload ────────────────────────────────────────────────────
-        print("\n📤  Step 5/5 — Uploading to YouTube ...")
-        vid = upload_to_youtube(
-            video_path       = video_path,
-            thumbnail_path   = thumb,
-            title            = meta["title"],
-            description      = meta["description"],
-            tags             = meta["tags"],
-            credentials_json = YOUTUBE_CREDENTIALS,
-        )
+        print("\n📤  Uploading ...")
+        vid=upload_to_youtube(video_path=video,thumbnail_path=thumb,
+            title=meta["title"],description=meta["description"],
+            tags=meta["tags"],credentials_json=YOUTUBE_CREDENTIALS)
         print(f"\n🎉  Live! https://youtu.be/{vid}")
         return vid
 
-
-if __name__ == "__main__":
+if __name__=="__main__":
     run()
