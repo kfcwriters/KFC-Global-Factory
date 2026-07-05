@@ -1,8 +1,11 @@
-name: 🎵 Daily Suno Romantic Song Video
+name: 🎵 Weekly Suno Romantic Song Video
 
 on:
   schedule:
-    - cron: "30 17 * * *"    # 11:00 PM IST daily
+    # Every Saturday at 3:30 PM UTC = 9:00 PM IST
+    # Saturday evening = peak romantic content viewing time
+    - cron: "30 15 * * 6"
+
   workflow_dispatch:
 
 jobs:
