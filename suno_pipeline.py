@@ -70,42 +70,60 @@ def get_saved_song():
 def generate_apiframe(api_key: str) -> tuple[bytes, str]:
     song = random.choice(ROMANTIC_SONGS)
     print(f"  [apiframe] Generating: {song['title']} ...")
-    headers = {"Authorization": api_key, "Content-Type": "application/json"}
 
-    # Correct endpoint: /suno-imagine (confirmed from apiframe docs)
-    resp = requests.post("https://api.apiframe.pro/suno-imagine",
+    # Apiframe v2 API — header is X-API-Key, not Authorization
+    headers = {
+        "X-API-Key"    : api_key,
+        "Content-Type" : "application/json"
+    }
+
+    # v2 endpoint: POST /v2/music/generate
+    resp = requests.post(
+        "https://api.apiframe.ai/v2/music/generate",
         headers=headers,
         json={
-            "prompt"   : song["prompt"],
-            "tags"     : song["tags"],
-            "mv"       : "chirp-v4",        # latest model with vocals
+            "model"     : "suno",
+            "prompt"    : song["prompt"],
+            "sunoParams": {
+                "custom_mode"   : True,
+                "tags"          : song["tags"],
+                "instrumental"  : False,
+                "model_version" : "V5_5",
+            }
         },
-        timeout=30)
+        timeout=30
+    )
 
     if not resp.ok:
-        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
 
-    task_id = resp.json().get("task_id")
-    print(f"  [apiframe] task: {task_id} — polling ...")
+    job_id = resp.json().get("jobId")
+    print(f"  [apiframe] jobId: {job_id} — polling ...")
 
+    # Poll job status: GET /v2/jobs/{jobId}
     for i in range(40):
         time.sleep(8)
-        poll = requests.post("https://api.apiframe.pro/fetch",
-            headers=headers, json={"task_id": task_id}, timeout=30)
+        poll = requests.get(
+            f"https://api.apiframe.ai/v2/jobs/{job_id}",
+            headers=headers,
+            timeout=30
+        )
         data   = poll.json()
         status = data.get("status","")
         print(f"  [apiframe] {i+1}: {status}")
 
-        if status == "finished":
-            songs = data.get("songs", [])
-            url   = songs[0].get("audio_url") if songs else None
-            if not url: raise RuntimeError(f"No audio_url in response")
+        if status == "COMPLETED":
+            tracks = data.get("result", {}).get("tracks", [])
+            url    = tracks[0].get("audioUrl") if tracks else None
+            if not url:
+                raise RuntimeError(f"No audioUrl in result: {data.get('result')}")
             mp3 = requests.get(url, timeout=120)
             mp3.raise_for_status()
             print(f"  [apiframe] {len(mp3.content)//1024} KB ✓")
             return mp3.content, song["title"]
-        if status in ("failed","error"):
-            raise RuntimeError(f"Failed: {data}")
+
+        if status == "FAILED":
+            raise RuntimeError(f"Job failed: {data}")
 
     raise RuntimeError("Timeout after 5 min")
 
