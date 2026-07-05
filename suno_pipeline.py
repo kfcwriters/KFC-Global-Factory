@@ -71,15 +71,23 @@ def generate_apiframe(api_key: str) -> tuple[bytes, str]:
     song = random.choice(ROMANTIC_SONGS)
     print(f"  [apiframe] Generating: {song['title']} ...")
     headers = {"Authorization": api_key, "Content-Type": "application/json"}
-    resp = requests.post("https://api.apiframe.pro/suno-create",
+
+    # Correct endpoint: /suno-imagine (confirmed from apiframe docs)
+    resp = requests.post("https://api.apiframe.pro/suno-imagine",
         headers=headers,
-        json={"custom_mode": True, "prompt": song["prompt"],
-              "tags": song["tags"], "title": song["title"],
-              "make_instrumental": False},
+        json={
+            "prompt"   : song["prompt"],
+            "tags"     : song["tags"],
+            "mv"       : "chirp-v4",        # latest model with vocals
+        },
         timeout=30)
-    resp.raise_for_status()
+
+    if not resp.ok:
+        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+
     task_id = resp.json().get("task_id")
     print(f"  [apiframe] task: {task_id} — polling ...")
+
     for i in range(40):
         time.sleep(8)
         poll = requests.post("https://api.apiframe.pro/fetch",
@@ -87,17 +95,19 @@ def generate_apiframe(api_key: str) -> tuple[bytes, str]:
         data   = poll.json()
         status = data.get("status","")
         print(f"  [apiframe] {i+1}: {status}")
-        if status in ("done","completed","success"):
-            clips = data.get("clips") or []
-            url   = (clips[0].get("audio_url") if clips else None) or data.get("audio_url")
-            if not url: raise RuntimeError(f"No audio URL")
+
+        if status == "finished":
+            songs = data.get("songs", [])
+            url   = songs[0].get("audio_url") if songs else None
+            if not url: raise RuntimeError(f"No audio_url in response")
             mp3 = requests.get(url, timeout=120)
             mp3.raise_for_status()
             print(f"  [apiframe] {len(mp3.content)//1024} KB ✓")
             return mp3.content, song["title"]
         if status in ("failed","error"):
             raise RuntimeError(f"Failed: {data}")
-    raise RuntimeError("Timeout")
+
+    raise RuntimeError("Timeout after 5 min")
 
 
 # ── SunoAI Python library (cookie-based, keep-alive built-in) ─────────────────
