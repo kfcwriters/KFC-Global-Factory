@@ -86,9 +86,9 @@ def generate_apiframe(api_key: str) -> tuple[bytes, str]:
             "prompt"    : song["prompt"],
             "sunoParams": {
                 "custom_mode"   : True,
-                "tags"          : song["tags"],
                 "instrumental"  : False,
                 "model_version" : "V5_5",
+                "style"         : song["tags"],
             }
         },
         timeout=30
