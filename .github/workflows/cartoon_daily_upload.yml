@@ -1,0 +1,56 @@
+name: "Daily Cartoon Episode (cartoon project)"
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Story topic (leave blank for a random one)"
+        required: false
+        default: ""
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies (cartoon project only)
+        run: pip install -r ai-cartoon-youtube/cartoon_requirements.txt
+
+      - name: Pick topic
+        id: topic
+        run: |
+          if [ -n "${{ github.event.inputs.topic }}" ]; then
+            echo "topic=${{ github.event.inputs.topic }}" >> $GITHUB_OUTPUT
+          else
+            TOPICS=("a fox who learns to share" "a turtle who is afraid of the water" "two friends who solve a puzzle together" "a bunny who learns patience" "a bear who learns to say sorry")
+            RANDOM_TOPIC=${TOPICS[$RANDOM % ${#TOPICS[@]}]}
+            echo "topic=$RANDOM_TOPIC" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run cartoon pipeline
+        working-directory: ai-cartoon-youtube
+        env:
+          GROQ_API_KEY_CARTOON: ${{ secrets.GROQ_API_KEY_CARTOON }}
+          YOUTUBE_CLIENT_ID_CARTOON: ${{ secrets.YOUTUBE_CLIENT_ID_CARTOON }}
+          YOUTUBE_CLIENT_SECRET_CARTOON: ${{ secrets.YOUTUBE_CLIENT_SECRET_CARTOON }}
+          YOUTUBE_REFRESH_TOKEN_CARTOON: ${{ secrets.YOUTUBE_REFRESH_TOKEN_CARTOON }}
+        run: python cartoon_main.py "${{ steps.topic.outputs.topic }}"
+
+      - name: Upload episode as workflow artifact (backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartoon-episode-output
+          path: ai-cartoon-youtube/cartoon_output/
+          retention-days: 7
