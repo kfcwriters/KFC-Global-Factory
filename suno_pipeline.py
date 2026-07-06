@@ -14,6 +14,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen      import generate_images
 from lyrics_overlay import add_lyrics
+from lyrics_writer  import generate_weekly_lyrics
 from video_assembly import create_video
 from metadata_gen   import generate_metadata
 from thumbnail_gen  import create_thumbnail
