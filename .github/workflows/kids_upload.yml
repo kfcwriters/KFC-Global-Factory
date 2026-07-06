@@ -1,0 +1,58 @@
+name: 🎨 Kids Cartoon Channel
+
+# ── Schedule ──────────────────────────────────────────────────────────────────
+# Monday    9:00 AM UTC = 2:30 PM IST
+# Wednesday 9:00 AM UTC = 2:30 PM IST
+# Friday    9:00 AM UTC = 2:30 PM IST
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # Monday
+    - cron: "0 9 * * 3"   # Wednesday
+    - cron: "0 9 * * 5"   # Friday
+
+  workflow_dispatch:
+    inputs:
+      upload_num:
+        description: "Upload slot (0=Monday, 1=Wednesday, 2=Friday)"
+        required: false
+        default: "0"
+
+jobs:
+  kids-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 🔧 System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg fonts-dejavu-core fonts-liberation espeak-ng
+
+      - name: 📥 Python dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: 🎨 Run Kids Pipeline
+        env:
+          HF_TOKEN:            ${{ secrets.HF_TOKEN }}
+          YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+          UPLOAD_NUM:          ${{ github.event.inputs.upload_num || '0' }}
+        run: python kids_pipeline.py
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kids-failure-logs
+          path: "*.log"
+          retention-days: 7
