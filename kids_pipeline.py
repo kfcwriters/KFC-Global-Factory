@@ -11,6 +11,8 @@ import os, random, subprocess, sys, tempfile, math
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+H = 720   # video height
 from kids_story_gen import get_content_for_week
 from kids_voice_gen import generate_narration
 from cartoon_gen    import create_cartoon_video
@@ -98,7 +100,7 @@ def mix_narration_music(narration_bytes: bytes, music_mp3: str,
 def make_thumbnail(content_type: str, title: str, tmp: Path) -> str:
     """Create a colorful thumbnail for the kids video."""
     from PIL import Image, ImageDraw, ImageFont
-    from src.cartoon_gen import PALETTES, draw_cartoon_scene
+    from cartoon_gen import PALETTES, draw_cartoon_scene
     import random
 
     palette = random.choice(PALETTES)
@@ -163,7 +165,6 @@ def make_metadata(content: dict) -> dict:
     return {"title":title, "tags":tags, "description":desc}
 
 
-H = 720   # module-level for thumbnail function
 
 
 def run():
