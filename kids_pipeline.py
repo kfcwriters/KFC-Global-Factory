@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-H = 720   # video height
+W, H = 1280, 720   # video dimensions
 from kids_story_gen import get_content_for_week
 from kids_voice_gen import generate_narration
 from cartoon_gen    import create_cartoon_video
