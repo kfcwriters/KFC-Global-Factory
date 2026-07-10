@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-suno_pipeline.py — Fully Automatic Romantic Song Video
+suno_pipeline.py — Fully Automatic Romantic Song Video + Shorts
 Music priority:
   1. apiframe.ai (300 free credits/month recurring — BEST FREE OPTION)
   2. SunoAI Python library + your cookie (free, keep-alive built in)
   3. songs/ folder (manual uploads)
   4. Local synthesis (always works)
+
+Uploads BOTH a full video AND a Shorts clip every run.
 """
 import os, random, subprocess, sys, tempfile, json, time, requests
 from pathlib import Path
@@ -16,6 +18,7 @@ from image_gen      import generate_images
 from lyrics_overlay import add_lyrics
 from lyrics_writer  import generate_weekly_lyrics
 from seo_gen         import generate_seo
+from shorts_maker   import make_short_from_video, make_shorts_metadata
 from video_assembly import create_video
 from thumbnail_gen  import create_thumbnail
 from youtube_upload import upload_to_youtube
@@ -191,7 +194,7 @@ def run():
     if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
 
     print(f"\n{'='*60}")
-    print(f"  Pipeline : Romantic Song Video (Fully Automated)")
+    print(f"  Pipeline : Romantic Song Video + Shorts (Fully Automated)")
     if APIFRAME_KEY: print(f"  Music    : apiframe.ai (300 free/month) ★★★★★")
     elif SUNO_COOKIE: print(f"  Music    : SunoAI Python lib + cookie ★★★★★")
     else: print(f"  Music    : songs/ folder or local synthesis")
@@ -200,6 +203,7 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp=Path(tmp); song_mp3=None; title="Beautiful Love Song"; style_used=""
 
+        # ── Get music ────────────────────────────────────────────────────────
         if APIFRAME_KEY and not song_mp3:
             try:
                 print("🎵  Generating via apiframe.ai (300 free/month) ...")
@@ -222,6 +226,7 @@ def run():
             print("🎵  Synthesising locally ...")
             song_mp3=make_local(tmp,DURATION)
 
+        # ── Loop short songs to fill duration ───────────────────────────────
         dur = probe_duration(song_mp3)
         if dur < DURATION-10:
             looped=str(tmp/"looped.mp3")
@@ -231,6 +236,7 @@ def run():
             song_mp3=looped
         dur=min(dur,DURATION); n_images=min(16,max(8,int(dur/15)))
 
+        # ── Images ───────────────────────────────────────────────────────────
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts=[random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs=generate_images(prompts,HF_TOKEN,vertical=False)
@@ -241,21 +247,39 @@ def run():
             p=tmp/f"frame_{i:02d}.jpg"; p.write_bytes(frame)
             image_paths.append(str(p))
 
+        # ── SEO metadata (pure Python, no API cost) ─────────────────────────
         print("\n📝  Generating SEO-optimized metadata ...")
         meta = generate_seo(title, "romantic songs", style_used)
         print(f"  → {meta['title']}")
 
+        # ── Thumbnail + full video ──────────────────────────────────────────
         thumb=str(tmp/"thumbnail.jpg")
         create_thumbnail(raw_imgs[0],meta["title"],thumb)
         video=str(tmp/"output.mp4")
         create_video(song_mp3,image_paths,video,vertical=False)
 
-        print("\n📤  Uploading ...")
+        # ── Shorts version ───────────────────────────────────────────────────
+        print("\n📱  Creating Shorts version ...")
+        short_video = str(tmp/"short.mp4")
+        make_short_from_video(video, short_video, duration=55, start_offset=15)
+        short_meta  = make_shorts_metadata(meta["title"], meta["tags"])
+
+        # ── Upload both ───────────────────────────────────────────────────────
+        print("\n📤  Uploading main video ...")
         vid=upload_to_youtube(video_path=video,thumbnail_path=thumb,
             title=meta["title"],description=meta["description"],
             tags=meta["tags"],credentials_json=YOUTUBE_CREDENTIALS)
-        print(f"\n🎉  Live! https://youtu.be/{vid}")
+        print(f"  → https://youtu.be/{vid}")
+
+        print("\n📱  Uploading Short ...")
+        short_id = upload_to_youtube(video_path=short_video, thumbnail_path=thumb,
+            title=short_meta["title"], description=short_meta["description"],
+            tags=short_meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
+        print(f"  → https://youtu.be/{short_id}")
+
+        print(f"\n🎉  Both live! Main: https://youtu.be/{vid} | Short: https://youtu.be/{short_id}")
         return vid
+
 
 if __name__=="__main__":
     run()
