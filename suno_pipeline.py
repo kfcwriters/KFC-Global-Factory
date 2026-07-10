@@ -15,8 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen      import generate_images
 from lyrics_overlay import add_lyrics
 from lyrics_writer  import generate_weekly_lyrics
+from seo_gen         import generate_seo
 from video_assembly import create_video
-from metadata_gen   import generate_metadata
 from thumbnail_gen  import create_thumbnail
 from youtube_upload import upload_to_youtube
 
@@ -42,7 +42,6 @@ BG_PROMPTS = [
     "man holding woman from behind watching sunset over ocean together",
 ]
 
-# Song styles — music feel changes each week even with fresh lyrics
 SONG_STYLES = [
     {"style": "romantic ballad, soft piano, emotional female vocals, slow tempo, heartfelt", "mood": "eternal love"},
     {"style": "sad romantic ballad, piano and violin, emotional female vocals, melancholic", "mood": "longing and missing"},
@@ -56,16 +55,13 @@ SONG_STYLES = [
     {"style": "soulful romantic RnB, piano and cello, deep emotional female vocals", "mood": "soulmate love"},
 ]
 
-# Fallback lyrics when Claude API is not available
 FALLBACK_LYRICS = [
-    {"title": "Never Let You Go", "prompt": "[Verse]\nIn the quiet of the night\nI reach out for your hand\nEvery star above us shines\nJust the way I had planned\n\n[Chorus]\nI will never let you go\nYou are the only love I know\nIn this world of highs and lows\nYou are my reason you are my soul\n\n[Verse]\nThrough every storm and every rain\nThrough every joy and every pain\nYour love is all I ever need\nYou are my heart you are my creed\n\n[Chorus]\nI will never let you go\nYou are the only love I know\nIn this world of highs and lows\nYou are my reason you are my soul"},
-    {"title": "Missing You Tonight", "prompt": "[Verse]\nThe rain falls on an empty street\nI walk alone without your heartbeat\nEvery corner holds your memory\nEvery shadow is what you used to be\n\n[Chorus]\nMissing you like the stars miss the sun\nMissing you now that you are gone\nEvery night I close my eyes and pray\nThat you will come back to me someday\n\n[Bridge]\nSomewhere out there under the same sky\nI know you think of me sometimes\nAnd that is all I need to get by\nUntil we meet again in better times"},
-    {"title": "You Are My World", "prompt": "[Verse]\nBefore you came into my life\nEverything was black and white\nNow the colors fill my days\nYou have set my heart ablaze\n\n[Chorus]\nYou are my world you are my sky\nThe reason that I laugh and cry\nWithout you here I am not complete\nYou are the rhythm of my heartbeat\n\n[Verse]\nYour gentle touch your tender kiss\nA feeling I would always miss\nIf you were ever far from me\nYou are my heart you are my peace"},
-    {"title": "Tere Bina My Love", "prompt": "[Verse]\nTere bina yeh dil mera\nKhoya khoya rehta hai\nTeri yaad mein har pal\nDard ka asar rehta hai\n\n[Chorus]\nCome back to me my love\nI cannot breathe without you near\nEvery moment without you\nIs a moment full of fear\n\n[Verse]\nIshq mera sachcha hai\nYeh dil tera deewana hai\nHar pal har ghadi bas tu hi\nMeri duniya meri jaana hai"},
-    {"title": "Forever Is You", "prompt": "[Verse]\nI used to think that love was just a word\nA pretty song that no one ever heard\nBut then you came and changed everything\nMade my heart open up and want to sing\n\n[Chorus]\nForever is you forever is this\nThe warmth of your hug the touch of your kiss\nNo matter how far the journey may go\nForever is you I want you to know\n\n[Bridge]\nWrite your name across my heart\nPromise me we will never part\nIn a world that changes every day\nMy love for you will always stay"},
+    {"title": "Never Let You Go", "prompt": "[Verse]\nIn the quiet of the night\nI reach out for your hand\nEvery star above us shines\nJust the way I had planned\n\n[Chorus]\nI will never let you go\nYou are the only love I know\nIn this world of highs and lows\nYou are my reason you are my soul"},
+    {"title": "Missing You Tonight", "prompt": "[Verse]\nThe rain falls on an empty street\nI walk alone without your heartbeat\n\n[Chorus]\nMissing you like the stars miss the sun\nMissing you now that you are gone"},
+    {"title": "You Are My World", "prompt": "[Verse]\nBefore you came into my life\nEverything was black and white\n\n[Chorus]\nYou are my world you are my sky\nThe reason that I laugh and cry"},
+    {"title": "Tere Bina My Love", "prompt": "[Verse]\nTere bina yeh dil mera\nKhoya khoya rehta hai\n\n[Chorus]\nCome back to me my love\nI cannot breathe without you near"},
+    {"title": "Forever Is You", "prompt": "[Verse]\nI used to think that love was just a word\nBut then you came and changed everything\n\n[Chorus]\nForever is you forever is this\nNo matter how far the journey may go"},
 ]
-
-
 
 
 def probe_duration(path):
@@ -83,12 +79,10 @@ def get_saved_song():
     return str(s), s.stem.replace("_"," ").replace("-"," ").title()
 
 
-# ── apiframe.ai (300 free credits/month) ──────────────────────────────────────
-
 def generate_apiframe(api_key: str, anthropic_api_key=None) -> tuple:
     """Generate fresh unique song every week using pure Python lyrics — no API needed."""
-    # Fresh unique lyrics — different every week, free forever
     song = generate_weekly_lyrics()
+    style_used = song.get("style", "")
 
     print(f"  [apiframe] Generating: '{song['title']}' ...")
     headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
@@ -101,7 +95,7 @@ def generate_apiframe(api_key: str, anthropic_api_key=None) -> tuple:
             "prompt": song["prompt"],
             "sunoParams": {
                 "custom_mode"  : True,
-                "style"        : song["style"],
+                "style"        : style_used,
                 "instrumental" : False,
                 "model_version": "V5_5",
             }
@@ -130,7 +124,7 @@ def generate_apiframe(api_key: str, anthropic_api_key=None) -> tuple:
             mp3 = requests.get(url, timeout=120)
             mp3.raise_for_status()
             print(f"  [apiframe] {len(mp3.content)//1024} KB ✓")
-            return mp3.content, song["title"]
+            return mp3.content, song["title"], style_used
 
         if status == "FAILED":
             raise RuntimeError(f"Job failed: {data}")
@@ -138,7 +132,7 @@ def generate_apiframe(api_key: str, anthropic_api_key=None) -> tuple:
     raise RuntimeError("Timeout after 5 min")
 
 
-def generate_sunoai_lib(cookie: str) -> tuple[bytes, str]:
+def generate_sunoai_lib(cookie: str) -> tuple:
     raw = cookie.strip()
     if raw.startswith("["):
         items = json.loads(raw)
@@ -148,22 +142,20 @@ def generate_sunoai_lib(cookie: str) -> tuple[bytes, str]:
         cookie = " ".join(raw.split())
 
     from suno import Suno, ModelVersions
-    from datetime import datetime
     week_num = datetime.utcnow().isocalendar()[1]
-    song     = ROMANTIC_SONGS[week_num % len(ROMANTIC_SONGS)]
+    song     = FALLBACK_LYRICS[week_num % len(FALLBACK_LYRICS)]
+    style_used = SONG_STYLES[week_num % len(SONG_STYLES)]["style"]
     print(f"  [sunolib] Week {week_num} → {song['title']} ...")
     client = Suno(cookie=cookie, model_version=ModelVersions.CHIRP_V3_5)
-    clips  = client.generate(prompt=song["prompt"], tags=song["tags"],
+    clips  = client.generate(prompt=song["prompt"], tags=style_used,
                               title=song["title"], is_custom=True,
                               make_instrumental=False, wait_audio=True)
     if not clips: raise RuntimeError("No clips returned")
     mp3 = requests.get(clips[0].audio_url, timeout=120)
     mp3.raise_for_status()
     print(f"  [sunolib] {len(mp3.content)//1024} KB ✓")
-    return mp3.content, song["title"]
+    return mp3.content, song["title"], style_used
 
-
-# ── Local synthesis (always works, no singing) ────────────────────────────────
 
 def make_local(tmp, duration):
     import numpy as np, scipy.io.wavfile as wf, io, math
@@ -206,35 +198,30 @@ def run():
     print(f"{'='*60}\n")
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
-        tmp=Path(tmp); song_mp3=None; title="Beautiful Love Song"
+        tmp=Path(tmp); song_mp3=None; title="Beautiful Love Song"; style_used=""
 
-        # 1. apiframe.ai (300 free/month recurring)
         if APIFRAME_KEY and not song_mp3:
             try:
                 print("🎵  Generating via apiframe.ai (300 free/month) ...")
-                data, title = generate_apiframe(APIFRAME_KEY, ANTHROPIC_API_KEY)
+                data, title, style_used = generate_apiframe(APIFRAME_KEY, ANTHROPIC_API_KEY)
                 p=tmp/"apiframe.mp3"; p.write_bytes(data); song_mp3=str(p)
             except Exception as e: print(f"  ⚠️  apiframe: {e}")
 
-        # 2. SunoAI Python library
         if SUNO_COOKIE and not song_mp3:
             try:
                 print("🎵  Generating via SunoAI library ...")
-                data, title = generate_sunoai_lib(SUNO_COOKIE)
+                data, title, style_used = generate_sunoai_lib(SUNO_COOKIE)
                 p=tmp/"suno.mp3"; p.write_bytes(data); song_mp3=str(p)
             except Exception as e: print(f"  ⚠️  SunoAI lib: {e}")
 
-        # 3. Saved songs folder
         if not song_mp3:
             saved, saved_title = get_saved_song()
             if saved: song_mp3=saved; title=saved_title; print(f"🎵  Using saved: {title}")
 
-        # 4. Local synthesis
         if not song_mp3:
             print("🎵  Synthesising locally ...")
             song_mp3=make_local(tmp,DURATION)
 
-        # Loop short songs
         dur = probe_duration(song_mp3)
         if dur < DURATION-10:
             looped=str(tmp/"looped.mp3")
@@ -254,11 +241,8 @@ def run():
             p=tmp/f"frame_{i:02d}.jpg"; p.write_bytes(frame)
             image_paths.append(str(p))
 
-        print("\n📝  Generating metadata ...")
-        meta=generate_metadata(f"romantic love song — {title}","romantic songs",ANTHROPIC_API_KEY)
-        meta["title"]=f"🎵 {title} | Romantic Song 🌹"[:100]
-        meta["tags"]=(["romantic song","love song","ai music","romantic music",
-                       "love ballad","romantic video"]+meta.get("tags",[]))[:15]
+        print("\n📝  Generating SEO-optimized metadata ...")
+        meta = generate_seo(title, "romantic songs", style_used)
         print(f"  → {meta['title']}")
 
         thumb=str(tmp/"thumbnail.jpg")
