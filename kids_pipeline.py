@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 """
-kids_pipeline.py — Professional Kids Cartoon Channel
-Uses pawpatrol_engine.py for Paw Patrol style animation.
+kids_pipeline.py — Kids Content Test Pipeline (Ken Burns test bed)
+Uses AI images (Pollinations) + NEW Ken Burns video_assembly.py
+This is the safe place to test the Ken Burns/transitions upgrade
+before rolling it into the main Suno pipeline.
+
 Uploads Mon/Wed/Fri at 2:30 PM IST.
 """
 import os, random, subprocess, sys, tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-from kids_story_gen   import get_content_for_week
-from kids_voice_gen   import generate_narration
-from pawpatrol_engine import create_cartoon_video, get_thumbnail_frame
-from youtube_upload   import upload_to_youtube
+from kids_story_gen  import get_content_for_week
+from kids_voice_gen  import generate_narration
+from image_gen       import generate_images
+from lyrics_overlay  import add_lyrics
+from video_assembly_kenburns import create_video   # ← EXPERIMENTAL, kids-only
+from thumbnail_gen   import create_thumbnail
+from youtube_upload  import upload_to_youtube
 
 import numpy as np
 import scipy.io.wavfile as wf
-import io, math
+import math
 
-W, H = 1280, 720
-SR   = 44100
+SR = 44100
 
 
 def make_kids_music(style: str, duration: int, tmp: Path) -> str:
@@ -84,64 +89,30 @@ def mix_narration_music(narration_bytes, music_mp3, out_mp3, duration):
             if os.path.exists(p2): os.unlink(p2)
 
 
-def make_thumbnail(content_type, title, tmp):
-    from PIL import ImageDraw, ImageFont
-    img  = get_thumbnail_frame(content_type)
-    draw = ImageDraw.Draw(img)
-
-    # Title banner
-    draw.rectangle([0, H*3//4, W, H], fill=(255,220,0))
-    draw.rectangle([0, H*3//4, W, H*3//4+6], fill=(255,100,0))
-
-    fnt   = None
-    for fp in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-               "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
-        if Path(fp).exists():
-            try:
-                from PIL import ImageFont
-                fnt = ImageFont.truetype(fp, 52)
-                break
-            except: pass
-    if fnt is None:
-        from PIL import ImageFont
-        fnt = ImageFont.load_default()
-
-    clean = title[:40]
-    bb    = draw.textbbox((0,0), clean, font=fnt)
-    tx    = (W - (bb[2]-bb[0])) // 2
-    ty    = H*3//4 + 15
-    draw.text((tx+2,ty+2), clean, font=fnt, fill=(200,0,0))
-    draw.text((tx, ty),    clean, font=fnt, fill=(50,50,50))
-
-    thumb = str(tmp/"thumbnail.jpg")
-    img.save(thumb, quality=95)
-    return thumb
-
-
 def make_metadata(content):
     type_tags = {
         "bedtime_story" : ["bedtime story","kids story","moral story",
-                           "animated story","children bedtime","kids cartoon"],
+                           "animated story","children bedtime"],
         "nursery_rhyme" : ["nursery rhyme","kids songs","rhymes for kids",
-                           "baby songs","toddler songs","kids rhymes"],
+                           "baby songs","toddler songs"],
         "educational"   : ["educational kids","learn for kids","kids learning",
-                           "preschool","kids education","learn with cartoons"],
+                           "preschool","kids education"],
         "fairy_tale"    : ["fairy tale kids","animated fairy tale",
-                           "magical story","kids fairy tale","cartoon story"],
+                           "magical story","kids fairy tale"],
     }
     emoji = {"bedtime_story":"🌙","nursery_rhyme":"🎵",
              "educational":"📚","fairy_tale":"✨"}[content["type"]]
-    title = f"{emoji} {content['title']} | Cartoon for Kids"[:100]
+    title = f"{emoji} {content['title']} | Story for Kids"[:100]
     tags  = (type_tags.get(content["type"],[]) +
-             ["kids cartoon","cartoon for kids","children cartoon",
-              "animated cartoon","kids youtube"])[:15]
+             ["kids story","story for kids","children video",
+              "kids youtube","bedtime stories"])[:15]
     desc  = (
         f"{title}\n\n"
-        f"🎬 Fun animated cartoon for children!\n\n"
+        f"🎬 Fun {content['type'].replace('_',' ')} for children!\n\n"
         f"Perfect for kids aged 2-8 years.\n"
         f"Educational, fun and entertaining!\n\n"
-        f"🔔 Subscribe for new cartoons 3x every week!\n\n"
-        f"#kidscartoon #cartoon #kidslearning #childrenstories #animated"
+        f"🔔 Subscribe for new stories 3x every week!\n\n"
+        f"#kidsstory #storyforkids #kidslearning #childrenstories"
     )
     return {"title":title,"tags":tags,"description":desc}
 
@@ -151,15 +122,15 @@ def run():
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
     UPLOAD_NUM          = int(os.environ.get("UPLOAD_NUM","0"))
 
-    if not YOUTUBE_CREDENTIALS:
-        raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
+    if not HF_TOKEN:            raise EnvironmentError("HF_TOKEN not set")
+    if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
 
     print(f"\n{'='*60}")
-    print(f"  Pipeline  : Kids Cartoon (Paw Patrol Style)")
+    print(f"  Pipeline  : Kids Story (Ken Burns TEST)")
     print(f"  Upload    : #{UPLOAD_NUM+1} of week")
     print(f"{'='*60}\n")
 
-    print("📖  Step 1/5 — Generating content ...")
+    print("📖  Step 1/6 — Generating content ...")
     content = get_content_for_week(UPLOAD_NUM)
     print(f"  → Type : {content['type']}")
     print(f"  → Title: {content['title']}")
@@ -167,36 +138,45 @@ def run():
     with tempfile.TemporaryDirectory(prefix="kids_") as tmp:
         tmp = Path(tmp)
 
-        print("\n🗣️   Step 2/5 — Narration voice ...")
+        print("\n🗣️   Step 2/6 — Narration voice ...")
         nar_bytes = generate_narration(content["script"], content["type"])
 
-        print("\n🎵  Step 3/5 — Background music + mix ...")
+        print("\n🎵  Step 3/6 — Background music + mix ...")
         words    = sum(len(l.split()) for l in content["script"])
-        duration = max(60, min(300, words*2+30))
+        duration = max(60, min(240, words*2+30))
         music    = make_kids_music(content["music"], duration, tmp)
         mixed    = str(tmp/"mixed.mp3")
         mix_narration_music(nar_bytes, music, mixed, duration)
 
-        print("\n🎨  Step 4/5 — Rendering Paw Patrol style cartoon ...")
-        video = str(tmp/"cartoon.mp4")
-        create_cartoon_video(
-            script       = content["script"],
-            audio_path   = mixed,
-            output_path  = video,
-            content_type = content["type"],
-        )
+        print(f"\n🖼️   Step 4/6 — Generating {len(content['prompts'])} images ...")
+        cartoon_prompts = [
+            f"{p}, bright vivid colors, safe for children, storybook illustration style"
+            for p in content["prompts"]
+        ]
+        raw_imgs = generate_images(cartoon_prompts, HF_TOKEN, vertical=False)
 
-        print("\n📤  Step 5/5 — Thumbnail + upload ...")
-        thumb = make_thumbnail(content["type"], content["title"], tmp)
+        image_paths = []
+        for i, img in enumerate(raw_imgs):
+            # Show a line of the story as caption on each image
+            line_idx = min(i, len(content["script"])-1)
+            frame = add_lyrics(img, [content["script"][line_idx]], "verse", "")
+            p = tmp / f"frame_{i:02d}.jpg"
+            p.write_bytes(frame)
+            image_paths.append(str(p))
+
+        print("\n🎬  Step 5/6 — Rendering video (Ken Burns + transitions) ...")
+        video = str(tmp/"story.mp4")
+        create_video(mixed, image_paths, video, vertical=False)
+
+        print("\n📤  Step 6/6 — Thumbnail + upload ...")
         meta  = make_metadata(content)
+        thumb = str(tmp/"thumbnail.jpg")
+        create_thumbnail(raw_imgs[0], meta["title"], thumb)
 
         vid = upload_to_youtube(
-            video_path       = video,
-            thumbnail_path   = thumb,
-            title            = meta["title"],
-            description      = meta["description"],
-            tags             = meta["tags"],
-            credentials_json = YOUTUBE_CREDENTIALS,
+            video_path=video, thumbnail_path=thumb,
+            title=meta["title"], description=meta["description"],
+            tags=meta["tags"], credentials_json=YOUTUBE_CREDENTIALS,
         )
         print(f"\n🎉  Live! https://youtu.be/{vid}")
         return vid
