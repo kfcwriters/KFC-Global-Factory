@@ -1,4 +1,4 @@
-name: 🎵 Weekly Suno Romantic Song Video
+name: 🎵 Weekly Suno Romantic Song Video + Short
 
 on:
   schedule:
@@ -30,7 +30,7 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: 🎵 Run Weekly Romantic Song Pipeline
+      - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           APIFRAME_KEY:        ${{ secrets.APIFRAME_KEY }}
