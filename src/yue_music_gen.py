@@ -39,7 +39,11 @@ def generate_song_yue(lyrics: str, genre_tags: str, hf_token: str,
     for space_id in YUE_SPACES:
         try:
             print(f"  [yue] Connecting to {space_id} ...")
-            client = Client(space_id, hf_token=hf_token)
+            # Newer gradio_client versions use token=, older used hf_token=
+            try:
+                client = Client(space_id, token=hf_token)
+            except TypeError:
+                client = Client(space_id, hf_token=hf_token)
 
             print(f"  [yue] Generating song ({len(lyrics)} chars lyrics) ...")
             print(f"  [yue] Genre: {genre_tags[:60]}")
