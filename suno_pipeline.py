@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 """
-suno_pipeline.py — Fully Automatic Romantic Song Video + Shorts
+suno_pipeline.py — Weekly Romantic Song Video + Short
 Music priority:
-  1. apiframe.ai (300 free credits/month recurring — BEST FREE OPTION)
-  2. SunoAI Python library + your cookie (free, keep-alive built in)
-  3. songs/ folder (manual uploads)
-  4. Local synthesis (always works)
-
-Uploads BOTH a full video AND a Shorts clip every run.
+  1. YuE (open-source, free HuggingFace Space) — REAL vocals, no cost ever
+  2. songs/ folder (manual Suno uploads, backup)
+  3. Local synthesis (instrumental, always works)
 """
-import os, random, subprocess, sys, tempfile, json, time, requests
+import os, random, subprocess, sys, tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -17,8 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen      import generate_images
 from lyrics_overlay import add_lyrics
 from lyrics_writer  import generate_weekly_lyrics
-from seo_gen         import generate_seo
+from seo_gen        import generate_seo
 from shorts_maker   import make_short_from_video, make_shorts_metadata
+from yue_music_gen  import generate_song_yue, build_yue_lyrics
 from video_assembly import create_video
 from thumbnail_gen  import create_thumbnail
 from youtube_upload import upload_to_youtube
@@ -41,29 +39,6 @@ BG_PROMPTS = [
     "couple watching stars lying on grass, milky way above, peaceful romantic",
     "couple in flower field at sunset, golden hour, romantic and joyful",
     "first dance at wedding with sparklers and fairy lights around them",
-    "couple on swing at sunrise, soft morning mist, peaceful love",
-    "man holding woman from behind watching sunset over ocean together",
-]
-
-SONG_STYLES = [
-    {"style": "romantic ballad, soft piano, emotional female vocals, slow tempo, heartfelt", "mood": "eternal love"},
-    {"style": "sad romantic ballad, piano and violin, emotional female vocals, melancholic", "mood": "longing and missing"},
-    {"style": "upbeat romantic pop, acoustic guitar, happy female vocals, feel good love", "mood": "joyful love"},
-    {"style": "bollywood fusion romantic, sitar and piano, Hindi English female vocals", "mood": "passionate love"},
-    {"style": "orchestral romantic, strings and piano, powerful female vocals, cinematic", "mood": "epic forever love"},
-    {"style": "soft intimate ballad, acoustic guitar, whispery female vocals, tender", "mood": "quiet love"},
-    {"style": "monsoon romantic, piano and rain sounds, dreamy female vocals, nostalgic", "mood": "rainy day love"},
-    {"style": "wedding romantic, orchestral, uplifting female vocals, ceremonial beautiful", "mood": "forever commitment"},
-    {"style": "first love ballad, sweet acoustic guitar, young innocent female vocals", "mood": "first love innocence"},
-    {"style": "soulful romantic RnB, piano and cello, deep emotional female vocals", "mood": "soulmate love"},
-]
-
-FALLBACK_LYRICS = [
-    {"title": "Never Let You Go", "prompt": "[Verse]\nIn the quiet of the night\nI reach out for your hand\nEvery star above us shines\nJust the way I had planned\n\n[Chorus]\nI will never let you go\nYou are the only love I know\nIn this world of highs and lows\nYou are my reason you are my soul"},
-    {"title": "Missing You Tonight", "prompt": "[Verse]\nThe rain falls on an empty street\nI walk alone without your heartbeat\n\n[Chorus]\nMissing you like the stars miss the sun\nMissing you now that you are gone"},
-    {"title": "You Are My World", "prompt": "[Verse]\nBefore you came into my life\nEverything was black and white\n\n[Chorus]\nYou are my world you are my sky\nThe reason that I laugh and cry"},
-    {"title": "Tere Bina My Love", "prompt": "[Verse]\nTere bina yeh dil mera\nKhoya khoya rehta hai\n\n[Chorus]\nCome back to me my love\nI cannot breathe without you near"},
-    {"title": "Forever Is You", "prompt": "[Verse]\nI used to think that love was just a word\nBut then you came and changed everything\n\n[Chorus]\nForever is you forever is this\nNo matter how far the journey may go"},
 ]
 
 
@@ -80,84 +55,6 @@ def get_saved_song():
     idx = datetime.utcnow().timetuple().tm_yday % len(songs)
     s   = songs[idx]
     return str(s), s.stem.replace("_"," ").replace("-"," ").title()
-
-
-def generate_apiframe(api_key: str, anthropic_api_key=None) -> tuple:
-    """Generate fresh unique song every week using pure Python lyrics — no API needed."""
-    song = generate_weekly_lyrics()
-    style_used = song.get("style", "")
-
-    print(f"  [apiframe] Generating: '{song['title']}' ...")
-    headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
-
-    resp = requests.post(
-        "https://api.apiframe.ai/v2/music/generate",
-        headers=headers,
-        json={
-            "model" : "suno",
-            "prompt": song["prompt"],
-            "sunoParams": {
-                "custom_mode"  : True,
-                "style"        : style_used,
-                "instrumental" : False,
-                "model_version": "V5_5",
-            }
-        },
-        timeout=30
-    )
-    if not resp.ok:
-        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
-
-    job_id = resp.json().get("jobId")
-    print(f"  [apiframe] jobId: {job_id} — polling ...")
-
-    for i in range(40):
-        time.sleep(8)
-        poll   = requests.get(f"https://api.apiframe.ai/v2/jobs/{job_id}",
-                              headers=headers, timeout=30)
-        data   = poll.json()
-        status = data.get("status", "")
-        print(f"  [apiframe] {i+1}: {status}")
-
-        if status == "COMPLETED":
-            tracks = data.get("result", {}).get("tracks", [])
-            url    = tracks[0].get("audioUrl") if tracks else None
-            if not url:
-                raise RuntimeError(f"No audioUrl in result")
-            mp3 = requests.get(url, timeout=120)
-            mp3.raise_for_status()
-            print(f"  [apiframe] {len(mp3.content)//1024} KB ✓")
-            return mp3.content, song["title"], style_used
-
-        if status == "FAILED":
-            raise RuntimeError(f"Job failed: {data}")
-
-    raise RuntimeError("Timeout after 5 min")
-
-
-def generate_sunoai_lib(cookie: str) -> tuple:
-    raw = cookie.strip()
-    if raw.startswith("["):
-        items = json.loads(raw)
-        cookie = "; ".join(f"{c['name']}={c['value']}" for c in items
-                           if c.get("name") and c.get("value"))
-    else:
-        cookie = " ".join(raw.split())
-
-    from suno import Suno, ModelVersions
-    week_num = datetime.utcnow().isocalendar()[1]
-    song     = FALLBACK_LYRICS[week_num % len(FALLBACK_LYRICS)]
-    style_used = SONG_STYLES[week_num % len(SONG_STYLES)]["style"]
-    print(f"  [sunolib] Week {week_num} → {song['title']} ...")
-    client = Suno(cookie=cookie, model_version=ModelVersions.CHIRP_V3_5)
-    clips  = client.generate(prompt=song["prompt"], tags=style_used,
-                              title=song["title"], is_custom=True,
-                              make_instrumental=False, wait_audio=True)
-    if not clips: raise RuntimeError("No clips returned")
-    mp3 = requests.get(clips[0].audio_url, timeout=120)
-    mp3.raise_for_status()
-    print(f"  [sunolib] {len(mp3.content)//1024} KB ✓")
-    return mp3.content, song["title"], style_used
 
 
 def make_local(tmp, duration):
@@ -185,46 +82,49 @@ def make_local(tmp, duration):
 
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN","")
-    ANTHROPIC_API_KEY   = os.environ.get("ANTHROPIC_API_KEY")
-    APIFRAME_KEY        = os.environ.get("APIFRAME_KEY")
-    SUNO_COOKIE         = os.environ.get("SUNO_COOKIE")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
 
     if not HF_TOKEN:            raise EnvironmentError("HF_TOKEN not set")
     if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
 
     print(f"\n{'='*60}")
-    print(f"  Pipeline : Romantic Song Video + Shorts (Fully Automated)")
-    if APIFRAME_KEY: print(f"  Music    : apiframe.ai (300 free/month) ★★★★★")
-    elif SUNO_COOKIE: print(f"  Music    : SunoAI Python lib + cookie ★★★★★")
-    else: print(f"  Music    : songs/ folder or local synthesis")
+    print(f"  Pipeline : Romantic Song Video + Short (Weekly)")
+    print(f"  Music    : YuE (open-source, free) ★★★★★")
     print(f"{'='*60}\n")
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp=Path(tmp); song_mp3=None; title="Beautiful Love Song"; style_used=""
 
-        # ── Get music ────────────────────────────────────────────────────────
-        if APIFRAME_KEY and not song_mp3:
-            try:
-                print("🎵  Generating via apiframe.ai (300 free/month) ...")
-                data, title, style_used = generate_apiframe(APIFRAME_KEY, ANTHROPIC_API_KEY)
-                p=tmp/"apiframe.mp3"; p.write_bytes(data); song_mp3=str(p)
-            except Exception as e: print(f"  ⚠️  apiframe: {e}")
+        # ── 1. YuE — open-source, genuinely free ─────────────────────────────
+        print("🎵  Generating via YuE (open-source, free) ...")
+        try:
+            song = generate_weekly_lyrics()
+            title = song["title"]
+            style_used = song.get("style", "romantic pop, female vocal, emotional")
+            yue_lyrics = build_yue_lyrics(song.get("sections", [
+                {"type":"verse", "lines": song["prompt"].split("\n")[:4]},
+                {"type":"chorus","lines": song["prompt"].split("\n")[4:8]},
+            ])) if "sections" in song else song["prompt"]
 
-        if SUNO_COOKIE and not song_mp3:
-            try:
-                print("🎵  Generating via SunoAI library ...")
-                data, title, style_used = generate_sunoai_lib(SUNO_COOKIE)
-                p=tmp/"suno.mp3"; p.write_bytes(data); song_mp3=str(p)
-            except Exception as e: print(f"  ⚠️  SunoAI lib: {e}")
+            data = generate_song_yue(yue_lyrics, style_used, HF_TOKEN, DURATION)
+            p = tmp/"yue_song.mp3"
+            p.write_bytes(data)
+            song_mp3 = str(p)
+            print(f"  → YuE generated: '{title}' ✓")
+        except Exception as e:
+            print(f"  ⚠️  YuE failed: {str(e)[:200]}")
 
+        # ── 2. Saved songs folder ─────────────────────────────────────────────
         if not song_mp3:
             saved, saved_title = get_saved_song()
-            if saved: song_mp3=saved; title=saved_title; print(f"🎵  Using saved: {title}")
+            if saved:
+                song_mp3 = saved; title = saved_title
+                print(f"🎵  Using saved song: {title}")
 
+        # ── 3. Local synthesis ────────────────────────────────────────────────
         if not song_mp3:
             print("🎵  Synthesising locally ...")
-            song_mp3=make_local(tmp,DURATION)
+            song_mp3 = make_local(tmp, DURATION)
 
         # ── Loop short songs to fill duration ───────────────────────────────
         dur = probe_duration(song_mp3)
@@ -247,18 +147,18 @@ def run():
             p=tmp/f"frame_{i:02d}.jpg"; p.write_bytes(frame)
             image_paths.append(str(p))
 
-        # ── SEO metadata (pure Python, no API cost) ─────────────────────────
+        # ── SEO metadata ─────────────────────────────────────────────────────
         print("\n📝  Generating SEO-optimized metadata ...")
         meta = generate_seo(title, "romantic songs", style_used)
         print(f"  → {meta['title']}")
 
-        # ── Thumbnail + full video ──────────────────────────────────────────
+        # ── Thumbnail + video ────────────────────────────────────────────────
         thumb=str(tmp/"thumbnail.jpg")
         create_thumbnail(raw_imgs[0],meta["title"],thumb)
         video=str(tmp/"output.mp4")
         create_video(song_mp3,image_paths,video,vertical=False)
 
-        # ── Shorts version ───────────────────────────────────────────────────
+        # ── Shorts ────────────────────────────────────────────────────────────
         print("\n📱  Creating Shorts version ...")
         short_video = str(tmp/"short.mp4")
         make_short_from_video(video, short_video, duration=55, start_offset=15)
