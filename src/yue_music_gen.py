@@ -14,8 +14,9 @@ Space: https://huggingface.co/spaces/multimodal-art-projection/YuE
 import os, time
 
 YUE_SPACES = [
-    "multimodal-art-projection/YuE",
-    "innova-ai/YuE-music-generator-space",  # community mirror, fallback
+    "innova-ai/YuE-music-generator-demo",   # verified working Space
+    "fffiloni/YuE",                          # verified working Space
+    "seawolf2357/YuE-music-generator-demo-zero",  # additional mirror
 ]
 
 
