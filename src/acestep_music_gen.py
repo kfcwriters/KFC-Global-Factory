@@ -2,25 +2,20 @@
 acestep_music_gen.py
 Generates full songs WITH REAL VOCALS using ACE-Step's official HF Space.
 
-Based on the actual live UI, the text2music Gradio app has these fields
-(in this order): audio_duration, enable_audio2audio, lora_name_or_path,
-ref_audio_input, ref_audio_strength, tags(prompt), lyrics, infer_step,
-guidance_scale, guidance_scale_text, guidance_scale_lyric, manual_seeds,
-scheduler_type, cfg_type, use_erg_tag, use_erg_lyric, use_erg_diffusion,
-oss_steps, guidance_interval, guidance_interval_decay, min_guidance_scale,
-granularity_scale.
-
-Since gradio_client version/space differences can change exact api_name,
-this module first tries the documented call, and if that fails, DUMPS the
-live API schema to the log so we can read the ground truth and fix it
-in one more iteration — no more blind guessing.
+v3: Smarter schema discovery — automatically finds the actual generation
+endpoint (searching for "generate"/"text2music" in the name) instead of
+guessing, and calls it with the exact discovered parameter names.
 """
-import time
+import time, json
 
 ACESTEP_SPACES = [
-    "ACE-Step/ACE-Step",         # official v1 — confirmed alive & responding
-    "ACE-Step/Ace-Step-v1.5",    # official v1.5 — newer
+    "ACE-Step/ACE-Step",         # official v1 — confirmed alive, generation demo
 ]
+
+# Keywords that indicate the "real" generation endpoint vs training/admin endpoints
+GENERATE_KEYWORDS = ["text2music", "generate", "__call__", "predict", "run"]
+SKIP_KEYWORDS = ["dataset", "checkpoint", "toggle", "visibility", "lambda",
+                 "update_model", "import", "training", "lora"]
 
 
 def _connect(space_id: str, hf_token: str):
@@ -31,21 +26,53 @@ def _connect(space_id: str, hf_token: str):
         return Client(space_id, hf_token=hf_token)
 
 
-def _dump_api_schema(client, space_id: str):
-    """Print the real API schema so we can see exact endpoint/param names."""
-    try:
-        print(f"  [acestep] --- API schema for {space_id} ---")
-        api_info = client.view_api(print_info=False, return_format="dict")
-        import json
-        print(json.dumps(api_info, indent=2)[:3000])   # cap output size
-        print(f"  [acestep] --- end schema ---")
-    except Exception as e:
-        print(f"  [acestep] Could not dump schema: {e}")
+def _find_generate_endpoint(client) -> tuple:
+    """
+    Inspect the full API schema and find the actual generation endpoint.
+    Returns (endpoint_name, list_of_param_names) or (None, None).
+    """
+    api_info = client.view_api(print_info=False, return_format="dict")
+    endpoints = api_info.get("named_endpoints", {})
+
+    print(f"  [acestep] Found {len(endpoints)} total endpoints")
+
+    candidates = []
+    for name, info in endpoints.items():
+        lname = name.lower()
+        if any(skip in lname for skip in SKIP_KEYWORDS):
+            continue
+        params = info.get("parameters", [])
+        # A real generation endpoint takes several parameters (duration, tags, lyrics etc)
+        # and returns audio
+        returns = info.get("returns", [])
+        returns_audio = any(
+            "audio" in str(r.get("component","")).lower() or
+            "audio" in str(r.get("label","")).lower()
+            for r in returns
+        )
+        score = len(params)
+        if any(kw in lname for kw in GENERATE_KEYWORDS):
+            score += 100
+        if returns_audio:
+            score += 50
+        candidates.append((score, name, params))
+
+    if not candidates:
+        return None, None
+
+    candidates.sort(key=lambda x: -x[0])
+    best_score, best_name, best_params = candidates[0]
+
+    print(f"  [acestep] Best candidate endpoint: {best_name} (score={best_score})")
+    param_names = [p.get("parameter_name", p.get("label","?")) for p in best_params]
+    print(f"  [acestep] Parameters ({len(param_names)}): {param_names}")
+
+    return best_name, best_params
 
 
 def generate_song_acestep(lyrics: str, style_tags: str, hf_token: str,
                           duration_sec: int = 210) -> bytes:
-    """Generate a full song with real vocals using ACE-Step."""
+    """Generate a full song with real vocals using ACE-Step, auto-discovering the API."""
     last_error = None
 
     for space_id in ACESTEP_SPACES:
@@ -53,53 +80,54 @@ def generate_song_acestep(lyrics: str, style_tags: str, hf_token: str,
             print(f"  [acestep] Connecting to {space_id} ...")
             client = _connect(space_id, hf_token)
 
-            print(f"  [acestep] Generating song ({duration_sec}s target) ...")
-            print(f"  [acestep] Style: {style_tags[:60]}")
+            print(f"  [acestep] Discovering real generation endpoint ...")
+            endpoint_name, params = _find_generate_endpoint(client)
 
-            # Try the documented positional order for the text2music tab.
-            # Using positional args (not kwargs) avoids api_name/kwarg mismatches
-            # across Space versions — matches the visible UI field order.
-            try:
-                result = client.predict(
-                    float(duration_sec),   # audio_duration
-                    False,                  # enable_audio2audio
-                    "",                     # lora_name_or_path
-                    None,                   # ref_audio_input
-                    0.5,                    # ref_audio_strength
-                    style_tags,             # tags
-                    lyrics,                 # lyrics
-                    27,                     # infer_step
-                    15,                     # guidance_scale
-                    0,                      # guidance_scale_text
-                    0,                      # guidance_scale_lyric
-                    "",                     # manual_seeds
-                    "euler",                # scheduler_type
-                    "apg",                  # cfg_type
-                    True,                   # use_erg_tag
-                    True,                   # use_erg_lyric
-                    True,                   # use_erg_diffusion
-                    "",                     # oss_steps
-                    0.5,                    # guidance_interval
-                    0.0,                    # guidance_interval_decay
-                    3,                      # min_guidance_scale
-                    10,                     # granularity_scale
-                    api_name="/text2music_stage_1"
-                )
-            except Exception as e1:
-                print(f"  [acestep] Named endpoint failed ({str(e1)[:100]}), "
-                      f"trying default fn_index=0 ...")
-                # Fallback: let gradio_client use the first/default API function
-                result = client.predict(
-                    float(duration_sec), False, "", None, 0.5,
-                    style_tags, lyrics, 27, 15, 0, 0, "",
-                    "euler", "apg", True, True, True, "",
-                    0.5, 0.0, 3, 10,
-                    fn_index=0
-                )
+            if not endpoint_name:
+                raise RuntimeError("No suitable generation endpoint found")
 
-            audio_path = result[0] if isinstance(result, (list, tuple)) else result
-            if isinstance(audio_path, dict):
-                audio_path = audio_path.get("path") or audio_path.get("audio") or audio_path.get("value")
+            # Build kwargs by matching discovered parameter names to our values
+            kwargs = {}
+            for p in params:
+                pname = p.get("parameter_name", "")
+                default = p.get("parameter_default")
+                pl = pname.lower()
+
+                if "duration" in pl:
+                    kwargs[pname] = float(duration_sec)
+                elif "tag" in pl or "prompt" in pl:
+                    kwargs[pname] = style_tags
+                elif "lyric" in pl:
+                    kwargs[pname] = lyrics
+                elif "infer_step" in pl or "steps" in pl:
+                    kwargs[pname] = 27
+                elif "guidance_scale" in pl and "text" not in pl and "lyric" not in pl:
+                    kwargs[pname] = 15.0
+                elif pname and p.get("parameter_has_default"):
+                    kwargs[pname] = default   # use documented default
+
+            print(f"  [acestep] Calling {endpoint_name} with {len(kwargs)} matched params ...")
+            result = client.predict(**kwargs, api_name=endpoint_name)
+
+            # Result may be a single value, tuple, or nested audio dict
+            audio_path = None
+            if isinstance(result, (list, tuple)):
+                for item in result:
+                    if isinstance(item, str) and (item.endswith(".wav") or item.endswith(".mp3")):
+                        audio_path = item
+                        break
+                    if isinstance(item, dict) and ("path" in item or "audio" in item):
+                        audio_path = item.get("path") or item.get("audio")
+                        break
+                if not audio_path:
+                    audio_path = result[0]
+            elif isinstance(result, dict):
+                audio_path = result.get("path") or result.get("audio")
+            else:
+                audio_path = result
+
+            if not audio_path:
+                raise RuntimeError(f"Could not extract audio path from result: {result}")
 
             with open(audio_path, "rb") as f:
                 data = f.read()
@@ -109,20 +137,13 @@ def generate_song_acestep(lyrics: str, style_tags: str, hf_token: str,
 
         except Exception as e:
             last_error = e
-            print(f"  [acestep] {space_id} failed: {str(e)[:200]}")
-            # Dump the real schema so we know exactly what to fix next time
-            try:
-                client = _connect(space_id, hf_token)
-                _dump_api_schema(client, space_id)
-            except Exception:
-                pass
+            print(f"  [acestep] {space_id} failed: {str(e)[:300]}")
             time.sleep(5)
 
     raise RuntimeError(f"All ACE-Step spaces failed. Last error: {last_error}")
 
 
 def build_acestep_lyrics(sections: list) -> str:
-    """Format section list into ACE-Step's [verse]/[chorus]/[bridge] format."""
     parts = []
     for sec in sections:
         tag = sec.get("type", "verse")
