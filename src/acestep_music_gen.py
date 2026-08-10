@@ -109,31 +109,64 @@ def generate_song_acestep(lyrics: str, style_tags: str, hf_token: str,
             print(f"  [acestep] Calling {endpoint_name} with {len(kwargs)} matched params ...")
             result = client.predict(**kwargs, api_name=endpoint_name)
 
-            # Result may be a single value, tuple, or nested audio dict
-            audio_path = None
+            # ── Extract ALL audio-like paths from result (there may be several) ──
+            print(f"  [acestep] Raw result type: {type(result)}")
             if isinstance(result, (list, tuple)):
-                for item in result:
-                    if isinstance(item, str) and (item.endswith(".wav") or item.endswith(".mp3")):
-                        audio_path = item
-                        break
-                    if isinstance(item, dict) and ("path" in item or "audio" in item):
-                        audio_path = item.get("path") or item.get("audio")
-                        break
-                if not audio_path:
-                    audio_path = result[0]
-            elif isinstance(result, dict):
-                audio_path = result.get("path") or result.get("audio")
-            else:
-                audio_path = result
+                print(f"  [acestep] Result has {len(result)} items:")
+                for i, item in enumerate(result):
+                    print(f"    [{i}] {type(item).__name__}: {str(item)[:150]}")
 
-            if not audio_path:
-                raise RuntimeError(f"Could not extract audio path from result: {result}")
+            candidate_paths = []
+            items = result if isinstance(result, (list, tuple)) else [result]
+            for item in items:
+                if isinstance(item, str) and (item.endswith(".wav") or item.endswith(".mp3") or item.endswith(".flac")):
+                    candidate_paths.append(item)
+                elif isinstance(item, dict):
+                    p = item.get("path") or item.get("audio") or item.get("value")
+                    if isinstance(p, str) and (p.endswith(".wav") or p.endswith(".mp3") or p.endswith(".flac")):
+                        candidate_paths.append(p)
 
-            with open(audio_path, "rb") as f:
-                data = f.read()
+            if not candidate_paths:
+                raise RuntimeError(f"No audio file paths found in result: {result}")
 
-            print(f"  [acestep] Generated {len(data)//1024} KB ✓")
-            return data
+            print(f"  [acestep] Found {len(candidate_paths)} audio candidate(s): {candidate_paths}")
+
+            # ── Validate each candidate: must exist, be non-trivial size, and NOT silent ──
+            import subprocess as _sp
+            for audio_path in candidate_paths:
+                try:
+                    with open(audio_path, "rb") as f:
+                        data = f.read()
+
+                    if len(data) < 50_000:   # smaller than ~50KB is suspicious for a song
+                        print(f"  [acestep] {audio_path}: too small ({len(data)} bytes) — skipping")
+                        continue
+
+                    # Check for actual audio content (not silence) using ffmpeg volumedetect
+                    probe = _sp.run(
+                        ["ffmpeg", "-i", audio_path, "-af", "volumedetect",
+                         "-f", "null", "-"],
+                        capture_output=True, text=True, timeout=30
+                    )
+                    stderr = probe.stderr
+                    mean_vol_line = [l for l in stderr.split("\n") if "mean_volume" in l]
+                    if mean_vol_line:
+                        mean_db = float(mean_vol_line[0].split(":")[1].strip().replace(" dB",""))
+                        print(f"  [acestep] {audio_path}: mean_volume={mean_db:.1f}dB, size={len(data)//1024}KB")
+                        if mean_db < -50:   # essentially silent
+                            print(f"  [acestep] {audio_path}: SILENT — skipping")
+                            continue
+                    else:
+                        print(f"  [acestep] {audio_path}: could not detect volume, accepting cautiously")
+
+                    print(f"  [acestep] Validated real audio: {audio_path} ({len(data)//1024} KB) ✓")
+                    return data
+
+                except Exception as val_err:
+                    print(f"  [acestep] {audio_path}: validation error ({val_err}) — skipping")
+                    continue
+
+            raise RuntimeError("All candidate audio files were invalid, too small, or silent")
 
         except Exception as e:
             last_error = e
