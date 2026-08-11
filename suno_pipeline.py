@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
+FULLY AUTOMATED — no external dependency, no risk of noise/silence uploads.
+
 Music priority:
-  1. ACE-Step (official HF Space, open-source, free) — REAL vocals ★★★★★
-  2. YuE (community HF Spaces, free) — REAL vocals when available
-  3. songs/ folder (manual Suno uploads, backup)
-  4. Our own vocal_synth.py — formant singing, ALWAYS works, zero dependency
+  1. songs/ folder (manual Suno uploads, if you add any — highest quality)
+  2. Our own vocal_synth.py + instrumental — ALWAYS works, reliable, fast
 """
 import os, random, subprocess, sys, tempfile
 from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-from image_gen        import generate_images
-from lyrics_overlay   import add_lyrics
-from lyrics_writer    import generate_weekly_lyrics
-from seo_gen          import generate_seo
-from shorts_maker     import make_short_from_video, make_shorts_metadata
-from acestep_music_gen import generate_song_acestep, build_acestep_lyrics
-from yue_music_gen     import generate_song_yue, build_yue_lyrics
-from vocal_synth       import sing_lyrics, detect_mood
-from video_assembly    import create_video
-from thumbnail_gen     import create_thumbnail
-from youtube_upload    import upload_to_youtube
+from image_gen       import generate_images
+from lyrics_overlay  import add_lyrics
+from lyrics_writer   import generate_weekly_lyrics
+from seo_gen         import generate_seo
+from shorts_maker    import make_short_from_video, make_shorts_metadata
+from vocal_synth     import sing_lyrics, detect_mood
+from video_assembly  import create_video
+from thumbnail_gen   import create_thumbnail
+from youtube_upload  import upload_to_youtube
 
 SONGS_DIR = Path(__file__).parent / "songs"
 DURATION  = 210
@@ -119,7 +117,7 @@ def run():
     if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
 
     print(f"\n{'='*60}")
-    print(f"  Pipeline : Romantic Song Video + Short (Weekly)")
+    print(f"  Pipeline : Romantic Song Video + Short (Weekly, Fully Automated)")
     print(f"{'='*60}\n")
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
@@ -133,48 +131,22 @@ def run():
             {"type":"chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # ── 1. ACE-Step (official Space, most reliable) ──────────────────────
-        print("🎵  Attempting ACE-Step (official, open-source, free) ...")
-        try:
-            ace_lyrics = build_acestep_lyrics(sections)
-            data = generate_song_acestep(ace_lyrics, style_used, HF_TOKEN, DURATION)
-            p = tmp/"acestep_song.mp3"
-            p.write_bytes(data)
-            song_mp3 = str(p)
-            print(f"  → ACE-Step generated real AI vocals ✓")
-        except Exception as e:
-            print(f"  ⚠️  ACE-Step unavailable: {str(e)[:150]}")
+        # ── 1. Saved songs folder (best quality, if you add manual uploads) ──
+        saved, saved_title = get_saved_song()
+        if saved:
+            song_mp3 = saved; title = saved_title
+            print(f"🎵  Using saved song: {title}")
 
-        # ── 2. YuE (community Spaces, backup) ─────────────────────────────────
+        # ── 2. Our own synthesizer — reliable, always works ───────────────────
         if not song_mp3:
-            print("🎵  Attempting YuE (community, free) ...")
-            try:
-                yue_lyrics = build_yue_lyrics(sections)
-                data = generate_song_yue(yue_lyrics, style_used, HF_TOKEN, DURATION)
-                p = tmp/"yue_song.mp3"
-                p.write_bytes(data)
-                song_mp3 = str(p)
-                print(f"  → YuE generated real AI vocals ✓")
-            except Exception as e:
-                print(f"  ⚠️  YuE unavailable: {str(e)[:150]}")
-
-        # ── 3. Saved songs folder ──────────────────────────────────────────────
-        if not song_mp3:
-            saved, saved_title = get_saved_song()
-            if saved:
-                song_mp3 = saved; title = saved_title
-                print(f"🎵  Using saved song: {title}")
-
-        # ── 4. Our own vocal synthesis — guaranteed fallback ──────────────────
-        if not song_mp3:
-            print("🎤  Synthesizing our own singing voice ...")
+            print("🎤  Synthesizing singing voice + instrumental ...")
             mood = detect_mood(style_used)
             vocal_wav = sing_lyrics(sections, mood=mood, tempo_bpm=76)
             instrumental = make_instrumental(tmp, DURATION, mood)
             mixed_path = str(tmp/"mixed.mp3")
             mix_vocals_instrumental(vocal_wav, instrumental, mixed_path, DURATION)
             song_mp3 = mixed_path
-            print(f"  → Our vocal synthesis + instrumental mixed ✓")
+            print(f"  → Song ready: '{title}' ✓")
 
         # ── Loop short audio to fill duration ─────────────────────────────────
         dur = probe_duration(song_mp3)
