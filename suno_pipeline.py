@@ -87,6 +87,13 @@ def make_instrumental(tmp, duration, mood="romantic"):
 
 
 def mix_vocals_instrumental(vocal_wav_bytes, instrumental_mp3, out_mp3, duration):
+    """
+    FIXED: vocal_synth.py v3 already normalizes vocals to strong RMS loudness.
+    Applying an ADDITIONAL volume=2.2 boost on top of that caused clipping/
+    distortion (heard as "broken music"). Now we pass vocals through near
+    unity gain with a limiter as a safety net against overs, and don't let
+    amix silently renormalize (which was masking our intended balance).
+    """
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         voc_tmp = f.name
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -99,11 +106,12 @@ def mix_vocals_instrumental(vocal_wav_bytes, instrumental_mp3, out_mp3, duration
         subprocess.run([
             "ffmpeg","-y","-i",looped,"-i",instrumental_mp3,
             "-filter_complex",
-            "[0:a]volume=2.2[v];[1:a]volume=0.55[m];"
-            "[v][m]amix=inputs=2:duration=shortest",
+            "[0:a]volume=1.0,alimiter=limit=0.9[v];"
+            "[1:a]volume=0.45[m];"
+            "[v][m]amix=inputs=2:duration=shortest:normalize=0",
             "-t",str(duration),"-c:a","libmp3lame","-q:a","2",out_mp3
         ], check=True, capture_output=True)
-        print(f"  [mix] Vocals + instrumental mixed ✓")
+        print(f"  [mix] Vocals + instrumental mixed (no double-boost) ✓")
     finally:
         for p in [voc_tmp, looped]:
             if os.path.exists(p): os.unlink(p)
