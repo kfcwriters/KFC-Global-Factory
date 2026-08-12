@@ -1,34 +1,29 @@
 """
-vocal_synth.py
-Our own formant-based singing voice synthesizer — 100% Python, no GPU,
-no external API, no cookies, no credits. Runs entirely on GitHub Actions.
+vocal_synth.py — v3, Formant Singing Synthesizer with RMS Loudness Fix
+=========================================================================
+Our own singing voice synthesizer, no GPU/API/external dependency.
 
-This simulates human vocal production:
-  - Glottal pulse train (vocal cord vibration) at melody pitch
-  - Formant filters (vocal tract resonances) shape vowel sounds
-  - Syllables mapped to lyrics, sung on a chord-following melody
-
-Honest expectation: this sounds synthetic/robotic-singing (like early
-vocaloid/speak & spell), NOT like a human singer. But it genuinely SINGS
-pitched notes following the melody — a real step up from silence or
-spoken narration, and something we fully own and control forever.
+v3 fix: Uses RMS (average loudness) normalization instead of peak-only
+normalization. Formant-filtered signals are often "peaky" (loud transients,
+quiet sustain) — peak normalization alone leaves them perceptually quiet
+even when mixed at high volume. RMS normalization ensures the vocal track
+has genuine audible presence when layered under instrumental music.
 """
 import numpy as np
 import scipy.io.wavfile as wavfile
+from scipy.signal import lfilter
 import io, re, random
 
 SR = 44100
 
-# ── Vowel formant frequencies (F1, F2, F3) — classic speech synthesis data ────
 VOWEL_FORMANTS = {
-    "a": (730, 1090, 2440),   # "ah"
-    "e": (530, 1840, 2480),   # "eh"
-    "i": (270, 2290, 3010),   # "ee"
-    "o": (570, 840, 2410),    # "oh"
-    "u": (300, 870, 2240),    # "oo"
+    "a": (730, 1090, 2440),
+    "e": (530, 1840, 2480),
+    "i": (270, 2290, 3010),
+    "o": (570, 840, 2410),
+    "u": (300, 870, 2240),
 }
 
-# Simple grapheme-to-vowel mapping (rough, good enough for singing synthesis)
 VOWEL_MAP = [
     (re.compile(r"oo|u"), "u"),
     (re.compile(r"ee|ea|i"), "i"),
@@ -47,7 +42,6 @@ def _guess_vowel(syllable: str) -> str:
 
 
 def _syllabify(word: str) -> list:
-    """Very rough syllable splitter based on vowel groups."""
     word = re.sub(r"[^a-zA-Z]", "", word).lower()
     if not word:
         return []
@@ -55,158 +49,196 @@ def _syllabify(word: str) -> list:
     return syllables if syllables else [word]
 
 
-def _formant_note(freq: float, dur: float, vowel: str, amp: float = 0.3) -> np.ndarray:
-    """
-    Synthesize one sung note using glottal pulses + formant filtering.
+def _plan_events(sections: list, notes: dict, tempo_bpm: int) -> list:
+    beat_dur = 60.0 / tempo_bpm
+    events = []
+    rng = random.Random(42)
 
-    Args:
-        freq  : Fundamental pitch (Hz) — the note being sung.
-        dur   : Duration in seconds.
-        vowel : Which vowel shape ("a","e","i","o","u").
-        amp   : Amplitude.
-    """
-    n = int(SR * dur)
+    for section in sections:
+        is_chorus = section.get("type") == "chorus"
+        pool = notes["chorus"] if is_chorus else notes["verse"]
+
+        for line in section.get("lines", []):
+            words = line.split()
+            for word in words:
+                syllables = _syllabify(word) or [word]
+                for si, syl in enumerate(syllables):
+                    vowel = _guess_vowel(syl)
+                    freq = rng.choice(pool)
+                    stressed = (si == 0)
+                    dur = beat_dur * (0.55 if not stressed else 0.75)
+                    dur *= rng.uniform(0.9, 1.15)
+                    amp = (0.55 if is_chorus else 0.42) * (1.15 if stressed else 1.0)
+                    events.append({
+                        "freq": freq, "dur": dur, "vowel": vowel,
+                        "amp": amp, "stressed": stressed
+                    })
+                events.append({"freq": 0, "dur": beat_dur*0.12, "vowel": "a", "amp": 0})
+            events.append({"freq": 0, "dur": beat_dur*0.6, "vowel": "a", "amp": 0})
+        events.append({"freq": 0, "dur": beat_dur*1.2, "vowel": "a", "amp": 0})
+
+    return events
+
+
+def _synthesize_continuous(events: list) -> np.ndarray:
+    total_dur = sum(e["dur"] for e in events)
+    n = int(SR * total_dur)
     if n <= 0:
-        return np.array([], dtype=np.float32)
+        return np.zeros(SR, dtype=np.float32)
 
-    t = np.linspace(0, dur, n, dtype=np.float32)
+    pitch_contour = np.zeros(n, dtype=np.float32)
+    amp_contour   = np.zeros(n, dtype=np.float32)
+    vowel_idx     = np.zeros(n, dtype=np.int32)
+    vowels_list   = list(VOWEL_FORMANTS.keys())
 
-    # 1. Glottal pulse train — vocal cord vibration (sawtooth-like buzz)
+    pos = 0
+    prev_freq = 220.0
+    for e in events:
+        dur_samples = max(1, int(SR * e["dur"]))
+        end = min(pos + dur_samples, n)
+        seg_len = end - pos
+        if seg_len <= 0:
+            break
+
+        target_freq = e["freq"] if e["freq"] > 0 else prev_freq
+        glide_len = min(seg_len, max(1, int(seg_len * 0.4)))
+        glide = np.linspace(prev_freq, target_freq, glide_len)
+        hold  = np.full(seg_len - glide_len, target_freq)
+        pitch_contour[pos:end] = np.concatenate([glide, hold])[:seg_len]
+
+        amp_val = e["amp"]
+        att = min(seg_len // 4, int(SR * 0.02))
+        rel = min(seg_len // 4, int(SR * 0.03))
+        env = np.full(seg_len, amp_val, dtype=np.float32)
+        if att > 0:
+            env[:att] = np.linspace(0, amp_val, att)
+        if rel > 0:
+            env[-rel:] = np.linspace(amp_val, amp_val*0.3, rel)
+        amp_contour[pos:end] = env
+
+        v_idx = vowels_list.index(e["vowel"]) if e["vowel"] in vowels_list else 0
+        vowel_idx[pos:end] = v_idx
+
+        prev_freq = target_freq
+        pos = end
+
+    t = np.arange(n, dtype=np.float32) / SR
+
+    vibrato = 1.0 + 0.012 * np.sin(2*np.pi*5.5*t)
+    inst_freq = pitch_contour * vibrato
+    phase = np.cumsum(2*np.pi*inst_freq/SR)
+
     glottal = np.zeros(n, dtype=np.float32)
-    for harmonic in range(1, 12):
-        h_amp = 1.0 / harmonic   # natural harmonic rolloff
-        glottal += h_amp * np.sin(2 * np.pi * freq * harmonic * t)
-    glottal /= np.max(np.abs(glottal) + 1e-9)
+    for harmonic in range(1, 10):
+        glottal += (1.0/harmonic) * np.sin(harmonic * phase)
+    peak = np.max(np.abs(glottal)) + 1e-9
+    glottal /= peak
 
-    # Add subtle vibrato (natural singing wobble)
-    vibrato = 1.0 + 0.015 * np.sin(2 * np.pi * 5.5 * t)
-    glottal *= vibrato
+    breath = np.random.randn(n).astype(np.float32) * 0.04
+    for k in range(1, n):
+        breath[k] = 0.9*breath[k-1] + 0.1*breath[k]
+    glottal_with_breath = glottal * 0.92 + breath
 
-    # 2. Formant filtering — shape the buzz into a vowel sound
-    f1, f2, f3 = VOWEL_FORMANTS.get(vowel, VOWEL_FORMANTS["a"])
-    signal = _apply_formant_filter(glottal, [f1, f2, f3])
+    signal = _apply_smooth_formants(glottal_with_breath, vowel_idx, vowels_list)
+    signal *= amp_contour
+    signal = _add_chorus(signal)
 
-    # 3. Envelope — soft attack/release so notes don't click
-    attack = min(int(SR * 0.03), n // 4)
-    release = min(int(SR * 0.08), n // 4)
-    env = np.ones(n, dtype=np.float32)
-    if attack > 0:
-        env[:attack] = np.linspace(0, 1, attack)
-    if release > 0:
-        env[-release:] = np.linspace(1, 0, release)
+    # ── RMS loudness normalization — fixes "vocals too quiet" issue ────────
+    rms = np.sqrt(np.mean(signal**2)) + 1e-9
+    target_rms = 0.28
+    signal = signal * (target_rms / rms)
+    signal = np.clip(signal, -0.95, 0.95)
 
-    return (signal * env * amp).astype(np.float32)
+    return signal.astype(np.float32)
 
 
-def _apply_formant_filter(signal: np.ndarray, formants: list) -> np.ndarray:
-    """Apply resonant band-pass filters at formant frequencies (simple IIR)."""
-    out = np.zeros_like(signal)
-    for f in formants:
-        out += _resonant_filter(signal, f, bandwidth=80)
+def _apply_smooth_formants(signal: np.ndarray, vowel_idx: np.ndarray,
+                           vowels_list: list) -> np.ndarray:
+    n = len(signal)
+    block = max(1, int(SR * 0.03))
+    out = np.zeros(n, dtype=np.float32)
+
+    filtered_per_vowel = {}
+    for vi, vowel in enumerate(vowels_list):
+        f1, f2, f3 = VOWEL_FORMANTS[vowel]
+        filtered_per_vowel[vi] = (
+            _resonant_filter(signal, f1, 90) +
+            _resonant_filter(signal, f2, 110) +
+            _resonant_filter(signal, f3, 130)
+        )
+
+    for start in range(0, n, block):
+        end = min(start+block, n)
+        block_vowels = vowel_idx[start:end]
+        if len(block_vowels) == 0:
+            continue
+        vi = int(np.bincount(block_vowels).argmax())
+        out[start:end] = filtered_per_vowel[vi][start:end]
+
     peak = np.max(np.abs(out)) + 1e-9
     return out / peak
 
 
 def _resonant_filter(signal: np.ndarray, freq: float, bandwidth: float) -> np.ndarray:
-    """Simple 2nd-order resonant filter (formant peak) via biquad."""
-    n = len(signal)
-    if n == 0:
-        return signal
-
     r = np.exp(-np.pi * bandwidth / SR)
     theta = 2 * np.pi * freq / SR
     a1 = -2 * r * np.cos(theta)
     a2 = r * r
-
-    out = np.zeros(n, dtype=np.float32)
-    x1 = x2 = y1 = y2 = 0.0
-    for i in range(n):
-        x0 = signal[i]
-        y0 = x0 - a1 * y1 - a2 * y2
-        out[i] = y0
-        x2, x1 = x1, x0
-        y2, y1 = y1, y0
-    return out
+    b0 = (1 - r*r) * 0.5
+    return lfilter([b0], [1, a1, a2], signal).astype(np.float32)
 
 
-# ── Melody note pool (pentatonic — always sounds pleasant) ────────────────────
+def _add_chorus(signal: np.ndarray, voices: int = 3) -> np.ndarray:
+    n = len(signal)
+    out = signal.copy()
+    rng = random.Random(7)
+    for v in range(voices - 1):
+        detune = rng.uniform(-0.008, 0.008)
+        delay_samples = rng.randint(int(SR*0.01), int(SR*0.03))
+        idx = np.arange(n) * (1 + detune)
+        idx = np.clip(idx, 0, n-1).astype(np.int32)
+        detuned = signal[idx]
+        delayed = np.zeros(n, dtype=np.float32)
+        if delay_samples < n:
+            delayed[delay_samples:] = detuned[:n-delay_samples]
+        out += delayed * 0.35
+    peak = np.max(np.abs(out)) + 1e-9
+    return out / peak * 0.85
+
+
 MELODY_NOTES_BY_MOOD = {
-    "romantic":  [220, 246, 261, 293, 329, 349, 392],
-    "happy":     [261, 293, 329, 392, 440, 493],
-    "sad":       [196, 220, 233, 261, 293, 311],
-    "default":   [220, 246, 261, 293, 329, 349, 392],
+    "romantic": {"verse":[220,246,261,293],  "chorus":[293,329,349,392]},
+    "happy":    {"verse":[261,293,329,349],  "chorus":[349,392,440,493]},
+    "sad":      {"verse":[196,220,233,261],  "chorus":[233,261,277,311]},
 }
 
 
 def sing_lyrics(sections: list, mood: str = "romantic",
                 tempo_bpm: int = 76) -> bytes:
-    """
-    Generate a full sung vocal track from lyrics sections.
+    print(f"  [vocal-synth-v3] Synthesizing (mood={mood}, {tempo_bpm} BPM) ...")
 
-    Args:
-        sections  : List of {"type": str, "lines": [str, ...]}
-        mood      : "romantic" / "happy" / "sad" — picks melody pool.
-        tempo_bpm : Singing tempo.
+    notes = MELODY_NOTES_BY_MOOD.get(mood, MELODY_NOTES_BY_MOOD["romantic"])
+    events = _plan_events(sections, notes, tempo_bpm)
 
-    Returns:
-        WAV audio bytes of the synthesized singing.
-    """
-    print(f"  [vocal-synth] Synthesizing singing voice (mood={mood}, {tempo_bpm} BPM) ...")
+    if not events:
+        events = [{"freq":220,"dur":2.0,"vowel":"a","amp":0.4,"stressed":False}]
 
-    notes = MELODY_NOTES_BY_MOOD.get(mood, MELODY_NOTES_BY_MOOD["default"])
-    beat_dur = 60.0 / tempo_bpm
-    syllable_dur = beat_dur / 2   # 2 syllables per beat, roughly
+    print(f"  [vocal-synth-v3] {len(events)} note events planned ...")
+    signal = _synthesize_continuous(events)
 
-    chunks = []
-    rng = random.Random(42)
+    rms = np.sqrt(np.mean(signal**2))
+    peak = np.max(np.abs(signal))
+    print(f"  [vocal-synth-v3] RMS={rms:.3f}, Peak={peak:.3f}")
 
-    for sec_idx, section in enumerate(sections):
-        is_chorus = section.get("type") == "chorus"
-        note_pool = notes[3:] if is_chorus else notes[:5]   # chorus = higher notes
-
-        for line in section.get("lines", []):
-            words = line.split()
-            for word in words:
-                syllables = _syllabify(word)
-                if not syllables:
-                    syllables = [word]
-                for syl in syllables:
-                    vowel = _guess_vowel(syl)
-                    freq = rng.choice(note_pool)
-                    dur = syllable_dur * rng.uniform(0.85, 1.3)
-                    amp = 0.45 if is_chorus else 0.35
-                    note = _formant_note(freq, dur, vowel, amp)
-                    chunks.append(note)
-                # tiny gap between words
-                chunks.append(np.zeros(int(SR * 0.03), dtype=np.float32))
-            # gap between lines
-            chunks.append(np.zeros(int(SR * beat_dur * 0.5), dtype=np.float32))
-        # gap between sections
-        chunks.append(np.zeros(int(SR * beat_dur), dtype=np.float32))
-
-    if not chunks:
-        chunks = [np.zeros(SR, dtype=np.float32)]
-
-    full = np.concatenate(chunks)
-
-    # Final normalize + fade
-    peak = np.max(np.abs(full)) + 1e-9
-    full = full / peak * 0.75
-    fade = min(int(SR * 1.5), len(full) // 6)
-    if fade > 0:
-        full[:fade] *= np.linspace(0, 1, fade)
-        full[-fade:] *= np.linspace(1, 0, fade)
-
+    dur_sec = len(signal) / SR
     buf = io.BytesIO()
-    wavfile.write(buf, SR, (full * 32767).astype(np.int16))
+    wavfile.write(buf, SR, (signal * 32767).astype(np.int16))
     data = buf.getvalue()
-    dur_sec = len(full) / SR
-    print(f"  [vocal-synth] Generated {dur_sec:.1f}s of singing ({len(data)//1024} KB) ✓")
+    print(f"  [vocal-synth-v3] Generated {dur_sec:.1f}s ({len(data)//1024} KB) ✓")
     return data
 
 
 def detect_mood(style_text: str) -> str:
-    """Guess mood category from a style/tags string."""
     s = style_text.lower()
     if any(w in s for w in ["sad", "melancholic", "longing", "missing"]):
         return "sad"
