@@ -147,14 +147,28 @@ def run():
 
         # ── 2. Our own synthesizer — reliable, always works ───────────────────
         if not song_mp3:
-            print("🎤  Synthesizing singing voice + instrumental ...")
+            DEBUG_INSTRUMENTAL_ONLY = os.environ.get("DEBUG_INSTRUMENTAL_ONLY","0") == "1"
+
             mood = detect_mood(style_used)
-            vocal_wav = sing_lyrics(sections, mood=mood, tempo_bpm=76)
             instrumental = make_instrumental(tmp, DURATION, mood)
-            mixed_path = str(tmp/"mixed.mp3")
-            mix_vocals_instrumental(vocal_wav, instrumental, mixed_path, DURATION)
-            song_mp3 = mixed_path
-            print(f"  → Song ready: '{title}' ✓")
+
+            if DEBUG_INSTRUMENTAL_ONLY:
+                print("🎵  DEBUG MODE: instrumental only, skipping vocal synth ...")
+                song_mp3 = instrumental
+                print(f"  → Instrumental-only song ready: '{title}' ✓")
+            else:
+                print("🎤  Synthesizing singing voice + instrumental ...")
+                vocal_wav = sing_lyrics(sections, mood=mood, tempo_bpm=76)
+
+                # Save raw vocal WAV separately too, for direct inspection
+                raw_vocal_path = tmp / "raw_vocal_only.wav"
+                raw_vocal_path.write_bytes(vocal_wav)
+                print(f"  [debug] Raw vocal-only file size: {raw_vocal_path.stat().st_size} bytes")
+
+                mixed_path = str(tmp/"mixed.mp3")
+                mix_vocals_instrumental(vocal_wav, instrumental, mixed_path, DURATION)
+                song_mp3 = mixed_path
+                print(f"  → Song ready: '{title}' ✓")
 
         # ── Loop short audio to fill duration ─────────────────────────────────
         dur = probe_duration(song_mp3)
