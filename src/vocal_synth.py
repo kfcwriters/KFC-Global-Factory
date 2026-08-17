@@ -129,15 +129,15 @@ def _synthesize_continuous(events: list) -> np.ndarray:
     phase = np.cumsum(2*np.pi*inst_freq/SR)
 
     glottal = np.zeros(n, dtype=np.float32)
-    for harmonic in range(1, 10):
-        glottal += (1.0/harmonic) * np.sin(harmonic * phase)
+    for harmonic in range(1, 6):   # fewer harmonics = softer, less harsh
+        glottal += (1.0/(harmonic**1.3)) * np.sin(harmonic * phase)   # faster rolloff
     peak = np.max(np.abs(glottal)) + 1e-9
     glottal /= peak
 
-    breath = np.random.randn(n).astype(np.float32) * 0.04
+    breath = np.random.randn(n).astype(np.float32) * 0.015
     for k in range(1, n):
-        breath[k] = 0.9*breath[k-1] + 0.1*breath[k]
-    glottal_with_breath = glottal * 0.92 + breath
+        breath[k] = 0.95*breath[k-1] + 0.05*breath[k]
+    glottal_with_breath = glottal * 0.95 + breath
 
     signal = _apply_smooth_formants(glottal_with_breath, vowel_idx, vowels_list)
     signal *= amp_contour
@@ -162,9 +162,9 @@ def _apply_smooth_formants(signal: np.ndarray, vowel_idx: np.ndarray,
     for vi, vowel in enumerate(vowels_list):
         f1, f2, f3 = VOWEL_FORMANTS[vowel]
         filtered_per_vowel[vi] = (
-            _resonant_filter(signal, f1, 90) +
-            _resonant_filter(signal, f2, 110) +
-            _resonant_filter(signal, f3, 130)
+            _resonant_filter(signal, f1, 140) +   # wider bandwidth = softer resonance
+            _resonant_filter(signal, f2, 170) +
+            _resonant_filter(signal, f3, 200)
         )
 
     for start in range(0, n, block):
@@ -188,20 +188,21 @@ def _resonant_filter(signal: np.ndarray, freq: float, bandwidth: float) -> np.nd
     return lfilter([b0], [1, a1, a2], signal).astype(np.float32)
 
 
-def _add_chorus(signal: np.ndarray, voices: int = 3) -> np.ndarray:
+def _add_chorus(signal: np.ndarray, voices: int = 2) -> np.ndarray:
+    """Reduced to 2 voices, gentler blend — avoids metallic/phasing artifacts."""
     n = len(signal)
     out = signal.copy()
     rng = random.Random(7)
     for v in range(voices - 1):
-        detune = rng.uniform(-0.008, 0.008)
-        delay_samples = rng.randint(int(SR*0.01), int(SR*0.03))
+        detune = rng.uniform(-0.004, 0.004)   # subtler detune
+        delay_samples = rng.randint(int(SR*0.008), int(SR*0.015))
         idx = np.arange(n) * (1 + detune)
         idx = np.clip(idx, 0, n-1).astype(np.int32)
         detuned = signal[idx]
         delayed = np.zeros(n, dtype=np.float32)
         if delay_samples < n:
             delayed[delay_samples:] = detuned[:n-delay_samples]
-        out += delayed * 0.35
+        out += delayed * 0.20   # gentler blend
     peak = np.max(np.abs(out)) + 1e-9
     return out / peak * 0.85
 
