@@ -59,23 +59,41 @@ def get_saved_song():
 
 
 def make_instrumental(tmp, duration, mood="romantic"):
+    """
+    IMPORTANT FIX: instrumental chord roots now match the vocal melody's
+    root notes exactly (same fundamental frequencies vocal_synth.py uses
+    for "verse" notes). Previously the instrumental used unrelated chord
+    frequencies (130,196,261,330) that clashed dissonantly against the
+    vocal melody notes (220,246,261,293 etc), causing harsh beating/
+    interference — heard as "disturbing sound". Now both layers share
+    one coherent musical foundation.
+    """
     import numpy as np, scipy.io.wavfile as wf, io, math
     SR = 44100; n = int(SR*duration)
     audio = np.zeros(n, np.float32)
     t_arr = np.linspace(0, duration, n, dtype=np.float32)
-    chord_sets = {
-        "romantic": [(130,.15),(196,.12),(261,.10),(330,.08)],
-        "happy":    [(196,.14),(246,.12),(293,.10),(392,.08)],
-        "sad":      [(110,.15),(165,.12),(220,.10),(277,.08)],
-    }
-    for freq, amp in chord_sets.get(mood, chord_sets["romantic"]):
-        mod = .7+.3*np.sin(2*math.pi*.06*t_arr)
+
+    # Root note matches vocal_synth.py's MELODY_NOTES_BY_MOOD "verse" root,
+    # played one and two octaves DOWN so it sits under the voice, not over it.
+    root_by_mood = {"romantic": 220, "happy": 261, "sad": 196}
+    root = root_by_mood.get(mood, 220)
+
+    # Simple, consonant drone: root + perfect fifth + octave, one octave down
+    intervals = [1.0, 1.5, 2.0]     # root, fifth, octave (just intonation)
+    amps      = [0.14, 0.09, 0.06]
+
+    for interval, amp in zip(intervals, amps):
+        freq = (root / 2) * interval    # one octave below the vocal register
+        mod  = .75 + .25*np.sin(2*math.pi*.05*t_arr)
         audio += amp*mod*np.sin(2*math.pi*freq*t_arr)
-    noise = np.random.randn(n).astype(np.float32)*.012
-    for k in range(1,n): noise[k]=.94*noise[k-1]+.06*noise[k]
+
+    # Very soft, low-passed noise bed (much gentler than before)
+    noise = np.random.randn(n).astype(np.float32)*.006
+    for k in range(1,n): noise[k]=.97*noise[k-1]+.03*noise[k]
     audio += noise
+
     peak = np.max(np.abs(audio))
-    if peak>0: audio=audio/peak*.70
+    if peak>0: audio=audio/peak*.55   # kept intentionally quieter than vocals
     fade = min(int(SR*3),n//5)
     audio[:fade]*=np.linspace(0,1,fade); audio[-fade:]*=np.linspace(1,0,fade)
     buf=io.BytesIO(); wf.write(buf,SR,(audio*32767).astype(np.int16))
@@ -106,9 +124,10 @@ def mix_vocals_instrumental(vocal_wav_bytes, instrumental_mp3, out_mp3, duration
         subprocess.run([
             "ffmpeg","-y","-i",looped,"-i",instrumental_mp3,
             "-filter_complex",
-            "[0:a]volume=1.0,alimiter=limit=0.9[v];"
-            "[1:a]volume=0.45[m];"
-            "[v][m]amix=inputs=2:duration=shortest:normalize=0",
+            "[0:a]volume=0.9,alimiter=limit=0.85:attack=5:release=50[v];"
+            "[1:a]volume=0.35[m];"
+            "[v][m]amix=inputs=2:duration=shortest:normalize=0,"
+            "alimiter=limit=0.92",
             "-t",str(duration),"-c:a","libmp3lame","-q:a","2",out_mp3
         ], check=True, capture_output=True)
         print(f"  [mix] Vocals + instrumental mixed (no double-boost) ✓")
