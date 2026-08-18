@@ -2,7 +2,6 @@ name: 🎵 Weekly Suno Romantic Song Video + Short
 
 on:
   schedule:
-    # Every Saturday at 3:30 PM UTC = 9:00 PM IST
     - cron: "30 15 * * 6"
   workflow_dispatch:
 
@@ -30,31 +29,38 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: 🎭 Install Playwright (for token refresh fallback)
-        run: |
-          playwright install chromium --with-deps
+      # --- NEW: Generate music with ACE-Step ---
+      - name: 🎵 Generate music with ACE-Step
+        id: acestep
+        uses: audiohacking/acestep-action@v1
+        with:
+          prompt: 'orchestral romantic, strings and piano, powerful female vocal'
+          lyrics: |
+            [Verse 1]
+            My heart knows the way
+            Through the darkest night
+            [Chorus]
+            You are my light
+            Forever by my side
+          duration: '210'   # 3.5 minutes
+          # If you want instrumental only, set `instrumental: true`
+          # instrumental: true
 
-      - name: 🔄 Refresh ACE Music token
-        id: refresh_token
-        run: |
-          TOKEN=$(python refresh_token.py)
-          echo "ACE_SESSION_TOKEN=$TOKEN" >> $GITHUB_ENV
+      # The action will output the audio file path.
+      # Typically it's something like: /home/runner/work/_temp/acestep/output.mp3
+      # We'll capture it as an environment variable.
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
-          ACE_MUSIC_API_KEY:   ${{ secrets.ACE_MUSIC_API_KEY }}  # used by refresh_token.py
-          ACE_SESSION_TOKEN:   ${{ env.ACE_SESSION_TOKEN }}
+          ACESTEP_AUDIO:       ${{ steps.acestep.outputs.audio-path || runner.temp }}/acestep/output.mp3
         run: python suno_pipeline.py
 
-      - name: 📋 Upload debug artifacts on failure
+      - name: 📋 Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-artifacts
-          path: |
-            debug_screenshot.png
-            page_debug.html
-            *.log
+          name: suno-failure-logs
+          path: "*.log"
           retention-days: 7
