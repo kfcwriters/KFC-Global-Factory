@@ -48,8 +48,7 @@ BG_PROMPTS = [
 
 # --- Boson AI Higgs Audio Configuration ---
 BOSON_API_KEY = os.environ.get("BOSON_API_KEY")
-BOSON_URL = "https://api.boson.ai/v1/audio/generate"  # OpenAI‑compatible endpoint
-# Official docs: https://docs.boson.ai/models/higgs-audio-tts/overview
+BOSON_URL = "https://api.boson.ai/v1/audio/generate"
 
 def generate_song_boson(prompt, lyrics="", duration=30, voice="female-1"):
     """
@@ -64,15 +63,13 @@ def generate_song_boson(prompt, lyrics="", duration=30, voice="female-1"):
         "Content-Type": "application/json"
     }
     
-    # Build the prompt – combine style description with lyrics
-    # Higgs Audio supports "style" parameter: singing, speaking, shouting, whispering
     payload = {
         "text": lyrics,
-        "prompt": prompt,          # Style description (e.g., "romantic pop, soft piano")
-        "style": "singing",        # Force singing mode
-        "voice": voice,            # Predefined voice (check their docs for available ones)
+        "prompt": prompt,
+        "style": "singing",
+        "voice": voice,
         "duration": duration,
-        "response_format": "mp3"   # or "wav"
+        "response_format": "mp3"
     }
     
     print("  [Boson] Submitting singing generation request...")
@@ -169,7 +166,7 @@ def run():
                 prompt=music_prompt,
                 lyrics=full_lyrics,
                 duration=DURATION,
-                voice="female-1"  # You can change this to any voice supported by Boson
+                voice="female-1"
             )
 
             song_mp3 = str(tmp / "generated_song.mp3")
@@ -178,7 +175,7 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
-        # Loop if needed (Boson may generate shorter segments; we loop to fill duration)
+        # Loop if needed
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
