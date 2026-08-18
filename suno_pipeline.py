@@ -49,10 +49,9 @@ ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
 
 def get_ace_token(headers, base_url):
     """
-    Get a session token from ACE Music API.
-    Tries multiple possible endpoints and methods.
+    Try to get a session token (fallback to API key if none found).
     """
-    # Possible token endpoints
+    # Try common endpoints
     endpoints = [
         f"{base_url}/engine/api/engine/token",
         f"{base_url}/engine/api/token",
@@ -61,7 +60,6 @@ def get_ace_token(headers, base_url):
         f"{base_url}/engine/token",
     ]
     
-    # Try GET first, then POST
     for method in ["GET", "POST"]:
         for url in endpoints:
             try:
@@ -70,23 +68,22 @@ def get_ace_token(headers, base_url):
                     resp = requests.get(url, headers=headers, timeout=30)
                 else:
                     resp = requests.post(url, headers=headers, timeout=30)
-                
                 if resp.status_code == 200:
                     data = resp.json()
-                    token = data.get("token")
-                    if not token:
-                        token = data.get("data", {}).get("token")
+                    token = data.get("token") or data.get("data", {}).get("token")
                     if token:
-                        print(f"  [ACE] Token obtained from {url} using {method}")
+                        print(f"  [ACE] Token obtained from {url}")
                         return token
                     else:
-                        print(f"  [ACE] No token in response from {url}: {data}")
+                        print(f"  [ACE] No token in response from {url}")
                 else:
                     print(f"  [ACE] {url} -> {resp.status_code}")
             except Exception as e:
                 print(f"  [ACE] Error with {url}: {e}")
     
-    raise Exception("Could not obtain session token from any endpoint. Please check the API documentation.")
+    # Fallback: use the API key itself as token
+    print("  [ACE] No token endpoint found. Using API key as token.")
+    return ACE_MUSIC_API_KEY
 
 def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
@@ -98,59 +95,75 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
     base_url = "https://ai-api.acemusic.ai"
     headers = {
         "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
-        "Content-Type": "application/json",  # for token GET, but we'll override when needed
+        "Content-Type": "application/json",
     }
     
-    # 1. Get session token (this will try multiple endpoints)
     print("  [ACE] Getting session token...")
     session_token = get_ace_token(headers, base_url)
-    print(f"  [ACE] Session token obtained: {session_token[:10]}...")
+    print(f"  [ACE] Using token: {session_token[:10]}...")
     
-    # 2. Prepare multipart form data for release_task
-    data = {
-        "task_type": "generate",
-        "model_type": "acestep-v15-xl-turbo",
-        "prompt": prompt,
-        "lyrics": lyrics,
-        "duration": str(duration),
-        "instrumental": "true" if instrumental else "false",
-        "vocal_language": language,
-        "thinking": "true",
-        "audio_format": "mp3",
-        "mode": "simple",
-        "token": session_token,
-    }
+    # Prepare data. Try multiple possible token parameter names.
+    data_templates = [
+        {"token": session_token},
+        {"api_key": session_token},
+        {"apikey": session_token},
+        {"key": session_token},
+        {}  # try without token if needed
+    ]
     
-    # For release_task we use multipart/form-data, so remove Content-Type header
-    headers.pop("Content-Type", None)
+    # Also try with and without "token" in the data.
+    # We'll attempt each template.
+    for token_param in data_templates:
+        data = {
+            "task_type": "generate",
+            "model_type": "acestep-v15-xl-turbo",
+            "prompt": prompt,
+            "lyrics": lyrics,
+            "duration": str(duration),
+            "instrumental": "true" if instrumental else "false",
+            "vocal_language": language,
+            "thinking": "true",
+            "audio_format": "mp3",
+            "mode": "simple",
+        }
+        # Merge token param if present
+        if token_param:
+            data.update(token_param)
+        
+        # Remove Content-Type header for multipart/form-data
+        headers.pop("Content-Type", None)
+        
+        print(f"  [ACE] Submitting with token param: {list(token_param.keys()) if token_param else 'none'}...")
+        try:
+            response = requests.post(
+                f"{base_url}/engine/api/engine/release_task",
+                data=data,
+                headers=headers,
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                task_id = result.get("task_id") or result.get("id")
+                if task_id:
+                    print(f"  [ACE] Task submitted. Task ID: {task_id}")
+                    return poll_for_audio_ace(task_id, headers, base_url)
+                else:
+                    # Maybe audio is returned directly
+                    audio_base64 = result.get("audio")
+                    if audio_base64:
+                        return base64.b64decode(audio_base64)
+                    print(f"  [ACE] No task_id or audio in response: {result}")
+                    continue
+            else:
+                print(f"  [ACE] Submission failed: {response.status_code} - {response.text[:200]}")
+                # If error mentions missing token, try next template
+                continue
+        except Exception as e:
+            print(f"  [ACE] Request error: {e}")
+            continue
     
-    print("  [ACE] Submitting generation task...")
-    try:
-        response = requests.post(
-            f"{base_url}/engine/api/engine/release_task",
-            data=data,
-            headers=headers,
-            timeout=60
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"Task submission failed: {response.status_code} - {response.text}")
-        
-        result = response.json()
-        task_id = result.get("task_id") or result.get("id")
-        
-        if not task_id:
-            audio_base64 = result.get("audio")
-            if audio_base64:
-                return base64.b64decode(audio_base64)
-            raise Exception(f"No task_id or audio in response: {result}")
-        
-        print(f"  [ACE] Task submitted. Task ID: {task_id}")
-        
-        return poll_for_audio_ace(task_id, headers, base_url)
-        
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"API request failed: {e}")
+    raise Exception("All submission attempts failed. Please check your API key and endpoint.")
 
 def poll_for_audio_ace(task_id, headers, base_url):
     """
