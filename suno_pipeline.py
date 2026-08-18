@@ -49,89 +49,134 @@ ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
 
 def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
-    Generate music using ACE Music's free API.
-    No GPU required.
+    Generate music using ACE Music's API (correct endpoint from playground).
     """
     if not ACE_MUSIC_API_KEY:
         raise EnvironmentError("ACE_MUSIC_API_KEY environment variable not set.")
     
+    base_url = "https://ai-api.acemusic.ai"
     headers = {
         "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
-        "Content-Type": "application/json"
+        # No Content-Type header – requests will set it for multipart/form-data
     }
     
-    # CORRECTED endpoint and payload
-    payload = {
+    # Prepare multipart form data (exactly as the playground does)
+    data = {
+        "task_type": "generate",
+        "model_type": "acestep-v15-xl-turbo",
         "prompt": prompt,
         "lyrics": lyrics,
-        "duration": duration,
-        "instrumental": instrumental,
-        "language": language,
-        "thinking": True,
-        "audio_format": "mp3"
+        "duration": str(duration),
+        "instrumental": "true" if instrumental else "false",
+        "vocal_language": language,
+        "thinking": "true",
+        "audio_format": "mp3",
+        "mode": "simple",
     }
     
     print("  [ACE] Submitting generation task...")
-    response = requests.post(
-        "https://api.acemusic.ai/v1/generate",
-        json=payload,
-        headers=headers,
-        timeout=60
-    )
-    
-    if response.status_code != 200:
-        raise Exception(f"Task submission failed: {response.status_code} - {response.text}")
-    
-    result = response.json()
-    job_id = result.get("job_id")
-    if not job_id:
-        raise Exception(f"No job_id in response: {result}")
-    
-    print(f"  [ACE] Task submitted. Job ID: {job_id}")
-    
-    # Poll for completion
-    max_attempts = 60
-    for attempt in range(max_attempts):
-        status_response = requests.get(
-            f"https://api.acemusic.ai/v1/jobs/{job_id}",
+    try:
+        response = requests.post(
+            f"{base_url}/engine/api/engine/release_task",
+            data=data,
             headers=headers,
-            timeout=30
+            timeout=60
         )
         
-        if status_response.status_code != 200:
-            print(f"  [ACE] Status check failed (attempt {attempt+1})")
-            time.sleep(5)
-            continue
+        if response.status_code != 200:
+            raise Exception(f"Task submission failed: {response.status_code} - {response.text}")
         
-        status_data = status_response.json()
-        status = status_data.get("status")
+        result = response.json()
+        task_id = result.get("task_id") or result.get("id")
         
-        if status == "succeeded":
-            print("  [ACE] Generation complete!")
-            result_data = status_data.get("result", {})
-            
-            audio_base64 = result_data.get("audio")
+        if not task_id:
+            # Sometimes audio is returned directly (rare)
+            audio_base64 = result.get("audio")
             if audio_base64:
                 return base64.b64decode(audio_base64)
-            
-            audio_url = result_data.get("audio_url")
-            if audio_url:
-                audio_response = requests.get(audio_url, timeout=60)
-                if audio_response.status_code == 200:
-                    return audio_response.content
-            
-            raise Exception("No audio data found")
-            
-        elif status == "failed":
-            error_msg = status_data.get("error", "Unknown error")
-            raise Exception(f"Generation failed: {error_msg}")
+            raise Exception(f"No task_id or audio in response: {result}")
         
-        else:
-            queue_pos = status_data.get("queue_position", "unknown")
-            print(f"  [ACE] Status: {status} (queue position: {queue_pos}) - waiting...")
+        print(f"  [ACE] Task submitted. Task ID: {task_id}")
+        
+        return poll_for_audio_ace(task_id, headers, base_url)
+        
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"API request failed: {e}")
+
+def poll_for_audio_ace(task_id, headers, base_url):
+    """
+    Poll the ACE Music API for task completion using status and query_result endpoints.
+    """
+    max_attempts = 60
+    for attempt in range(max_attempts):
+        try:
+            # Check status
+            status_response = requests.get(
+                f"{base_url}/engine/api/engine/status",
+                params={"task_id": task_id},
+                headers=headers,
+                timeout=30
+            )
+            
+            if status_response.status_code != 200:
+                print(f"  [ACE] Status check failed (attempt {attempt+1})")
+                time.sleep(5)
+                continue
+            
+            status_data = status_response.json()
+            status = status_data.get("status")
+            
+            if status == "succeeded" or status == "completed":
+                print("  [ACE] Generation complete!")
+                
+                # Fetch result
+                result_response = requests.get(
+                    f"{base_url}/engine/api/engine/query_result",
+                    params={"task_id": task_id},
+                    headers=headers,
+                    timeout=30
+                )
+                
+                if result_response.status_code != 200:
+                    raise Exception(f"Failed to fetch result: {result_response.status_code}")
+                
+                result_data = result_response.json()
+                
+                # Try different possible fields
+                audio_base64 = result_data.get("audio")
+                if audio_base64:
+                    return base64.b64decode(audio_base64)
+                
+                audio_url = result_data.get("audio_url")
+                if audio_url:
+                    audio_response = requests.get(audio_url, timeout=60)
+                    if audio_response.status_code == 200:
+                        return audio_response.content
+                
+                # Sometimes nested under 'data'
+                data_field = result_data.get("data", {})
+                audio_base64 = data_field.get("audio")
+                if audio_base64:
+                    return base64.b64decode(audio_base64)
+                
+                raise Exception("No audio data found in result")
+                
+            elif status == "failed" or status == "error":
+                error_msg = status_data.get("error", "Unknown error")
+                raise Exception(f"Generation failed: {error_msg}")
+            
+            else:
+                # status is "queued", "processing", "running", etc.
+                progress = status_data.get("progress", "unknown")
+                print(f"  [ACE] Status: {status} (progress: {progress}) - waiting...")
+                time.sleep(5)
+                
+        except requests.exceptions.RequestException as e:
+            print(f"  [ACE] Polling error (attempt {attempt+1}): {e}")
             time.sleep(5)
+            continue
     
-    raise Exception("Timeout")
+    raise Exception(f"Polling timeout after {max_attempts} attempts")
 
 # --- Helper functions ---
 def detect_mood(style_text):
@@ -177,6 +222,7 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
 
+        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
