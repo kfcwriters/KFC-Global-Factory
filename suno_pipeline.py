@@ -2,10 +2,6 @@
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
 FULLY AUTOMATED — uses ACE Music API (free, no GPU) to generate the full song.
-
-Music priority:
-  1. songs/ folder (manual Suno uploads — highest quality, if you add any)
-  2. ACE Music API — always works, free, professional quality
 """
 import os
 import random
@@ -29,7 +25,7 @@ from thumbnail_gen   import create_thumbnail
 from youtube_upload  import upload_to_youtube
 
 SONGS_DIR = Path(__file__).parent / "songs"
-DURATION  = 210   # seconds
+DURATION  = 210
 
 BG_PROMPTS = [
     "romantic couple holding hands at golden sunset on beach, cinematic warm glow",
@@ -50,7 +46,6 @@ BG_PROMPTS = [
 
 # --- ACE Music API Configuration ---
 ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
-ACE_API_BASE_URL = "https://api.acemusic.ai"
 
 def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
@@ -65,20 +60,20 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         "Content-Type": "application/json"
     }
     
-    # Step 1: Submit the generation task
+    # CORRECTED endpoint and payload
     payload = {
-        "caption": prompt,
+        "prompt": prompt,
         "lyrics": lyrics,
-        "audio_duration": duration,
+        "duration": duration,
         "instrumental": instrumental,
-        "vocal_language": language,
-        "thinking": True,        # higher quality
+        "language": language,
+        "thinking": True,
         "audio_format": "mp3"
     }
     
     print("  [ACE] Submitting generation task...")
     response = requests.post(
-        f"{ACE_API_BASE_URL}/v1/music/generate",
+        "https://api.acemusic.ai/v1/generate",
         json=payload,
         headers=headers,
         timeout=60
@@ -94,11 +89,11 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
     
     print(f"  [ACE] Task submitted. Job ID: {job_id}")
     
-    # Step 2: Poll for completion
+    # Poll for completion
     max_attempts = 60
     for attempt in range(max_attempts):
         status_response = requests.get(
-            f"{ACE_API_BASE_URL}/v1/jobs/{job_id}",
+            f"https://api.acemusic.ai/v1/jobs/{job_id}",
             headers=headers,
             timeout=30
         )
@@ -115,19 +110,17 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
             print("  [ACE] Generation complete!")
             result_data = status_data.get("result", {})
             
-            # Check for audio as base64
             audio_base64 = result_data.get("audio")
             if audio_base64:
                 return base64.b64decode(audio_base64)
             
-            # Check for audio URL
             audio_url = result_data.get("audio_url")
             if audio_url:
                 audio_response = requests.get(audio_url, timeout=60)
                 if audio_response.status_code == 200:
                     return audio_response.content
             
-            raise Exception("No audio data found in successful response")
+            raise Exception("No audio data found")
             
         elif status == "failed":
             error_msg = status_data.get("error", "Unknown error")
@@ -138,9 +131,9 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
             print(f"  [ACE] Status: {status} (queue position: {queue_pos}) - waiting...")
             time.sleep(5)
     
-    raise Exception(f"Timeout after {max_attempts} attempts")
+    raise Exception("Timeout")
 
-# --- Helper: detect mood from style text ---
+# --- Helper functions ---
 def detect_mood(style_text):
     style_lower = style_text.lower()
     if "romantic" in style_lower or "love" in style_lower:
@@ -151,7 +144,6 @@ def detect_mood(style_text):
         return "sad"
     return "neutral"
 
-# --- Existing helper functions (unchanged) ---
 def probe_duration(path):
     r = subprocess.run(["ffprobe","-v","error","-show_entries","format=duration",
                         "-of","default=noprint_wrappers=1:nokey=1",path],
@@ -169,7 +161,7 @@ def get_saved_song():
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
-    ACE_MUSIC_API_KEY   = os.environ.get("ACE_MUSIC_API_KEY")   # read it here as well
+    ACE_MUSIC_API_KEY   = os.environ.get("ACE_MUSIC_API_KEY")
 
     if not HF_TOKEN:
         raise EnvironmentError("HF_TOKEN not set")
@@ -184,11 +176,7 @@ def run():
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
-        song_mp3 = None
-        title = "Beautiful Love Song"
-        style_used = ""
 
-        # 1. Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
@@ -197,15 +185,13 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # 2. Check for saved song (manual uploads)
+        # Try saved song first
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
             title = saved_title
             print(f"🎵  Using saved song: {title}")
-
-        # 3. If no saved song, generate with ACE Music API
-        if not song_mp3:
+        else:
             print("🎵  Generating music with ACE Music API...")
             mood = detect_mood(style_used)
             music_prompt = f"{style_used}, {mood} mood"
@@ -225,7 +211,7 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
-        # 4. Ensure the song is long enough (loop if needed)
+        # Loop if needed
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
@@ -236,7 +222,7 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur / 15)))
 
-        # 5. Generate images
+        # Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
@@ -248,33 +234,26 @@ def run():
             p.write_bytes(frame)
             image_paths.append(str(p))
 
-        # 6. SEO metadata
         print("\n📝  Generating SEO-optimized metadata ...")
         meta = generate_seo(title, "romantic songs", style_used)
         print(f"  → {meta['title']}")
 
-        # 7. Thumbnail
         thumb = str(tmp / "thumbnail.jpg")
         create_thumbnail(raw_imgs[0], meta["title"], thumb)
-
-        # 8. Main video
         video = str(tmp / "output.mp4")
         create_video(song_mp3, image_paths, video, vertical=False)
 
-        # 9. Shorts
         print("\n📱  Creating Shorts version ...")
         short_video = str(tmp / "short.mp4")
         make_short_from_video(video, short_video, duration=55, start_offset=15)
         short_meta = make_shorts_metadata(meta["title"], meta["tags"])
 
-        # 10. Upload main
         print("\n📤  Uploading main video ...")
         vid = upload_to_youtube(video_path=video, thumbnail_path=thumb,
             title=meta["title"], description=meta["description"],
             tags=meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
         print(f"  → https://youtu.be/{vid}")
 
-        # 11. Upload Short
         print("\n📱  Uploading Short ...")
         short_id = upload_to_youtube(video_path=short_video, thumbnail_path=thumb,
             title=short_meta["title"], description=short_meta["description"],
@@ -283,7 +262,6 @@ def run():
 
         print(f"\n🎉  Both live! Main: https://youtu.be/{vid} | Short: https://youtu.be/{short_id}")
         return vid
-
 
 if __name__ == "__main__":
     run()
