@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
-FULLY AUTOMATED — uses ACE Music API with a browser-captured session token.
+Uses Boson AI Higgs Audio (singing generation) – free, rate-limited public preview.
+No GPU required, works with GitHub Actions.
 """
 import os
 import random
@@ -13,6 +14,7 @@ from datetime import datetime
 import time
 import base64
 import requests
+import json
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen       import generate_images
@@ -44,119 +46,58 @@ BG_PROMPTS = [
     "first dance at wedding with sparklers and fairy lights around them",
 ]
 
-# --- ACE Music API Configuration ---
-ACE_SESSION_TOKEN = os.environ.get("ACE_SESSION_TOKEN")
-ACE_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")  # optional, may not be needed
-BASE_URL = "https://ai-api.acemusic.ai"
+# --- Boson AI Higgs Audio Configuration ---
+BOSON_API_KEY = os.environ.get("BOSON_API_KEY")
+BOSON_URL = "https://api.boson.ai/v1/audio/generate"  # OpenAI‑compatible endpoint
+# Official docs: https://docs.boson.ai/models/higgs-audio-tts/overview
 
-def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
+def generate_song_boson(prompt, lyrics="", duration=30, voice="female-1"):
     """
-    Generate music using ACE Music API with a browser-captured session token.
+    Generate singing audio using Boson AI Higgs Audio.
+    Free, rate-limited public preview. No GPU needed.
     """
-    if not ACE_SESSION_TOKEN:
-        raise EnvironmentError("ACE_SESSION_TOKEN environment variable not set.")
+    if not BOSON_API_KEY:
+        raise EnvironmentError("BOSON_API_KEY environment variable not set.")
     
     headers = {
-        "Origin": "https://acemusic.ai",
-        "Referer": "https://acemusic.ai/",
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    }
-    # If you have an API key, you can still include it
-    if ACE_API_KEY:
-        headers["Authorization"] = f"Bearer {ACE_API_KEY}"
-    
-    # Prepare the exact same payload as the browser
-    data = {
-        "task_type": "generate",
-        "model_type": "acestep-v15-xl-turbo",
-        "prompt": prompt,
-        "lyrics": lyrics,
-        "duration": str(duration),
-        "instrumental": "true" if instrumental else "false",
-        "vocal_language": language,
-        "thinking": "true",
-        "audio_format": "mp3",
-        "mode": "simple",
-        "token": ACE_SESSION_TOKEN,  # <-- the crucial part
-        # Additional fields from your capture
-        "app": "studio-web",
-        "sample_mode": "true",       # or false if you want custom
-        "seed": "-1",
-        "sample_query": prompt,      # might be used for sample mode
+        "Authorization": f"Bearer {BOSON_API_KEY}",
+        "Content-Type": "application/json"
     }
     
-    print("  [ACE] Submitting generation task...")
-    resp = requests.post(
-        f"{BASE_URL}/engine/api/engine/release_task",
-        data=data,
-        headers=headers,
-        timeout=60
-    )
+    # Build the prompt – combine style description with lyrics
+    # Higgs Audio supports "style" parameter: singing, speaking, shouting, whispering
+    payload = {
+        "text": lyrics,
+        "prompt": prompt,          # Style description (e.g., "romantic pop, soft piano")
+        "style": "singing",        # Force singing mode
+        "voice": voice,            # Predefined voice (check their docs for available ones)
+        "duration": duration,
+        "response_format": "mp3"   # or "wav"
+    }
     
-    if resp.status_code != 200:
-        raise Exception(f"Task submission failed: {resp.status_code} - {resp.text}")
-    
-    result = resp.json()
-    task_id = result.get("task_id") or result.get("id")
-    if not task_id:
-        audio_b64 = result.get("audio")
+    print("  [Boson] Submitting singing generation request...")
+    try:
+        response = requests.post(BOSON_URL, json=payload, headers=headers, timeout=120)
+        if response.status_code != 200:
+            raise Exception(f"Boson API error: {response.status_code} - {response.text}")
+        
+        data = response.json()
+        
+        # Extract audio – could be base64 or a URL
+        audio_b64 = data.get("audio") or data.get("data", {}).get("audio")
         if audio_b64:
             return base64.b64decode(audio_b64)
-        raise Exception(f"No task_id or audio in response: {result}")
+        
+        audio_url = data.get("audio_url") or data.get("data", {}).get("audio_url")
+        if audio_url:
+            audio_resp = requests.get(audio_url, timeout=60)
+            if audio_resp.status_code == 200:
+                return audio_resp.content
+        
+        raise Exception("No audio found in response: " + str(data))
     
-    print(f"  [ACE] Task submitted. Task ID: {task_id}")
-    return poll_for_audio_ace(task_id, headers)
-
-def poll_for_audio_ace(task_id, headers):
-    """Poll for task completion."""
-    max_attempts = 60
-    for attempt in range(max_attempts):
-        try:
-            status_response = requests.get(
-                f"{BASE_URL}/engine/api/engine/status",
-                params={"task_id": task_id},
-                headers=headers,
-                timeout=30
-            )
-            if status_response.status_code != 200:
-                print(f"  [ACE] Status check failed (attempt {attempt+1})")
-                time.sleep(5)
-                continue
-            
-            status_data = status_response.json()
-            status = status_data.get("status")
-            if status == "succeeded" or status == "completed":
-                print("  [ACE] Generation complete!")
-                result_response = requests.get(
-                    f"{BASE_URL}/engine/api/engine/query_result",
-                    params={"task_id": task_id},
-                    headers=headers,
-                    timeout=30
-                )
-                if result_response.status_code != 200:
-                    raise Exception(f"Result fetch failed: {result_response.status_code}")
-                result_data = result_response.json()
-                audio_b64 = result_data.get("audio") or result_data.get("data", {}).get("audio")
-                if audio_b64:
-                    return base64.b64decode(audio_b64)
-                audio_url = result_data.get("audio_url") or result_data.get("data", {}).get("audio_url")
-                if audio_url:
-                    audio_resp = requests.get(audio_url, timeout=60)
-                    if audio_resp.status_code == 200:
-                        return audio_resp.content
-                raise Exception("No audio found in result")
-            elif status == "failed" or status == "error":
-                error_msg = status_data.get("error", "Unknown error")
-                raise Exception(f"Generation failed: {error_msg}")
-            else:
-                progress = status_data.get("progress", "unknown")
-                print(f"  [ACE] Status: {status} (progress: {progress}) - waiting...")
-                time.sleep(5)
-        except Exception as e:
-            print(f"  [ACE] Polling error: {e}")
-            time.sleep(5)
-    raise Exception("Polling timeout")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Boson request failed: {e}")
 
 # --- Helper functions (unchanged) ---
 def detect_mood(style_text):
@@ -186,14 +127,14 @@ def get_saved_song():
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
-    ACE_SESSION_TOKEN   = os.environ.get("ACE_SESSION_TOKEN")
+    BOSON_API_KEY       = os.environ.get("BOSON_API_KEY")
 
     if not HF_TOKEN:
         raise EnvironmentError("HF_TOKEN not set")
     if not YOUTUBE_CREDENTIALS:
         raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
-    if not ACE_SESSION_TOKEN:
-        raise EnvironmentError("ACE_SESSION_TOKEN not set")
+    if not BOSON_API_KEY:
+        raise EnvironmentError("BOSON_API_KEY not set")
 
     print(f"\n{'='*60}")
     print(f"  Pipeline : Romantic Song Video + Short (Weekly, Fully Automated)")
@@ -202,6 +143,7 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
 
+        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
@@ -210,23 +152,24 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
+        # Try saved song first (manual uploads)
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
             title = saved_title
             print(f"🎵  Using saved song: {title}")
         else:
-            print("🎵  Generating music with ACE Music API...")
+            print("🎵  Generating singing with Boson AI Higgs Audio...")
             mood = detect_mood(style_used)
             music_prompt = f"{style_used}, {mood} mood"
             full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
 
-            audio_data = generate_music_with_ace(
+            # Generate audio via Boson AI
+            audio_data = generate_song_boson(
                 prompt=music_prompt,
                 lyrics=full_lyrics,
                 duration=DURATION,
-                instrumental=False,
-                language="en"
+                voice="female-1"  # You can change this to any voice supported by Boson
             )
 
             song_mp3 = str(tmp / "generated_song.mp3")
@@ -235,6 +178,7 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
+        # Loop if needed (Boson may generate shorter segments; we loop to fill duration)
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
@@ -245,6 +189,7 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur / 15)))
 
+        # Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
