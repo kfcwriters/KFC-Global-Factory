@@ -20,13 +20,15 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      # --- Install ffmpeg quickly via static binary ---
-      - name: 🔧 Install ffmpeg (static binary)
+      # --- Install ffmpeg + ffprobe via static binary (fast) ---
+      - name: 🔧 Install ffmpeg + ffprobe (static binary)
         run: |
           curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
           sudo cp ffmpeg-*-static/ffmpeg /usr/local/bin/
+          sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
           ffmpeg -version
-          echo "✅ ffmpeg is ready"
+          ffprobe -version
+          echo "✅ ffmpeg and ffprobe are ready"
 
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
