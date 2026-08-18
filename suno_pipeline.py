@@ -50,24 +50,47 @@ ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
 def get_ace_token(headers, base_url):
     """
     Get a session token from ACE Music API.
-    Required before submitting a generation task.
+    Tries multiple possible endpoints and methods.
     """
-    resp = requests.get(f"{base_url}/engine/api/engine/token", headers=headers, timeout=30)
-    if resp.status_code != 200:
-        raise Exception(f"Token request failed: {resp.status_code} - {resp.text}")
-    data = resp.json()
-    # Token may be in 'token' or nested in 'data'
-    token = data.get("token")
-    if not token:
-        token = data.get("data", {}).get("token")
-    if not token:
-        raise Exception(f"No token in response: {data}")
-    return token
+    # Possible token endpoints
+    endpoints = [
+        f"{base_url}/engine/api/engine/token",
+        f"{base_url}/engine/api/token",
+        f"{base_url}/api/token",
+        f"{base_url}/token",
+        f"{base_url}/engine/token",
+    ]
+    
+    # Try GET first, then POST
+    for method in ["GET", "POST"]:
+        for url in endpoints:
+            try:
+                print(f"  [ACE] Trying {method} {url} ...")
+                if method == "GET":
+                    resp = requests.get(url, headers=headers, timeout=30)
+                else:
+                    resp = requests.post(url, headers=headers, timeout=30)
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    token = data.get("token")
+                    if not token:
+                        token = data.get("data", {}).get("token")
+                    if token:
+                        print(f"  [ACE] Token obtained from {url} using {method}")
+                        return token
+                    else:
+                        print(f"  [ACE] No token in response from {url}: {data}")
+                else:
+                    print(f"  [ACE] {url} -> {resp.status_code}")
+            except Exception as e:
+                print(f"  [ACE] Error with {url}: {e}")
+    
+    raise Exception("Could not obtain session token from any endpoint. Please check the API documentation.")
 
 def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
     Generate music using ACE Music's API.
-    Authenticates with a session token obtained from /token endpoint.
     """
     if not ACE_MUSIC_API_KEY:
         raise EnvironmentError("ACE_MUSIC_API_KEY environment variable not set.")
@@ -75,16 +98,15 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
     base_url = "https://ai-api.acemusic.ai"
     headers = {
         "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
-        "Content-Type": "application/json",  # For token request, but we'll use JSON
+        "Content-Type": "application/json",  # for token GET, but we'll override when needed
     }
     
-    # 1. Get session token
+    # 1. Get session token (this will try multiple endpoints)
     print("  [ACE] Getting session token...")
     session_token = get_ace_token(headers, base_url)
     print(f"  [ACE] Session token obtained: {session_token[:10]}...")
     
     # 2. Prepare multipart form data for release_task
-    # Include the session token in the data
     data = {
         "task_type": "generate",
         "model_type": "acestep-v15-xl-turbo",
@@ -96,11 +118,11 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         "thinking": "true",
         "audio_format": "mp3",
         "mode": "simple",
-        "token": session_token,   # <-- critical: include this
+        "token": session_token,
     }
     
     # For release_task we use multipart/form-data, so remove Content-Type header
-    headers.pop("Content-Type", None)  # or set to None
+    headers.pop("Content-Type", None)
     
     print("  [ACE] Submitting generation task...")
     try:
@@ -132,12 +154,11 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
 
 def poll_for_audio_ace(task_id, headers, base_url):
     """
-    Poll the ACE Music API for task completion using status and query_result endpoints.
+    Poll the ACE Music API for task completion.
     """
     max_attempts = 60
     for attempt in range(max_attempts):
         try:
-            # Check status
             status_response = requests.get(
                 f"{base_url}/engine/api/engine/status",
                 params={"task_id": task_id},
@@ -156,7 +177,6 @@ def poll_for_audio_ace(task_id, headers, base_url):
             if status == "succeeded" or status == "completed":
                 print("  [ACE] Generation complete!")
                 
-                # Fetch result
                 result_response = requests.get(
                     f"{base_url}/engine/api/engine/query_result",
                     params={"task_id": task_id},
@@ -169,7 +189,6 @@ def poll_for_audio_ace(task_id, headers, base_url):
                 
                 result_data = result_response.json()
                 
-                # Try different possible fields
                 audio_base64 = result_data.get("audio")
                 if audio_base64:
                     return base64.b64decode(audio_base64)
@@ -180,7 +199,6 @@ def poll_for_audio_ace(task_id, headers, base_url):
                     if audio_response.status_code == 200:
                         return audio_response.content
                 
-                # Sometimes nested under 'data'
                 data_field = result_data.get("data", {})
                 audio_base64 = data_field.get("audio")
                 if audio_base64:
@@ -193,7 +211,6 @@ def poll_for_audio_ace(task_id, headers, base_url):
                 raise Exception(f"Generation failed: {error_msg}")
             
             else:
-                # status is "queued", "processing", "running", etc.
                 progress = status_data.get("progress", "unknown")
                 print(f"  [ACE] Status: {status} (progress: {progress}) - waiting...")
                 time.sleep(5)
@@ -205,7 +222,7 @@ def poll_for_audio_ace(task_id, headers, base_url):
     
     raise Exception(f"Polling timeout after {max_attempts} attempts")
 
-# --- Helper functions ---
+# --- Helper functions (unchanged) ---
 def detect_mood(style_text):
     style_lower = style_text.lower()
     if "romantic" in style_lower or "love" in style_lower:
@@ -249,7 +266,6 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
 
-        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
@@ -258,7 +274,6 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # Try saved song first
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
@@ -284,7 +299,6 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
-        # Loop if needed
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
@@ -295,7 +309,6 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur / 15)))
 
-        # Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
