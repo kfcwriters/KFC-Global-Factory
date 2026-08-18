@@ -26,19 +26,25 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             ffmpeg fonts-dejavu-core fonts-liberation
+
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: 🎭 Install Playwright (for token refresh)
+        run: |
+          playwright install chromium --with-deps
+
+      - name: 🔄 Refresh ACE Music token
+        id: refresh_token
+        run: |
+          TOKEN=$(python refresh_token.py)
+          echo "ACE_SESSION_TOKEN=$TOKEN" >> $GITHUB_ENV
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
-          APIFRAME_KEY:        ${{ secrets.APIFRAME_KEY }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-          TUNEE_API_KEY: ${{ secrets.TUNEE_API_KEY }}
-          BOSON_API_KEY: ${{ secrets.BOSON_API_KEY }}
-          ACE_MUSIC_API_KEY: ${{ secrets.ACE_MUSIC_API_KEY }}
-          ACE_SESSION_TOKEN: ${{ secrets.ACE_SESSION_TOKEN }}
+          ACE_SESSION_TOKEN:   ${{ env.ACE_SESSION_TOKEN }}
         run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
