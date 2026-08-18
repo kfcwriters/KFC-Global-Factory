@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
-Uses Tunee AI for singing generation.
-If Tunee fails, generates a simple procedural tone (no beep, just a soft chord).
+Uses MiniMax Music 2.6 API (100 free calls/day).
 """
 import os
 import random
@@ -16,8 +15,6 @@ import base64
 import requests
 import json
 import re
-import socket
-from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen       import generate_images
@@ -50,114 +47,62 @@ BG_PROMPTS = [
 ]
 
 # ============================================================
-# TUNEE AI INTEGRATION
+# MINIMAX MUSIC 2.6 INTEGRATION
 # ============================================================
-TUNEE_API_KEY = os.environ.get("TUNEE_API_KEY")
+MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY")
 
-# List of possible endpoints (some may work)
-TUNEE_ENDPOINTS = [
-    "https://api.tunee-agent.com/generate",
-    "https://api.tunee.ai/generate",
-    "https://tunee.ai/api/generate",
-]
-
-def resolve_host(host):
-    """Try to resolve hostname to IP (to detect network issues)."""
-    try:
-        return socket.gethostbyname(host)
-    except socket.gaierror:
-        return None
-
-def generate_song_tunee(prompt, lyrics, title, model="Tempolor 4.5+"):
-    """Generate a full song with vocals using Tunee AI."""
-    if not TUNEE_API_KEY:
-        raise Exception("TUNEE_API_KEY not set")
-
+def generate_song_minimax(prompt, lyrics="", duration=30):
+    """
+    Generate music using MiniMax Music 2.6 API.
+    Free tier: 100 calls/day.
+    Model: music-2.6
+    """
+    if not MINIMAX_API_KEY:
+        raise EnvironmentError("MINIMAX_API_KEY not set")
+    
     headers = {
-        "Authorization": f"Bearer {TUNEE_API_KEY}",
+        "Authorization": f"Bearer {MINIMAX_API_KEY}",
         "Content-Type": "application/json"
     }
+    
     payload = {
+        "model": "music-2.6",
         "prompt": prompt,
-        "title": title,
         "lyrics": lyrics,
-        "model": model,
+        "audio_setting": {
+            "sample_rate": 44100,
+            "bitrate": 256000,
+            "format": "mp3"
+        }
     }
-
-    for endpoint in TUNEE_ENDPOINTS:
-        host = endpoint.split("/")[2]
-        for attempt in range(3):
-            # Check DNS before trying
-            if not resolve_host(host):
-                print(f"  [Tunee] Cannot resolve {host}, attempt {attempt+1}/3, waiting...")
-                time.sleep(5)
-                continue
-            try:
-                print(f"  [Tunee] Trying {endpoint} (attempt {attempt+1})...")
-                resp = requests.post(endpoint, json=payload, headers=headers, timeout=120)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    # Check for direct audio
-                    audio_b64 = data.get("audio") or data.get("data", {}).get("audio")
-                    if audio_b64:
-                        return base64.b64decode(audio_b64)
-                    share_url = data.get("shareUrl")
-                    if share_url:
-                        return download_audio_from_tunee_share(share_url)
-                    raise Exception("No audio or shareUrl in response")
-                else:
-                    print(f"  [Tunee] {endpoint} returned {resp.status_code}")
-            except Exception as e:
-                print(f"  [Tunee] Error: {e}")
-                time.sleep(3)
-    raise Exception("All Tunee endpoints failed")
-
-def download_audio_from_tunee_share(share_url):
-    """Extract audio from the share page."""
-    print(f"  [Tunee] Fetching share page: {share_url}")
-    try:
-        page_resp = requests.get(share_url, timeout=30)
-        if page_resp.status_code != 200:
-            raise Exception(f"Share page error: {page_resp.status_code}")
-        html = page_resp.text
-    except Exception as e:
-        raise Exception(f"Error fetching share page: {e}")
-
-    # Regex patterns to find audio URL
-    patterns = [
-        r'<audio[^>]+src=["\']([^"\']+)["\']',
-        r'<source[^>]+src=["\']([^"\']+)["\']',
-        r'"audioUrl"\s*:\s*"([^"]+)"',
-        r'href=["\']([^"\']+\.mp3)["\']',
-        r'https?://[^\s"\']+\.mp3',
-    ]
-    audio_url = None
-    for pat in patterns:
-        match = re.search(pat, html, re.IGNORECASE)
-        if match:
-            audio_url = match.group(1) if len(match.groups()) >= 1 else match.group(0)
-            break
-
-    if not audio_url:
-        raise Exception("Could not find audio URL in share page")
-
-    audio_url = urljoin(share_url, audio_url)
-    print(f"  [Tunee] Downloading audio from: {audio_url}")
-    audio_resp = requests.get(audio_url, timeout=60)
-    if audio_resp.status_code != 200:
-        raise Exception(f"Audio download failed: {audio_resp.status_code}")
-    return audio_resp.content
+    
+    print("  [MiniMax] Generating music...")
+    response = requests.post(
+        "https://api.minimax.io/v1/music_generation",
+        json=payload,
+        headers=headers,
+        timeout=120
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        # Audio is hex-encoded
+        audio_hex = data.get("data", {}).get("audio")
+        if audio_hex:
+            return bytes.fromhex(audio_hex)
+        raise Exception("No audio in response")
+    else:
+        raise Exception(f"MiniMax error: {response.status_code} - {response.text}")
 
 # ============================================================
-# PROCEDURAL FALLBACK (if everything else fails)
+# FALLBACK: Procedural tone
 # ============================================================
 def generate_procedural_tone(duration):
-    """Generate a soft chord as a placeholder (not a beep)."""
+    """Generate a soft chord as placeholder."""
     import numpy as np
     import scipy.io.wavfile as wavfile
     sample_rate = 44100
     t = np.linspace(0, duration, int(sample_rate * duration))
-    # A minor chord
     freqs = [440, 554, 659]
     audio = np.zeros_like(t)
     for freq in freqs:
@@ -171,15 +116,15 @@ def generate_procedural_tone(duration):
     return audio_bytes
 
 # ============================================================
-# MAIN GENERATION FUNCTION
+# MAIN GENERATE FUNCTION
 # ============================================================
 def generate_song(prompt, lyrics, title, duration):
-    """Try Tunee, fallback to procedural tone."""
+    """Try MiniMax, fallback to procedural."""
     try:
-        print("  [Music] Attempting Tunee AI...")
-        return generate_song_tunee(prompt, lyrics, title)
+        print("  [Music] Attempting MiniMax Music 2.6...")
+        return generate_song_minimax(prompt, lyrics, duration)
     except Exception as e:
-        print(f"  [Music] Tunee failed: {e}")
+        print(f"  [Music] MiniMax failed: {e}")
         print("  [Music] Generating procedural tone...")
         return generate_procedural_tone(duration)
 
@@ -215,14 +160,14 @@ def get_saved_song():
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
-    TUNEE_API_KEY       = os.environ.get("TUNEE_API_KEY")
+    MINIMAX_API_KEY     = os.environ.get("MINIMAX_API_KEY")
 
     if not HF_TOKEN:
         raise EnvironmentError("HF_TOKEN not set")
     if not YOUTUBE_CREDENTIALS:
         raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
-    if not TUNEE_API_KEY:
-        raise EnvironmentError("TUNEE_API_KEY not set")
+    if not MINIMAX_API_KEY:
+        raise EnvironmentError("MINIMAX_API_KEY not set")
 
     print(f"\n{'='*60}")
     print(f"  Pipeline : Romantic Song Video + Short (Weekly, Fully Automated)")
@@ -245,7 +190,7 @@ def run():
             title = saved_title
             print(f"🎵  Using saved song: {title}")
         else:
-            print("🎵  Generating song with Tunee AI...")
+            print("🎵  Generating song with MiniMax Music 2.6...")
             mood = detect_mood(style_used)
             music_prompt = f"{style_used}, {mood} mood"
             full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
