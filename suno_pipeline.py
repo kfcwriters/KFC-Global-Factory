@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
-Fully automated, free, no GPU required.
-Primary: ACE Music API (token refresh attempted)
-Fallback: Hugging Face Inference API (Bark)
-Last resort: procedural tone
+Uses Tunee AI for singing generation (free API, full songs with vocals).
+Everything else (lyrics, images, video, upload) remains unchanged.
 """
 import os
 import random
@@ -17,6 +15,8 @@ import time
 import base64
 import requests
 import json
+import re
+from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen       import generate_images
@@ -49,183 +49,119 @@ BG_PROMPTS = [
 ]
 
 # ============================================================
-# PRIMARY: ACE Music API (with token refresh)
+# Tunee AI Integration
 # ============================================================
-def refresh_ace_token():
-    """
-    Attempt to get a fresh ACE session token.
-    Tries multiple auth methods on the correct domain.
-    """
-    api_key = os.environ.get("ACE_MUSIC_API_KEY")
-    if not api_key:
-        return None
-    
-    base_url = "https://acem-api.acemusic.ai"
-    url = f"{base_url}/api/acem/user/ai/token"
-    
-    auth_methods = [
-        {"Authorization": f"Bearer {api_key}"},
-        {"X-API-Key": api_key},
-        {"Api-Key": api_key},
-        {"X-Api-Key": api_key},
-        {}  # no auth header (maybe it works)
-    ]
-    
-    for method_idx, auth_header in enumerate(auth_methods):
-        headers = {
-            "Origin": "https://acemusic.ai",
-            "Referer": "https://acemusic.ai/",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0"
-        }
-        headers.update(auth_header)
-        try:
-            resp = requests.get(url, headers=headers, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                token = data.get("token") or data.get("data", {}).get("token")
-                if token:
-                    print(f"  [ACE] Token obtained with method {method_idx}")
-                    return token
-        except:
-            pass
-    return None
+TUNEE_API_KEY = os.environ.get("TUNEE_API_KEY")
+TUNEE_API_URL = "https://api.tunee-agent.com/generate"  # Verify with official docs
 
-def generate_song_ace(prompt, lyrics="", duration=30):
-    """Use ACE Music API with a fresh token."""
-    token = refresh_ace_token()
-    if not token:
-        raise Exception("Could not obtain ACE token")
-    
+def generate_song_tunee(prompt, lyrics, title, model="Tempolor 4.5+"):
+    """
+    Generate a full song using Tunee AI (vocals + music).
+    Returns audio bytes (MP3).
+    """
+    if not TUNEE_API_KEY:
+        raise EnvironmentError("TUNEE_API_KEY not set. Please add it to GitHub secrets.")
+
     headers = {
-        "Origin": "https://acemusic.ai",
-        "Referer": "https://acemusic.ai/",
-        "Accept": "application/json",
+        "Authorization": f"Bearer {TUNEE_API_KEY}",
+        "Content-Type": "application/json"
     }
-    data = {
-        "task_type": "generate",
-        "model_type": "acestep-v15-xl-turbo",
+
+    payload = {
         "prompt": prompt,
+        "title": title,
         "lyrics": lyrics,
-        "duration": str(duration),
-        "instrumental": "false",
-        "vocal_language": "en",
-        "thinking": "true",
-        "audio_format": "mp3",
-        "mode": "simple",
-        "ai_token": token,
-        "app": "studio-web",
-        "sample_mode": "false",
-        "seed": "-1",
+        "model": model,
+        # "instrumental": False   # Set to True for instrumental-only
     }
-    
-    resp = requests.post(
-        "https://ai-api.acemusic.ai/engine/api/engine/release_task",
-        data=data,
-        headers=headers,
-        timeout=60
-    )
+
+    print("  [Tunee] Submitting generation request...")
+    resp = requests.post(TUNEE_API_URL, json=payload, headers=headers, timeout=120)
     if resp.status_code != 200:
-        raise Exception(f"ACE submission failed: {resp.status_code} - {resp.text}")
-    
-    result = resp.json()
-    task_id = result.get("task_id")
-    if not task_id:
-        raise Exception("No task_id from ACE")
-    
-    # Poll for result
-    for attempt in range(30):
-        status = requests.get(
-            "https://ai-api.acemusic.ai/engine/api/engine/status",
-            params={"task_id": task_id},
-            headers=headers
-        )
-        if status.status_code != 200:
-            time.sleep(5)
-            continue
-        status_data = status.json()
-        if status_data.get("status") == "succeeded":
-            result_resp = requests.get(
-                "https://ai-api.acemusic.ai/engine/api/engine/query_result",
-                params={"task_id": task_id},
-                headers=headers
-            )
-            if result_resp.status_code == 200:
-                result_data = result_resp.json()
-                audio_b64 = result_data.get("audio") or result_data.get("data", {}).get("audio")
-                if audio_b64:
-                    return base64.b64decode(audio_b64)
-                audio_url = result_data.get("audio_url")
-                if audio_url:
-                    audio = requests.get(audio_url)
-                    if audio.status_code == 200:
-                        return audio.content
-            break
-        time.sleep(5)
-    raise Exception("ACE generation timed out")
+        raise Exception(f"Tunee API error: {resp.status_code} - {resp.text}")
+
+    data = resp.json()
+    share_url = data.get("shareUrl")
+    if not share_url:
+        raise Exception("No shareUrl in response. Response: " + str(data))
+
+    print(f"  [Tunee] Generation started. Share URL: {share_url}")
+
+    # Download the audio from the share URL
+    audio_data = download_audio_from_tunee_share(share_url)
+    return audio_data
+
+def download_audio_from_tunee_share(share_url):
+    """
+    Fetch the share page, extract the audio URL, and download the MP3.
+    """
+    # Fetch the page
+    print("  [Tunee] Fetching share page...")
+    try:
+        page_resp = requests.get(share_url, timeout=30)
+        if page_resp.status_code != 200:
+            raise Exception(f"Failed to fetch share page: {page_resp.status_code}")
+        html = page_resp.text
+    except Exception as e:
+        raise Exception(f"Error fetching share page: {e}")
+
+    # Try to find audio URL in the page
+    # Common patterns: <audio src="...">, <source src="...">, or a JSON blob
+    audio_url = None
+
+    # Pattern 1: <audio> or <source> tags
+    src_match = re.search(r'<audio[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if not src_match:
+        src_match = re.search(r'<source[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if src_match:
+        audio_url = src_match.group(1)
+
+    # Pattern 2: JSON containing audio URL
+    if not audio_url:
+        json_match = re.search(r'{"audioUrl"\s*:\s*"([^"]+)"', html)
+        if json_match:
+            audio_url = json_match.group(1)
+
+    # Pattern 3: If it's a direct MP3 link in a link element
+    if not audio_url:
+        link_match = re.search(r'<a[^>]+href=["\']([^"\']+\.mp3)["\']', html, re.IGNORECASE)
+        if link_match:
+            audio_url = link_match.group(1)
+
+    if not audio_url:
+        # Try to find any .mp3 URL
+        mp3_match = re.search(r'https?://[^\s"\']+\.mp3', html)
+        if mp3_match:
+            audio_url = mp3_match.group(0)
+
+    if not audio_url:
+        raise Exception("Could not find audio URL in share page. HTML snippet: " + html[:500])
+
+    # Make absolute if relative
+    audio_url = urljoin(share_url, audio_url)
+
+    # Download the audio
+    print(f"  [Tunee] Downloading audio from: {audio_url}")
+    audio_resp = requests.get(audio_url, timeout=60)
+    if audio_resp.status_code != 200:
+        raise Exception(f"Failed to download audio: {audio_resp.status_code}")
+
+    return audio_resp.content
 
 # ============================================================
-# FALLBACK 1: Hugging Face Inference API (Bark)
+# Fallback: procedural tone (if Tunee fails)
 # ============================================================
-def generate_song_hf_bark(prompt, lyrics="", duration=30):
-    """
-    Use Hugging Face Inference API for Bark.
-    Free, rate-limited, no GPU, no local model loading.
-    """
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise Exception("HF_TOKEN not set")
-    
-    # Build a prompt that encourages singing
-    if lyrics:
-        text = f"♪ ({prompt}) {lyrics} ♪"
-    else:
-        text = f"♪ {prompt} ♪"
-    
-    headers = {"Authorization": f"Bearer {hf_token}"}
-    payload = {"inputs": text, "parameters": {"do_sample": True, "temperature": 0.6}}
-    
-    print("  [HF-Bark] Generating audio via Hugging Face...")
-    resp = requests.post(
-        "https://api-inference.huggingface.co/models/suno/bark",
-        json=payload,
-        headers=headers,
-        timeout=120
-    )
-    
-    if resp.status_code == 200:
-        # Bark returns audio (WAV) directly
-        return resp.content
-    elif resp.status_code == 503:
-        # Model is loading – wait and retry
-        print("  [HF-Bark] Model is loading, waiting 20s...")
-        time.sleep(20)
-        resp = requests.post(
-            "https://api-inference.huggingface.co/models/suno/bark",
-            json=payload,
-            headers=headers,
-            timeout=120
-        )
-        if resp.status_code == 200:
-            return resp.content
-    raise Exception(f"HF Bark failed: {resp.status_code} - {resp.text}")
-
-# ============================================================
-# FALLBACK 2: Procedural tone (last resort)
-# ============================================================
-def generate_procedural_tone(duration=30):
+def generate_procedural_tone(duration):
     """Generate a simple sine wave as a placeholder."""
     import numpy as np
     import scipy.io.wavfile as wavfile
     sample_rate = 44100
     t = np.linspace(0, duration, int(sample_rate * duration))
-    # Simple chord progression: A minor
-    freqs = [440, 554, 659]  # A, C#, E
+    freqs = [440, 554, 659]  # A minor chord
     audio = np.zeros_like(t)
     for freq in freqs:
         audio += 0.3 * np.sin(2 * np.pi * freq * t)
     audio = audio / np.max(np.abs(audio)) * 0.5
-    # Save to bytes
     buf = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     wavfile.write(buf.name, sample_rate, (audio * 32767).astype(np.int16))
     with open(buf.name, "rb") as f:
@@ -234,29 +170,17 @@ def generate_procedural_tone(duration=30):
     return audio_bytes
 
 # ============================================================
-# MAIN GENERATION FUNCTION (tries in order)
+# Main generation function
 # ============================================================
-def generate_song(prompt, lyrics="", duration=30):
-    """
-    Try ACE Music API first, then HF Bark, then procedural.
-    """
-    # 1. ACE
+def generate_song(prompt, lyrics, title, duration):
+    """Try Tunee AI first, fall back to procedural tone."""
     try:
-        print("  [Music] Attempting ACE Music API...")
-        return generate_song_ace(prompt, lyrics, duration)
+        print("  [Music] Attempting Tunee AI...")
+        return generate_song_tunee(prompt, lyrics, title)
     except Exception as e:
-        print(f"  [Music] ACE failed: {e}")
-    
-    # 2. HF Bark
-    try:
-        print("  [Music] Attempting Hugging Face Bark...")
-        return generate_song_hf_bark(prompt, lyrics, duration)
-    except Exception as e:
-        print(f"  [Music] HF Bark failed: {e}")
-    
-    # 3. Procedural tone
-    print("  [Music] All APIs failed. Generating procedural tone...")
-    return generate_procedural_tone(duration)
+        print(f"  [Music] Tunee AI failed: {e}")
+        print("  [Music] Generating procedural tone...")
+        return generate_procedural_tone(duration)
 
 # ============================================================
 # Helper functions (unchanged)
@@ -290,11 +214,14 @@ def get_saved_song():
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
+    TUNEE_API_KEY       = os.environ.get("TUNEE_API_KEY")
 
     if not HF_TOKEN:
         raise EnvironmentError("HF_TOKEN not set")
     if not YOUTUBE_CREDENTIALS:
         raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
+    if not TUNEE_API_KEY:
+        raise EnvironmentError("TUNEE_API_KEY not set")
 
     print(f"\n{'='*60}")
     print(f"  Pipeline : Romantic Song Video + Short (Weekly, Fully Automated)")
@@ -303,6 +230,7 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
 
+        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
@@ -311,13 +239,14 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
+        # Try saved song first
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
             title = saved_title
             print(f"🎵  Using saved song: {title}")
         else:
-            print("🎵  Generating song...")
+            print("🎵  Generating song with Tunee AI...")
             mood = detect_mood(style_used)
             music_prompt = f"{style_used}, {mood} mood"
             full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
@@ -325,6 +254,7 @@ def run():
             audio_data = generate_song(
                 prompt=music_prompt,
                 lyrics=full_lyrics,
+                title=title,
                 duration=DURATION
             )
 
@@ -334,6 +264,7 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
+        # Loop if needed
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
@@ -344,6 +275,7 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur / 15)))
 
+        # Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
