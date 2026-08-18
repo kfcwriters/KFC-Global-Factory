@@ -1,10 +1,52 @@
-# suno_pipeline.py (modified run() function)
+#!/usr/bin/env python3
+"""
+suno_pipeline.py — Weekly Romantic Song Video + Short
+FULLY AUTOMATED — uses ACE Music API (free, no GPU) to generate the full song.
 
+Music priority:
+  1. songs/ folder (manual Suno uploads — highest quality, if you add any)
+  2. ACE Music API — always works, free, professional quality
+"""
 import os
+import random
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from datetime import datetime
 import time
 import base64
 import requests
-# ... your other imports ...
+
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+from image_gen       import generate_images
+from lyrics_overlay  import add_lyrics
+from lyrics_writer   import generate_weekly_lyrics
+from seo_gen         import generate_seo
+from shorts_maker    import make_short_from_video, make_shorts_metadata
+from video_assembly  import create_video
+from thumbnail_gen   import create_thumbnail
+from youtube_upload  import upload_to_youtube
+
+SONGS_DIR = Path(__file__).parent / "songs"
+DURATION  = 210   # seconds
+
+BG_PROMPTS = [
+    "romantic couple holding hands at golden sunset on beach, cinematic warm glow",
+    "couple slow dancing in candlelit room with rose petals, soft bokeh lights",
+    "two lovers on rooftop under stars, city lights below, romantic night",
+    "couple under cherry blossom tree, pink petals falling, dreamy spring light",
+    "man surprising woman with roses in garden, romantic golden evening",
+    "couple sharing umbrella in gentle rain, warm street lights reflection",
+    "silhouette of couple embracing at sunset on hill, dramatic orange sky",
+    "couple sitting by lake at twilight, fairy lights on water reflection",
+    "woman in red dress and man dancing at outdoor wedding, fairy lights",
+    "couple on boat in misty river at dawn, mountains behind them",
+    "close up of two hands intertwined, soft bokeh golden background",
+    "couple watching stars lying on grass, milky way above, peaceful romantic",
+    "couple in flower field at sunset, golden hour, romantic and joyful",
+    "first dance at wedding with sparklers and fairy lights around them",
+]
 
 # --- ACE Music API Configuration ---
 ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
@@ -30,7 +72,7 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         "audio_duration": duration,
         "instrumental": instrumental,
         "vocal_language": language,
-        "thinking": True,  # Higher quality
+        "thinking": True,        # higher quality
         "audio_format": "mp3"
     }
     
@@ -70,7 +112,7 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         status = status_data.get("status")
         
         if status == "succeeded":
-            print(f"  [ACE] Generation complete!")
+            print("  [ACE] Generation complete!")
             result_data = status_data.get("result", {})
             
             # Check for audio as base64
@@ -98,11 +140,36 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
     
     raise Exception(f"Timeout after {max_attempts} attempts")
 
+# --- Helper: detect mood from style text ---
+def detect_mood(style_text):
+    style_lower = style_text.lower()
+    if "romantic" in style_lower or "love" in style_lower:
+        return "romantic"
+    elif "happy" in style_lower or "joy" in style_lower:
+        return "happy"
+    elif "sad" in style_lower or "melancholy" in style_lower:
+        return "sad"
+    return "neutral"
 
+# --- Existing helper functions (unchanged) ---
+def probe_duration(path):
+    r = subprocess.run(["ffprobe","-v","error","-show_entries","format=duration",
+                        "-of","default=noprint_wrappers=1:nokey=1",path],
+                       capture_output=True, text=True)
+    return float(r.stdout.strip() or 180)
+
+def get_saved_song():
+    songs = sorted(SONGS_DIR.glob("*.mp3"))
+    if not songs: return None, None
+    idx = datetime.utcnow().timetuple().tm_yday % len(songs)
+    s   = songs[idx]
+    return str(s), s.stem.replace("_"," ").replace("-"," ").title()
+
+# --- Main pipeline ---
 def run():
-    HF_TOKEN = os.environ.get("HF_TOKEN", "")
+    HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
-    ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")  # Get the key
+    ACE_MUSIC_API_KEY   = os.environ.get("ACE_MUSIC_API_KEY")   # read it here as well
 
     if not HF_TOKEN:
         raise EnvironmentError("HF_TOKEN not set")
@@ -117,52 +184,103 @@ def run():
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
-        
-        # Generate lyrics
+        song_mp3 = None
+        title = "Beautiful Love Song"
+        style_used = ""
+
+        # 1. Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
         sections = song.get("sections") or [
-            {"type": "verse", "lines": song["prompt"].split("\n")[:4]},
+            {"type": "verse",  "lines": song["prompt"].split("\n")[:4]},
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # --- NEW: Generate music with ACE Music API ---
-        print("🎵  Generating music with ACE Music API...")
-        
-        # Build the prompt and lyrics
-        music_prompt = f"{style_used}, {mood} mood"
-        full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
-        
-        # Generate the full song (vocals + instrumental)
-        audio_data = generate_music_with_ace(
-            prompt=music_prompt,
-            lyrics=full_lyrics,
-            duration=DURATION,
-            instrumental=False,
-            language="en"
-        )
-        
-        # Save the generated audio
-        song_mp3 = str(tmp / "generated_song.mp3")
-        with open(song_mp3, "wb") as f:
-            f.write(audio_data)
-        
-        print(f"  → Song generated: '{title}' ✓")
-        
-        # Skip the separate vocal/instrumental mixing steps
-        # because ACE Music generates the complete song.
+        # 2. Check for saved song (manual uploads)
+        saved, saved_title = get_saved_song()
+        if saved:
+            song_mp3 = saved
+            title = saved_title
+            print(f"🎵  Using saved song: {title}")
 
-        # --- Continue with image generation, video creation, upload ---
+        # 3. If no saved song, generate with ACE Music API
+        if not song_mp3:
+            print("🎵  Generating music with ACE Music API...")
+            mood = detect_mood(style_used)
+            music_prompt = f"{style_used}, {mood} mood"
+            full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
+
+            audio_data = generate_music_with_ace(
+                prompt=music_prompt,
+                lyrics=full_lyrics,
+                duration=DURATION,
+                instrumental=False,
+                language="en"
+            )
+
+            song_mp3 = str(tmp / "generated_song.mp3")
+            with open(song_mp3, "wb") as f:
+                f.write(audio_data)
+
+            print(f"  → Song generated: '{title}' ✓")
+
+        # 4. Ensure the song is long enough (loop if needed)
+        dur = probe_duration(song_mp3)
+        if dur < DURATION - 10:
+            looped = str(tmp / "looped.mp3")
+            subprocess.run(["ffmpeg","-y","-stream_loop","-1","-i",song_mp3,
+                           "-t",str(DURATION),"-c","copy",looped],
+                          check=True, capture_output=True)
+            song_mp3 = looped
+        dur = min(dur, DURATION)
+        n_images = min(16, max(8, int(dur / 15)))
+
+        # 5. Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
-        # ... rest of your image generation code ...
-        
+        prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
+        raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
+
+        image_paths = []
+        for i, img in enumerate(raw_imgs):
+            frame = add_lyrics(img, [title], "verse", "")
+            p = tmp / f"frame_{i:02d}.jpg"
+            p.write_bytes(frame)
+            image_paths.append(str(p))
+
+        # 6. SEO metadata
         print("\n📝  Generating SEO-optimized metadata ...")
-        # ... rest of your SEO code ...
-        
+        meta = generate_seo(title, "romantic songs", style_used)
+        print(f"  → {meta['title']}")
+
+        # 7. Thumbnail
+        thumb = str(tmp / "thumbnail.jpg")
+        create_thumbnail(raw_imgs[0], meta["title"], thumb)
+
+        # 8. Main video
+        video = str(tmp / "output.mp4")
+        create_video(song_mp3, image_paths, video, vertical=False)
+
+        # 9. Shorts
+        print("\n📱  Creating Shorts version ...")
+        short_video = str(tmp / "short.mp4")
+        make_short_from_video(video, short_video, duration=55, start_offset=15)
+        short_meta = make_shorts_metadata(meta["title"], meta["tags"])
+
+        # 10. Upload main
         print("\n📤  Uploading main video ...")
-        # ... rest of your upload code ...
-        
+        vid = upload_to_youtube(video_path=video, thumbnail_path=thumb,
+            title=meta["title"], description=meta["description"],
+            tags=meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
+        print(f"  → https://youtu.be/{vid}")
+
+        # 11. Upload Short
+        print("\n📱  Uploading Short ...")
+        short_id = upload_to_youtube(video_path=short_video, thumbnail_path=thumb,
+            title=short_meta["title"], description=short_meta["description"],
+            tags=short_meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
+        print(f"  → https://youtu.be/{short_id}")
+
         print(f"\n🎉  Both live! Main: https://youtu.be/{vid} | Short: https://youtu.be/{short_id}")
         return vid
 
