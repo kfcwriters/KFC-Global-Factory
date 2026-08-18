@@ -47,9 +47,27 @@ BG_PROMPTS = [
 # --- ACE Music API Configuration ---
 ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
 
+def get_ace_token(headers, base_url):
+    """
+    Get a session token from ACE Music API.
+    Required before submitting a generation task.
+    """
+    resp = requests.get(f"{base_url}/engine/api/engine/token", headers=headers, timeout=30)
+    if resp.status_code != 200:
+        raise Exception(f"Token request failed: {resp.status_code} - {resp.text}")
+    data = resp.json()
+    # Token may be in 'token' or nested in 'data'
+    token = data.get("token")
+    if not token:
+        token = data.get("data", {}).get("token")
+    if not token:
+        raise Exception(f"No token in response: {data}")
+    return token
+
 def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
-    Generate music using ACE Music's API (correct endpoint from playground).
+    Generate music using ACE Music's API.
+    Authenticates with a session token obtained from /token endpoint.
     """
     if not ACE_MUSIC_API_KEY:
         raise EnvironmentError("ACE_MUSIC_API_KEY environment variable not set.")
@@ -57,10 +75,16 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
     base_url = "https://ai-api.acemusic.ai"
     headers = {
         "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
-        # No Content-Type header – requests will set it for multipart/form-data
+        "Content-Type": "application/json",  # For token request, but we'll use JSON
     }
     
-    # Prepare multipart form data (exactly as the playground does)
+    # 1. Get session token
+    print("  [ACE] Getting session token...")
+    session_token = get_ace_token(headers, base_url)
+    print(f"  [ACE] Session token obtained: {session_token[:10]}...")
+    
+    # 2. Prepare multipart form data for release_task
+    # Include the session token in the data
     data = {
         "task_type": "generate",
         "model_type": "acestep-v15-xl-turbo",
@@ -72,7 +96,11 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         "thinking": "true",
         "audio_format": "mp3",
         "mode": "simple",
+        "token": session_token,   # <-- critical: include this
     }
+    
+    # For release_task we use multipart/form-data, so remove Content-Type header
+    headers.pop("Content-Type", None)  # or set to None
     
     print("  [ACE] Submitting generation task...")
     try:
@@ -90,7 +118,6 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         task_id = result.get("task_id") or result.get("id")
         
         if not task_id:
-            # Sometimes audio is returned directly (rare)
             audio_base64 = result.get("audio")
             if audio_base64:
                 return base64.b64decode(audio_base64)
