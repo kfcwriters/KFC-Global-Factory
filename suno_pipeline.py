@@ -2,7 +2,9 @@
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
 Fully automated, free, no GPU required.
-Uses Bark (local) as primary engine, with ACE Music API as optional fallback.
+Primary: ACE Music API (token refresh attempted)
+Fallback: Hugging Face Inference API (Bark)
+Last resort: procedural tone
 """
 import os
 import random
@@ -47,54 +49,12 @@ BG_PROMPTS = [
 ]
 
 # ============================================================
-# OPTION 1: Bark (Local, Free, No API)
-# ============================================================
-def generate_song_bark(prompt, lyrics="", duration=30):
-    """
-    Generate singing using Bark (local, no API).
-    Bark is from Suno – it produces sing-talk, but it's free and works on CPU.
-    """
-    print("  [Bark] Loading model (first run downloads ~1.2GB)...")
-    try:
-        from bark import SAMPLE_RATE, generate_audio, preload_models
-        import scipy.io.wavfile as wavfile
-    except ImportError:
-        print("  [Bark] Installing bark...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "bark", "scipy", "numpy"], check=True)
-        from bark import SAMPLE_RATE, generate_audio, preload_models
-        import scipy.io.wavfile as wavfile
-    
-    preload_models()
-    
-    # Craft a prompt that encourages singing
-    if lyrics:
-        # Add musical notation and style instructions
-        text = f"♪ ({prompt}) {lyrics} ♪"
-    else:
-        text = f"♪ {prompt} ♪"
-    
-    print("  [Bark] Generating audio (this takes 1-2 minutes on CPU)...")
-    audio_array = generate_audio(text, history_prompt=None, text_temp=0.6, waveform_temp=0.6)
-    
-    output_path = "song_bark.wav"
-    wavfile.write(output_path, SAMPLE_RATE, audio_array)
-    
-    # Convert to MP3
-    mp3_path = "song_bark.mp3"
-    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path],
-                   check=True, capture_output=True)
-    with open(mp3_path, "rb") as f:
-        audio_bytes = f.read()
-    os.remove(output_path)
-    os.remove(mp3_path)
-    return audio_bytes
-
-# ============================================================
-# OPTION 2: ACE Music API (Fallback – requires fresh token)
+# PRIMARY: ACE Music API (with token refresh)
 # ============================================================
 def refresh_ace_token():
     """
-    Attempt to get a fresh ACE session token using various auth methods.
+    Attempt to get a fresh ACE session token.
+    Tries multiple auth methods on the correct domain.
     """
     api_key = os.environ.get("ACE_MUSIC_API_KEY")
     if not api_key:
@@ -103,13 +63,12 @@ def refresh_ace_token():
     base_url = "https://acem-api.acemusic.ai"
     url = f"{base_url}/api/acem/user/ai/token"
     
-    # Try different authentication methods
     auth_methods = [
         {"Authorization": f"Bearer {api_key}"},
         {"X-API-Key": api_key},
         {"Api-Key": api_key},
         {"X-Api-Key": api_key},
-        # No auth header (maybe it works without?)
+        {}  # no auth header (maybe it works)
     ]
     
     for method_idx, auth_header in enumerate(auth_methods):
@@ -126,16 +85,14 @@ def refresh_ace_token():
                 data = resp.json()
                 token = data.get("token") or data.get("data", {}).get("token")
                 if token:
-                    print(f"  [ACE] Token obtained with auth method {method_idx}")
+                    print(f"  [ACE] Token obtained with method {method_idx}")
                     return token
         except:
             pass
     return None
 
 def generate_song_ace(prompt, lyrics="", duration=30):
-    """
-    Use ACE Music API with a fresh token.
-    """
+    """Use ACE Music API with a fresh token."""
     token = refresh_ace_token()
     if not token:
         raise Exception("Could not obtain ACE token")
@@ -208,20 +165,98 @@ def generate_song_ace(prompt, lyrics="", duration=30):
     raise Exception("ACE generation timed out")
 
 # ============================================================
-# Main generation function – tries ACE first, falls back to Bark
+# FALLBACK 1: Hugging Face Inference API (Bark)
+# ============================================================
+def generate_song_hf_bark(prompt, lyrics="", duration=30):
+    """
+    Use Hugging Face Inference API for Bark.
+    Free, rate-limited, no GPU, no local model loading.
+    """
+    hf_token = os.environ.get("HF_TOKEN")
+    if not hf_token:
+        raise Exception("HF_TOKEN not set")
+    
+    # Build a prompt that encourages singing
+    if lyrics:
+        text = f"♪ ({prompt}) {lyrics} ♪"
+    else:
+        text = f"♪ {prompt} ♪"
+    
+    headers = {"Authorization": f"Bearer {hf_token}"}
+    payload = {"inputs": text, "parameters": {"do_sample": True, "temperature": 0.6}}
+    
+    print("  [HF-Bark] Generating audio via Hugging Face...")
+    resp = requests.post(
+        "https://api-inference.huggingface.co/models/suno/bark",
+        json=payload,
+        headers=headers,
+        timeout=120
+    )
+    
+    if resp.status_code == 200:
+        # Bark returns audio (WAV) directly
+        return resp.content
+    elif resp.status_code == 503:
+        # Model is loading – wait and retry
+        print("  [HF-Bark] Model is loading, waiting 20s...")
+        time.sleep(20)
+        resp = requests.post(
+            "https://api-inference.huggingface.co/models/suno/bark",
+            json=payload,
+            headers=headers,
+            timeout=120
+        )
+        if resp.status_code == 200:
+            return resp.content
+    raise Exception(f"HF Bark failed: {resp.status_code} - {resp.text}")
+
+# ============================================================
+# FALLBACK 2: Procedural tone (last resort)
+# ============================================================
+def generate_procedural_tone(duration=30):
+    """Generate a simple sine wave as a placeholder."""
+    import numpy as np
+    import scipy.io.wavfile as wavfile
+    sample_rate = 44100
+    t = np.linspace(0, duration, int(sample_rate * duration))
+    # Simple chord progression: A minor
+    freqs = [440, 554, 659]  # A, C#, E
+    audio = np.zeros_like(t)
+    for freq in freqs:
+        audio += 0.3 * np.sin(2 * np.pi * freq * t)
+    audio = audio / np.max(np.abs(audio)) * 0.5
+    # Save to bytes
+    buf = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    wavfile.write(buf.name, sample_rate, (audio * 32767).astype(np.int16))
+    with open(buf.name, "rb") as f:
+        audio_bytes = f.read()
+    os.unlink(buf.name)
+    return audio_bytes
+
+# ============================================================
+# MAIN GENERATION FUNCTION (tries in order)
 # ============================================================
 def generate_song(prompt, lyrics="", duration=30):
     """
-    Try ACE Music API first (if token available), then fall back to Bark.
+    Try ACE Music API first, then HF Bark, then procedural.
     """
-    # First, try ACE with a fresh token
+    # 1. ACE
     try:
         print("  [Music] Attempting ACE Music API...")
         return generate_song_ace(prompt, lyrics, duration)
     except Exception as e:
         print(f"  [Music] ACE failed: {e}")
-        print("  [Music] Falling back to Bark (local)...")
-        return generate_song_bark(prompt, lyrics, duration)
+    
+    # 2. HF Bark
+    try:
+        print("  [Music] Attempting Hugging Face Bark...")
+        return generate_song_hf_bark(prompt, lyrics, duration)
+    except Exception as e:
+        print(f"  [Music] HF Bark failed: {e}")
+    
+    # 3. Procedural tone
+    print("  [Music] All APIs failed. Generating procedural tone...")
+    return generate_procedural_tone(duration)
 
 # ============================================================
 # Helper functions (unchanged)
@@ -268,7 +303,6 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
 
-        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
@@ -277,7 +311,6 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # Try saved song first
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
@@ -301,7 +334,6 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
-        # Loop to fill duration
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
@@ -312,7 +344,6 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur / 15)))
 
-        # Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
