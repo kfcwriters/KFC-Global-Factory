@@ -30,7 +30,7 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: 🎭 Install Playwright (for token refresh)
+      - name: 🎭 Install Playwright (for token refresh fallback)
         run: |
           playwright install chromium --with-deps
 
@@ -44,13 +44,17 @@ jobs:
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+          ACE_MUSIC_API_KEY:   ${{ secrets.ACE_MUSIC_API_KEY }}  # used by refresh_token.py
           ACE_SESSION_TOKEN:   ${{ env.ACE_SESSION_TOKEN }}
         run: python suno_pipeline.py
 
-      - name: 📋 Upload logs on failure
+      - name: 📋 Upload debug artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: suno-failure-logs
-          path: "*.log"
+          name: debug-artifacts
+          path: |
+            debug_screenshot.png
+            page_debug.html
+            *.log
           retention-days: 7
