@@ -2,7 +2,6 @@ name: 🎵 Weekly Suno Romantic Song Video + Short
 
 on:
   schedule:
-    # Every Saturday at 3:30 PM UTC = 9:00 PM IST
     - cron: "30 15 * * 6"
   workflow_dispatch:
 
@@ -30,10 +29,10 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- NEW: Generate music with ACE-Step ---
+      # --- Generate music with ACE-Step (corrected reference) ---
       - name: 🎵 Generate music with ACE-Step
         id: acestep
-        uses: audiohacking/acestep-action@v1
+        uses: audiohacking/acestep-action@main   # <-- use @main instead of @v1
         with:
           prompt: 'orchestral romantic, strings and piano, powerful female vocal'
           lyrics: |
@@ -43,12 +42,9 @@ jobs:
             [Chorus]
             You are my light
             Forever by my side
-          duration: '210'   # 3.5 minutes (adjust as needed)
-          # If you want instrumental only, uncomment the next line:
+          duration: '210'
+          # If you want instrumental only, uncomment:
           # instrumental: true
-
-      # The action's output file path is in ${{ runner.temp }}/acestep/output.mp3
-      # We'll pass it to the Python script via environment variable.
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
