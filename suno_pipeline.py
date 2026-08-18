@@ -54,8 +54,8 @@ MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY")
 def generate_song_minimax(prompt, lyrics="", duration=30):
     """
     Generate music using MiniMax Music 2.6 API.
-    Free tier: 100 calls/day.
-    Model: music-2.6
+    Prints full response for debugging.
+    Tries both .io and .com endpoints.
     """
     if not MINIMAX_API_KEY:
         raise EnvironmentError("MINIMAX_API_KEY not set")
@@ -76,23 +76,74 @@ def generate_song_minimax(prompt, lyrics="", duration=30):
         }
     }
     
-    print("  [MiniMax] Generating music...")
-    response = requests.post(
+    # Try both endpoints
+    endpoints = [
         "https://api.minimax.io/v1/music_generation",
-        json=payload,
-        headers=headers,
-        timeout=120
-    )
+        "https://api.minimaxi.com/v1/music_generation"
+    ]
     
-    if response.status_code == 200:
-        data = response.json()
-        # Audio is hex-encoded
-        audio_hex = data.get("data", {}).get("audio")
+    for endpoint in endpoints:
+        print(f"  [MiniMax] Trying endpoint: {endpoint}")
+        try:
+            response = requests.post(endpoint, json=payload, headers=headers, timeout=120)
+        except Exception as e:
+            print(f"  [MiniMax] Request failed: {e}")
+            continue
+        
+        print(f"  [MiniMax] Status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"  [MiniMax] Error response: {response.text[:500]}")
+            continue
+        
+        try:
+            data = response.json()
+        except Exception as e:
+            print(f"  [MiniMax] Failed to parse JSON: {e}")
+            continue
+        
+        # Print full JSON for debugging
+        print(f"  [MiniMax] Response JSON: {json.dumps(data, indent=2)[:1500]}")
+        
+        # Try multiple ways to extract audio
+        audio_hex = None
+        
+        # 1: data.data.audio
+        if data.get("data") and isinstance(data["data"], dict):
+            audio_hex = data["data"].get("audio")
+        
+        # 2: data.audio
+        if not audio_hex and data.get("audio"):
+            audio_hex = data.get("audio")
+        
+        # 3: data.result.audio
+        if not audio_hex and data.get("result") and isinstance(data["result"], dict):
+            audio_hex = data["result"].get("audio")
+        
+        # 4: data.output.audio
+        if not audio_hex and data.get("output") and isinstance(data["output"], dict):
+            audio_hex = data["output"].get("audio")
+        
+        # 5: data.audio_url (if they give a URL instead)
+        audio_url = None
+        if data.get("data") and isinstance(data["data"], dict):
+            audio_url = data["data"].get("audio_url")
+        if not audio_url and data.get("audio_url"):
+            audio_url = data.get("audio_url")
+        
         if audio_hex:
+            print("  [MiniMax] Audio extracted as hex")
             return bytes.fromhex(audio_hex)
-        raise Exception("No audio in response")
-    else:
-        raise Exception(f"MiniMax error: {response.status_code} - {response.text}")
+        elif audio_url:
+            print(f"  [MiniMax] Downloading audio from URL: {audio_url}")
+            audio_resp = requests.get(audio_url, timeout=60)
+            if audio_resp.status_code == 200:
+                return audio_resp.content
+            else:
+                print(f"  [MiniMax] Failed to download from URL: {audio_resp.status_code}")
+        else:
+            print("  [MiniMax] No audio found in response")
+    
+    raise Exception("All endpoints failed or no audio in response")
 
 # ============================================================
 # FALLBACK: Procedural tone
