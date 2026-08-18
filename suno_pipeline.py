@@ -1,243 +1,171 @@
-#!/usr/bin/env python3
-"""
-suno_pipeline.py — Weekly Romantic Song Video + Short
-FULLY AUTOMATED — no external dependency, no risk of noise/silence uploads.
+# suno_pipeline.py (modified run() function)
 
-Music priority:
-  1. songs/ folder (manual Suno uploads, if you add any — highest quality)
-  2. Our own vocal_synth.py + instrumental — ALWAYS works, reliable, fast
-"""
-import os, random, subprocess, sys, tempfile
-from pathlib import Path
-from datetime import datetime
+import os
+import time
+import base64
+import requests
+# ... your other imports ...
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-from image_gen       import generate_images
-from lyrics_overlay  import add_lyrics
-from lyrics_writer   import generate_weekly_lyrics
-from seo_gen         import generate_seo
-from shorts_maker    import make_short_from_video, make_shorts_metadata
-from vocal_synth     import sing_lyrics, detect_mood
-from video_assembly  import create_video
-from thumbnail_gen   import create_thumbnail
-from youtube_upload  import upload_to_youtube
+# --- ACE Music API Configuration ---
+ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
+ACE_API_BASE_URL = "https://api.acemusic.ai"
 
-SONGS_DIR = Path(__file__).parent / "songs"
-DURATION  = 210
-
-BG_PROMPTS = [
-    "romantic couple holding hands at golden sunset on beach, cinematic warm glow",
-    "couple slow dancing in candlelit room with rose petals, soft bokeh lights",
-    "two lovers on rooftop under stars, city lights below, romantic night",
-    "couple under cherry blossom tree, pink petals falling, dreamy spring light",
-    "man surprising woman with roses in garden, romantic golden evening",
-    "couple sharing umbrella in gentle rain, warm street lights reflection",
-    "silhouette of couple embracing at sunset on hill, dramatic orange sky",
-    "couple sitting by lake at twilight, fairy lights on water reflection",
-    "woman in red dress and man dancing at outdoor wedding, fairy lights",
-    "couple on boat in misty river at dawn, mountains behind them",
-    "close up of two hands intertwined, soft bokeh golden background",
-    "couple watching stars lying on grass, milky way above, peaceful romantic",
-    "couple in flower field at sunset, golden hour, romantic and joyful",
-    "first dance at wedding with sparklers and fairy lights around them",
-]
-
-
-def probe_duration(path):
-    r = subprocess.run(["ffprobe","-v","error","-show_entries","format=duration",
-                        "-of","default=noprint_wrappers=1:nokey=1",path],
-                       capture_output=True, text=True)
-    return float(r.stdout.strip() or 180)
-
-
-def get_saved_song():
-    songs = sorted(SONGS_DIR.glob("*.mp3"))
-    if not songs: return None, None
-    idx = datetime.utcnow().timetuple().tm_yday % len(songs)
-    s   = songs[idx]
-    return str(s), s.stem.replace("_"," ").replace("-"," ").title()
-
-
-def make_instrumental(tmp, duration, mood="romantic"):
+def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
-    IMPORTANT FIX: instrumental chord roots now match the vocal melody's
-    root notes exactly (same fundamental frequencies vocal_synth.py uses
-    for "verse" notes). Previously the instrumental used unrelated chord
-    frequencies (130,196,261,330) that clashed dissonantly against the
-    vocal melody notes (220,246,261,293 etc), causing harsh beating/
-    interference — heard as "disturbing sound". Now both layers share
-    one coherent musical foundation.
+    Generate music using ACE Music's free API.
+    No GPU required.
     """
-    import numpy as np, scipy.io.wavfile as wf, io, math
-    SR = 44100; n = int(SR*duration)
-    audio = np.zeros(n, np.float32)
-    t_arr = np.linspace(0, duration, n, dtype=np.float32)
-
-    # Root note matches vocal_synth.py's MELODY_NOTES_BY_MOOD "verse" root,
-    # played one and two octaves DOWN so it sits under the voice, not over it.
-    root_by_mood = {"romantic": 220, "happy": 261, "sad": 196}
-    root = root_by_mood.get(mood, 220)
-
-    # Simple, consonant drone: root + perfect fifth + octave, one octave down
-    intervals = [1.0, 1.5, 2.0]     # root, fifth, octave (just intonation)
-    amps      = [0.14, 0.09, 0.06]
-
-    for interval, amp in zip(intervals, amps):
-        freq = (root / 2) * interval    # one octave below the vocal register
-        mod  = .75 + .25*np.sin(2*math.pi*.05*t_arr)
-        audio += amp*mod*np.sin(2*math.pi*freq*t_arr)
-
-    # Very soft, low-passed noise bed (much gentler than before)
-    noise = np.random.randn(n).astype(np.float32)*.006
-    for k in range(1,n): noise[k]=.97*noise[k-1]+.03*noise[k]
-    audio += noise
-
-    peak = np.max(np.abs(audio))
-    if peak>0: audio=audio/peak*.55   # kept intentionally quieter than vocals
-    fade = min(int(SR*3),n//5)
-    audio[:fade]*=np.linspace(0,1,fade); audio[-fade:]*=np.linspace(1,0,fade)
-    buf=io.BytesIO(); wf.write(buf,SR,(audio*32767).astype(np.int16))
-    raw=tmp/"instrumental.wav"; raw.write_bytes(buf.getvalue())
-    mp3=str(tmp/"instrumental.mp3")
-    subprocess.run(["ffmpeg","-y","-i",str(raw),"-codec:a","libmp3lame","-qscale:a","2",mp3],
-                   check=True,capture_output=True)
-    return mp3
-
-
-def mix_vocals_instrumental(vocal_wav_bytes, instrumental_mp3, out_mp3, duration):
-    """
-    FIXED: vocal_synth.py v3 already normalizes vocals to strong RMS loudness.
-    Applying an ADDITIONAL volume=2.2 boost on top of that caused clipping/
-    distortion (heard as "broken music"). Now we pass vocals through near
-    unity gain with a limiter as a safety net against overs, and don't let
-    amix silently renormalize (which was masking our intended balance).
-    """
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        voc_tmp = f.name
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        looped = f.name
-    try:
-        open(voc_tmp,"wb").write(vocal_wav_bytes)
-        subprocess.run(["ffmpeg","-y","-stream_loop","-1","-i",voc_tmp,
-                       "-t",str(duration),looped],
-                      check=True,capture_output=True)
-        subprocess.run([
-            "ffmpeg","-y","-i",looped,"-i",instrumental_mp3,
-            "-filter_complex",
-            "[0:a]volume=0.9,alimiter=limit=0.85:attack=5:release=50[v];"
-            "[1:a]volume=0.35[m];"
-            "[v][m]amix=inputs=2:duration=shortest:normalize=0,"
-            "alimiter=limit=0.92",
-            "-t",str(duration),"-c:a","libmp3lame","-q:a","2",out_mp3
-        ], check=True, capture_output=True)
-        print(f"  [mix] Vocals + instrumental mixed (no double-boost) ✓")
-    finally:
-        for p in [voc_tmp, looped]:
-            if os.path.exists(p): os.unlink(p)
+    if not ACE_MUSIC_API_KEY:
+        raise EnvironmentError("ACE_MUSIC_API_KEY environment variable not set.")
+    
+    headers = {
+        "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    # Step 1: Submit the generation task
+    payload = {
+        "caption": prompt,
+        "lyrics": lyrics,
+        "audio_duration": duration,
+        "instrumental": instrumental,
+        "vocal_language": language,
+        "thinking": True,  # Higher quality
+        "audio_format": "mp3"
+    }
+    
+    print("  [ACE] Submitting generation task...")
+    response = requests.post(
+        f"{ACE_API_BASE_URL}/v1/music/generate",
+        json=payload,
+        headers=headers,
+        timeout=60
+    )
+    
+    if response.status_code != 200:
+        raise Exception(f"Task submission failed: {response.status_code} - {response.text}")
+    
+    result = response.json()
+    job_id = result.get("job_id")
+    if not job_id:
+        raise Exception(f"No job_id in response: {result}")
+    
+    print(f"  [ACE] Task submitted. Job ID: {job_id}")
+    
+    # Step 2: Poll for completion
+    max_attempts = 60
+    for attempt in range(max_attempts):
+        status_response = requests.get(
+            f"{ACE_API_BASE_URL}/v1/jobs/{job_id}",
+            headers=headers,
+            timeout=30
+        )
+        
+        if status_response.status_code != 200:
+            print(f"  [ACE] Status check failed (attempt {attempt+1})")
+            time.sleep(5)
+            continue
+        
+        status_data = status_response.json()
+        status = status_data.get("status")
+        
+        if status == "succeeded":
+            print(f"  [ACE] Generation complete!")
+            result_data = status_data.get("result", {})
+            
+            # Check for audio as base64
+            audio_base64 = result_data.get("audio")
+            if audio_base64:
+                return base64.b64decode(audio_base64)
+            
+            # Check for audio URL
+            audio_url = result_data.get("audio_url")
+            if audio_url:
+                audio_response = requests.get(audio_url, timeout=60)
+                if audio_response.status_code == 200:
+                    return audio_response.content
+            
+            raise Exception("No audio data found in successful response")
+            
+        elif status == "failed":
+            error_msg = status_data.get("error", "Unknown error")
+            raise Exception(f"Generation failed: {error_msg}")
+        
+        else:
+            queue_pos = status_data.get("queue_position", "unknown")
+            print(f"  [ACE] Status: {status} (queue position: {queue_pos}) - waiting...")
+            time.sleep(5)
+    
+    raise Exception(f"Timeout after {max_attempts} attempts")
 
 
 def run():
-    HF_TOKEN            = os.environ.get("HF_TOKEN","")
+    HF_TOKEN = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
+    ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")  # Get the key
 
-    if not HF_TOKEN:            raise EnvironmentError("HF_TOKEN not set")
-    if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
+    if not HF_TOKEN:
+        raise EnvironmentError("HF_TOKEN not set")
+    if not YOUTUBE_CREDENTIALS:
+        raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
+    if not ACE_MUSIC_API_KEY:
+        raise EnvironmentError("ACE_MUSIC_API_KEY not set")
 
     print(f"\n{'='*60}")
     print(f"  Pipeline : Romantic Song Video + Short (Weekly, Fully Automated)")
     print(f"{'='*60}\n")
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
-        tmp=Path(tmp); song_mp3=None; title="Beautiful Love Song"; style_used=""
-
+        tmp = Path(tmp)
+        
+        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
         sections = song.get("sections") or [
-            {"type":"verse",  "lines": song["prompt"].split("\n")[:4]},
-            {"type":"chorus", "lines": song["prompt"].split("\n")[4:8]},
+            {"type": "verse", "lines": song["prompt"].split("\n")[:4]},
+            {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # ── 1. Saved songs folder (best quality, if you add manual uploads) ──
-        saved, saved_title = get_saved_song()
-        if saved:
-            song_mp3 = saved; title = saved_title
-            print(f"🎵  Using saved song: {title}")
+        # --- NEW: Generate music with ACE Music API ---
+        print("🎵  Generating music with ACE Music API...")
+        
+        # Build the prompt and lyrics
+        music_prompt = f"{style_used}, {mood} mood"
+        full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
+        
+        # Generate the full song (vocals + instrumental)
+        audio_data = generate_music_with_ace(
+            prompt=music_prompt,
+            lyrics=full_lyrics,
+            duration=DURATION,
+            instrumental=False,
+            language="en"
+        )
+        
+        # Save the generated audio
+        song_mp3 = str(tmp / "generated_song.mp3")
+        with open(song_mp3, "wb") as f:
+            f.write(audio_data)
+        
+        print(f"  → Song generated: '{title}' ✓")
+        
+        # Skip the separate vocal/instrumental mixing steps
+        # because ACE Music generates the complete song.
 
-        # ── 2. Our own synthesizer — reliable, always works ───────────────────
-        if not song_mp3:
-            DEBUG_INSTRUMENTAL_ONLY = os.environ.get("DEBUG_INSTRUMENTAL_ONLY","0") == "1"
-
-            mood = detect_mood(style_used)
-            instrumental = make_instrumental(tmp, DURATION, mood)
-
-            if DEBUG_INSTRUMENTAL_ONLY:
-                print("🎵  DEBUG MODE: instrumental only, skipping vocal synth ...")
-                song_mp3 = instrumental
-                print(f"  → Instrumental-only song ready: '{title}' ✓")
-            else:
-                print("🎤  Synthesizing singing voice + instrumental ...")
-                vocal_wav = sing_lyrics(sections, mood=mood, tempo_bpm=76)
-
-                # Save raw vocal WAV separately too, for direct inspection
-                raw_vocal_path = tmp / "raw_vocal_only.wav"
-                raw_vocal_path.write_bytes(vocal_wav)
-                print(f"  [debug] Raw vocal-only file size: {raw_vocal_path.stat().st_size} bytes")
-
-                mixed_path = str(tmp/"mixed.mp3")
-                mix_vocals_instrumental(vocal_wav, instrumental, mixed_path, DURATION)
-                song_mp3 = mixed_path
-                print(f"  → Song ready: '{title}' ✓")
-
-        # ── Loop short audio to fill duration ─────────────────────────────────
-        dur = probe_duration(song_mp3)
-        if dur < DURATION-10:
-            looped=str(tmp/"looped.mp3")
-            subprocess.run(["ffmpeg","-y","-stream_loop","-1","-i",song_mp3,
-                           "-t",str(DURATION),"-c","copy",looped],
-                          check=True,capture_output=True)
-            song_mp3=looped
-        dur=min(dur,DURATION); n_images=min(16,max(8,int(dur/15)))
-
+        # --- Continue with image generation, video creation, upload ---
         print(f"\n🖼️   Generating {n_images} romantic images ...")
-        prompts=[random.choice(BG_PROMPTS) for _ in range(n_images)]
-        raw_imgs=generate_images(prompts,HF_TOKEN,vertical=False)
-
-        image_paths=[]
-        for i,img in enumerate(raw_imgs):
-            frame=add_lyrics(img,[title],"verse","")
-            p=tmp/f"frame_{i:02d}.jpg"; p.write_bytes(frame)
-            image_paths.append(str(p))
-
+        # ... rest of your image generation code ...
+        
         print("\n📝  Generating SEO-optimized metadata ...")
-        meta = generate_seo(title, "romantic songs", style_used)
-        print(f"  → {meta['title']}")
-
-        thumb=str(tmp/"thumbnail.jpg")
-        create_thumbnail(raw_imgs[0],meta["title"],thumb)
-        video=str(tmp/"output.mp4")
-        create_video(song_mp3,image_paths,video,vertical=False)
-
-        print("\n📱  Creating Shorts version ...")
-        short_video = str(tmp/"short.mp4")
-        make_short_from_video(video, short_video, duration=55, start_offset=15)
-        short_meta  = make_shorts_metadata(meta["title"], meta["tags"])
-
+        # ... rest of your SEO code ...
+        
         print("\n📤  Uploading main video ...")
-        vid=upload_to_youtube(video_path=video,thumbnail_path=thumb,
-            title=meta["title"],description=meta["description"],
-            tags=meta["tags"],credentials_json=YOUTUBE_CREDENTIALS)
-        print(f"  → https://youtu.be/{vid}")
-
-        print("\n📱  Uploading Short ...")
-        short_id = upload_to_youtube(video_path=short_video, thumbnail_path=thumb,
-            title=short_meta["title"], description=short_meta["description"],
-            tags=short_meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
-        print(f"  → https://youtu.be/{short_id}")
-
+        # ... rest of your upload code ...
+        
         print(f"\n🎉  Both live! Main: https://youtu.be/{vid} | Short: https://youtu.be/{short_id}")
         return vid
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     run()
