@@ -35,6 +35,7 @@ jobs:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           APIFRAME_KEY:        ${{ secrets.APIFRAME_KEY }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+          BOSON_API_KEY: ${{ secrets.BOSON_API_KEY }}
           ACE_MUSIC_API_KEY: ${{ secrets.ACE_MUSIC_API_KEY }}
           ACE_SESSION_TOKEN: ${{ secrets.ACE_SESSION_TOKEN }}
         run: python suno_pipeline.py
