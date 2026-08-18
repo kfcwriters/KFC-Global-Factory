@@ -46,32 +46,63 @@ BG_PROMPTS = [
 
 # --- ACE Music API Configuration ---
 ACE_MUSIC_API_KEY = os.environ.get("ACE_MUSIC_API_KEY")
-BASE_URL = "https://acem-api.acemusic.ai"  # The correct base domain
+BASE_URL = "https://acem-api.acemusic.ai"
 
-def get_ace_token(headers):
+def get_ace_token():
     """
-    Get a session token from the correct endpoint.
+    Try multiple authentication methods to get a session token.
     """
     url = f"{BASE_URL}/api/acem/user/ai/token"
-    print(f"  [ACE] Getting token from {url} ...")
-    try:
-        resp = requests.get(url, headers=headers, timeout=30)
-        if resp.status_code == 200:
-            data = resp.json()
-            # The token might be in 'token' or 'data.token'
-            token = data.get("token")
-            if not token:
-                token = data.get("data", {}).get("token")
-            if token:
-                print(f"  [ACE] Token obtained successfully.")
-                return token
-            else:
-                print(f"  [ACE] No token in response: {data}")
-        else:
-            print(f"  [ACE] Token request failed: {resp.status_code} - {resp.text[:200]}")
-    except Exception as e:
-        print(f"  [ACE] Error getting token: {e}")
-    return None
+    
+    # Different authentication methods to try
+    auth_methods = [
+        # Method 1: Bearer token (what we tried, but maybe the key itself is the token)
+        {"headers": {"Authorization": f"Bearer {ACE_MUSIC_API_KEY}"}},
+        # Method 2: API key as query parameter
+        {"params": {"api_key": ACE_MUSIC_API_KEY}},
+        # Method 3: API key as header X-API-Key
+        {"headers": {"X-API-Key": ACE_MUSIC_API_KEY}},
+        # Method 4: API key as header Api-Key
+        {"headers": {"Api-Key": ACE_MUSIC_API_KEY}},
+        # Method 5: API key in JSON body (POST)
+        {"json": {"api_key": ACE_MUSIC_API_KEY}},
+        # Method 6: API key as form data (POST)
+        {"data": {"api_key": ACE_MUSIC_API_KEY}},
+        # Method 7: Bearer token with the token from the playground? Not possible, but we'll try empty
+    ]
+    
+    # Try GET first, then POST
+    for method in ["GET", "POST"]:
+        for auth in auth_methods:
+            try:
+                print(f"  [ACE] Trying {method} with {list(auth.keys())}...")
+                if method == "GET":
+                    resp = requests.get(url, **auth, timeout=30)
+                else:
+                    # For POST, we need to set content-type appropriately
+                    if "json" in auth:
+                        resp = requests.post(url, json=auth["json"], timeout=30)
+                    elif "data" in auth:
+                        resp = requests.post(url, data=auth["data"], timeout=30)
+                    else:
+                        # If no body, just send with headers
+                        headers = auth.get("headers", {})
+                        resp = requests.post(url, headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    token = data.get("token") or data.get("data", {}).get("token")
+                    if token:
+                        print(f"  [ACE] Token obtained with {method} {list(auth.keys())}")
+                        return token
+                    else:
+                        print(f"  [ACE] No token in response: {data}")
+                else:
+                    print(f"  [ACE] {method} with {list(auth.keys())} -> {resp.status_code}")
+            except Exception as e:
+                print(f"  [ACE] Error: {e}")
+    
+    # If we reach here, we failed
+    raise Exception("Could not obtain session token with any method. Please check your API key.")
 
 def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, language="en"):
     """
@@ -80,19 +111,11 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
     if not ACE_MUSIC_API_KEY:
         raise EnvironmentError("ACE_MUSIC_API_KEY environment variable not set.")
     
-    headers = {
-        "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    
-    # 1. Get session token
     print("  [ACE] Getting session token...")
-    session_token = get_ace_token(headers)
-    if not session_token:
-        raise Exception("Could not obtain session token. Check your API key and network.")
+    session_token = get_ace_token()
     print(f"  [ACE] Using token: {session_token[:10]}...")
     
-    # 2. Prepare multipart form data
+    # Prepare multipart form data
     data = {
         "task_type": "generate",
         "model_type": "acestep-v15-xl-turbo",
@@ -104,11 +127,14 @@ def generate_music_with_ace(prompt, lyrics="", duration=30, instrumental=False, 
         "thinking": "true",
         "audio_format": "mp3",
         "mode": "simple",
-        "token": session_token,  # Include the token in the data
+        "token": session_token,
     }
     
+    headers = {
+        "Authorization": f"Bearer {ACE_MUSIC_API_KEY}",  # Keep for release_task
+    }
     # Remove Content-Type header for multipart/form-data
-    headers.pop("Content-Type", None)
+    # requests will set it automatically
     
     print("  [ACE] Submitting generation task...")
     try:
