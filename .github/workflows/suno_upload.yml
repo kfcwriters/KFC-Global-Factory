@@ -20,31 +20,26 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: 🔧 System dependencies
+      - name: 🔧 Verify ffmpeg is available
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            ffmpeg fonts-dejavu-core fonts-liberation
+          ffmpeg -version
+          echo "✅ ffmpeg is ready"
 
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- Generate music with ACE-Step (corrected reference) ---
-      - name: 🎵 Generate music with ACE-Step
+      - name: 🎵 Generate music with ACE-Step (15s test)
         id: acestep
-        uses: audiohacking/acestep-action@main   # <-- use @main instead of @v1
+        uses: audiohacking/acestep-action@main
+        continue-on-error: true
         with:
-          prompt: 'orchestral romantic, strings and piano, powerful female vocal'
+          prompt: 'orchestral romantic, strings and piano'
           lyrics: |
             [Verse 1]
             My heart knows the way
-            Through the darkest night
             [Chorus]
             You are my light
-            Forever by my side
-          duration: '210'
-          # If you want instrumental only, uncomment:
-          # instrumental: true
+          duration: '15'
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
