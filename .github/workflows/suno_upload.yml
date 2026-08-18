@@ -2,6 +2,7 @@ name: 🎵 Weekly Suno Romantic Song Video + Short
 
 on:
   schedule:
+    # Every Saturday at 3:30 PM UTC = 9:00 PM IST
     - cron: "30 15 * * 6"
   workflow_dispatch:
 
@@ -42,19 +43,18 @@ jobs:
             [Chorus]
             You are my light
             Forever by my side
-          duration: '210'   # 3.5 minutes
-          # If you want instrumental only, set `instrumental: true`
+          duration: '210'   # 3.5 minutes (adjust as needed)
+          # If you want instrumental only, uncomment the next line:
           # instrumental: true
 
-      # The action will output the audio file path.
-      # Typically it's something like: /home/runner/work/_temp/acestep/output.mp3
-      # We'll capture it as an environment variable.
+      # The action's output file path is in ${{ runner.temp }}/acestep/output.mp3
+      # We'll pass it to the Python script via environment variable.
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
-          ACESTEP_AUDIO:       ${{ steps.acestep.outputs.audio-path || runner.temp }}/acestep/output.mp3
+          ACESTEP_AUDIO:       ${{ runner.temp }}/acestep/output.mp3
         run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
