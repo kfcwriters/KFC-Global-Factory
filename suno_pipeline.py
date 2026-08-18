@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
-Uses Tunee AI for singing generation (free API, full songs with vocals).
-Everything else (lyrics, images, video, upload) remains unchanged.
+Uses Tunee AI for singing generation.
+If Tunee fails, generates a simple procedural tone (no beep, just a soft chord).
 """
 import os
 import random
@@ -16,6 +16,7 @@ import base64
 import requests
 import json
 import re
+import socket
 from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -49,115 +50,115 @@ BG_PROMPTS = [
 ]
 
 # ============================================================
-# Tunee AI Integration
+# TUNEE AI INTEGRATION
 # ============================================================
 TUNEE_API_KEY = os.environ.get("TUNEE_API_KEY")
-TUNEE_API_URL = "https://api.tunee-agent.com/generate"  # Verify with official docs
+
+# List of possible endpoints (some may work)
+TUNEE_ENDPOINTS = [
+    "https://api.tunee-agent.com/generate",
+    "https://api.tunee.ai/generate",
+    "https://tunee.ai/api/generate",
+]
+
+def resolve_host(host):
+    """Try to resolve hostname to IP (to detect network issues)."""
+    try:
+        return socket.gethostbyname(host)
+    except socket.gaierror:
+        return None
 
 def generate_song_tunee(prompt, lyrics, title, model="Tempolor 4.5+"):
-    """
-    Generate a full song using Tunee AI (vocals + music).
-    Returns audio bytes (MP3).
-    """
+    """Generate a full song with vocals using Tunee AI."""
     if not TUNEE_API_KEY:
-        raise EnvironmentError("TUNEE_API_KEY not set. Please add it to GitHub secrets.")
+        raise Exception("TUNEE_API_KEY not set")
 
     headers = {
         "Authorization": f"Bearer {TUNEE_API_KEY}",
         "Content-Type": "application/json"
     }
-
     payload = {
         "prompt": prompt,
         "title": title,
         "lyrics": lyrics,
         "model": model,
-        # "instrumental": False   # Set to True for instrumental-only
     }
 
-    print("  [Tunee] Submitting generation request...")
-    resp = requests.post(TUNEE_API_URL, json=payload, headers=headers, timeout=120)
-    if resp.status_code != 200:
-        raise Exception(f"Tunee API error: {resp.status_code} - {resp.text}")
-
-    data = resp.json()
-    share_url = data.get("shareUrl")
-    if not share_url:
-        raise Exception("No shareUrl in response. Response: " + str(data))
-
-    print(f"  [Tunee] Generation started. Share URL: {share_url}")
-
-    # Download the audio from the share URL
-    audio_data = download_audio_from_tunee_share(share_url)
-    return audio_data
+    for endpoint in TUNEE_ENDPOINTS:
+        host = endpoint.split("/")[2]
+        for attempt in range(3):
+            # Check DNS before trying
+            if not resolve_host(host):
+                print(f"  [Tunee] Cannot resolve {host}, attempt {attempt+1}/3, waiting...")
+                time.sleep(5)
+                continue
+            try:
+                print(f"  [Tunee] Trying {endpoint} (attempt {attempt+1})...")
+                resp = requests.post(endpoint, json=payload, headers=headers, timeout=120)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # Check for direct audio
+                    audio_b64 = data.get("audio") or data.get("data", {}).get("audio")
+                    if audio_b64:
+                        return base64.b64decode(audio_b64)
+                    share_url = data.get("shareUrl")
+                    if share_url:
+                        return download_audio_from_tunee_share(share_url)
+                    raise Exception("No audio or shareUrl in response")
+                else:
+                    print(f"  [Tunee] {endpoint} returned {resp.status_code}")
+            except Exception as e:
+                print(f"  [Tunee] Error: {e}")
+                time.sleep(3)
+    raise Exception("All Tunee endpoints failed")
 
 def download_audio_from_tunee_share(share_url):
-    """
-    Fetch the share page, extract the audio URL, and download the MP3.
-    """
-    # Fetch the page
-    print("  [Tunee] Fetching share page...")
+    """Extract audio from the share page."""
+    print(f"  [Tunee] Fetching share page: {share_url}")
     try:
         page_resp = requests.get(share_url, timeout=30)
         if page_resp.status_code != 200:
-            raise Exception(f"Failed to fetch share page: {page_resp.status_code}")
+            raise Exception(f"Share page error: {page_resp.status_code}")
         html = page_resp.text
     except Exception as e:
         raise Exception(f"Error fetching share page: {e}")
 
-    # Try to find audio URL in the page
-    # Common patterns: <audio src="...">, <source src="...">, or a JSON blob
+    # Regex patterns to find audio URL
+    patterns = [
+        r'<audio[^>]+src=["\']([^"\']+)["\']',
+        r'<source[^>]+src=["\']([^"\']+)["\']',
+        r'"audioUrl"\s*:\s*"([^"]+)"',
+        r'href=["\']([^"\']+\.mp3)["\']',
+        r'https?://[^\s"\']+\.mp3',
+    ]
     audio_url = None
-
-    # Pattern 1: <audio> or <source> tags
-    src_match = re.search(r'<audio[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE)
-    if not src_match:
-        src_match = re.search(r'<source[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE)
-    if src_match:
-        audio_url = src_match.group(1)
-
-    # Pattern 2: JSON containing audio URL
-    if not audio_url:
-        json_match = re.search(r'{"audioUrl"\s*:\s*"([^"]+)"', html)
-        if json_match:
-            audio_url = json_match.group(1)
-
-    # Pattern 3: If it's a direct MP3 link in a link element
-    if not audio_url:
-        link_match = re.search(r'<a[^>]+href=["\']([^"\']+\.mp3)["\']', html, re.IGNORECASE)
-        if link_match:
-            audio_url = link_match.group(1)
+    for pat in patterns:
+        match = re.search(pat, html, re.IGNORECASE)
+        if match:
+            audio_url = match.group(1) if len(match.groups()) >= 1 else match.group(0)
+            break
 
     if not audio_url:
-        # Try to find any .mp3 URL
-        mp3_match = re.search(r'https?://[^\s"\']+\.mp3', html)
-        if mp3_match:
-            audio_url = mp3_match.group(0)
+        raise Exception("Could not find audio URL in share page")
 
-    if not audio_url:
-        raise Exception("Could not find audio URL in share page. HTML snippet: " + html[:500])
-
-    # Make absolute if relative
     audio_url = urljoin(share_url, audio_url)
-
-    # Download the audio
     print(f"  [Tunee] Downloading audio from: {audio_url}")
     audio_resp = requests.get(audio_url, timeout=60)
     if audio_resp.status_code != 200:
-        raise Exception(f"Failed to download audio: {audio_resp.status_code}")
-
+        raise Exception(f"Audio download failed: {audio_resp.status_code}")
     return audio_resp.content
 
 # ============================================================
-# Fallback: procedural tone (if Tunee fails)
+# PROCEDURAL FALLBACK (if everything else fails)
 # ============================================================
 def generate_procedural_tone(duration):
-    """Generate a simple sine wave as a placeholder."""
+    """Generate a soft chord as a placeholder (not a beep)."""
     import numpy as np
     import scipy.io.wavfile as wavfile
     sample_rate = 44100
     t = np.linspace(0, duration, int(sample_rate * duration))
-    freqs = [440, 554, 659]  # A minor chord
+    # A minor chord
+    freqs = [440, 554, 659]
     audio = np.zeros_like(t)
     for freq in freqs:
         audio += 0.3 * np.sin(2 * np.pi * freq * t)
@@ -170,15 +171,15 @@ def generate_procedural_tone(duration):
     return audio_bytes
 
 # ============================================================
-# Main generation function
+# MAIN GENERATION FUNCTION
 # ============================================================
 def generate_song(prompt, lyrics, title, duration):
-    """Try Tunee AI first, fall back to procedural tone."""
+    """Try Tunee, fallback to procedural tone."""
     try:
         print("  [Music] Attempting Tunee AI...")
         return generate_song_tunee(prompt, lyrics, title)
     except Exception as e:
-        print(f"  [Music] Tunee AI failed: {e}")
+        print(f"  [Music] Tunee failed: {e}")
         print("  [Music] Generating procedural tone...")
         return generate_procedural_tone(duration)
 
@@ -209,7 +210,7 @@ def get_saved_song():
     return str(s), s.stem.replace("_"," ").replace("-"," ").title()
 
 # ============================================================
-# Main pipeline
+# MAIN PIPELINE
 # ============================================================
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
@@ -230,7 +231,6 @@ def run():
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
         tmp = Path(tmp)
 
-        # Generate lyrics
         song = generate_weekly_lyrics()
         title = song["title"]
         style_used = song.get("style", "romantic pop, female vocal, emotional")
@@ -239,7 +239,6 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # Try saved song first
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
@@ -264,7 +263,6 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
-        # Loop if needed
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
@@ -275,7 +273,6 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur / 15)))
 
-        # Generate images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
