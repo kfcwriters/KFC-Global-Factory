@@ -36,6 +36,7 @@ jobs:
           APIFRAME_KEY:        ${{ secrets.APIFRAME_KEY }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
           ACE_MUSIC_API_KEY: ${{ secrets.ACE_MUSIC_API_KEY }}
+          ACE_SESSION_TOKEN: ${{ secrets.ACE_SESSION_TOKEN }}
         run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
