@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
-Uses Boson AI Higgs Audio (singing generation) – free, rate-limited public preview.
-No GPU required, works with GitHub Actions.
+Fully automated, free, no GPU required.
+Uses Bark (local) as primary engine, with ACE Music API as optional fallback.
 """
 import os
 import random
@@ -46,100 +46,104 @@ BG_PROMPTS = [
     "first dance at wedding with sparklers and fairy lights around them",
 ]
 
-# --- Boson AI Higgs Audio Configuration ---
-BOSON_API_KEY = os.environ.get("BOSON_API_KEY")
+# ============================================================
+# OPTION 1: Bark (Local, Free, No API)
+# ============================================================
+def generate_song_bark(prompt, lyrics="", duration=30):
+    """
+    Generate singing using Bark (local, no API).
+    Bark is from Suno – it produces sing-talk, but it's free and works on CPU.
+    """
+    print("  [Bark] Loading model (first run downloads ~1.2GB)...")
+    try:
+        from bark import SAMPLE_RATE, generate_audio, preload_models
+        import scipy.io.wavfile as wavfile
+    except ImportError:
+        print("  [Bark] Installing bark...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "bark", "scipy", "numpy"], check=True)
+        from bark import SAMPLE_RATE, generate_audio, preload_models
+        import scipy.io.wavfile as wavfile
+    
+    preload_models()
+    
+    # Craft a prompt that encourages singing
+    if lyrics:
+        # Add musical notation and style instructions
+        text = f"♪ ({prompt}) {lyrics} ♪"
+    else:
+        text = f"♪ {prompt} ♪"
+    
+    print("  [Bark] Generating audio (this takes 1-2 minutes on CPU)...")
+    audio_array = generate_audio(text, history_prompt=None, text_temp=0.6, waveform_temp=0.6)
+    
+    output_path = "song_bark.wav"
+    wavfile.write(output_path, SAMPLE_RATE, audio_array)
+    
+    # Convert to MP3
+    mp3_path = "song_bark.mp3"
+    subprocess.run(["ffmpeg", "-y", "-i", output_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path],
+                   check=True, capture_output=True)
+    with open(mp3_path, "rb") as f:
+        audio_bytes = f.read()
+    os.remove(output_path)
+    os.remove(mp3_path)
+    return audio_bytes
 
-def generate_song_boson(prompt, lyrics="", duration=30, voice="female-1"):
+# ============================================================
+# OPTION 2: ACE Music API (Fallback – requires fresh token)
+# ============================================================
+def refresh_ace_token():
     """
-    Generate singing audio using Boson AI Higgs Audio.
-    Tries multiple possible endpoints to handle API changes.
-    Free, rate-limited public preview. No GPU needed.
+    Attempt to get a fresh ACE session token using various auth methods.
     """
-    if not BOSON_API_KEY:
-        raise EnvironmentError("BOSON_API_KEY environment variable not set.")
+    api_key = os.environ.get("ACE_MUSIC_API_KEY")
+    if not api_key:
+        return None
     
-    headers = {
-        "Authorization": f"Bearer {BOSON_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    base_url = "https://acem-api.acemusic.ai"
+    url = f"{base_url}/api/acem/user/ai/token"
     
-    # Possible endpoints based on common patterns and docs
-    endpoints = [
-        "https://api.boson.ai/v1/higgs-audio/tts",
-        "https://api.boson.ai/v1/higgs-audio/generate",
-        "https://api.boson.ai/v1/audio/tts",
-        "https://api.boson.ai/v1/audio/generate",
-        "https://api.boson.ai/v1/chat/completions",  # Some use this with audio
+    # Try different authentication methods
+    auth_methods = [
+        {"Authorization": f"Bearer {api_key}"},
+        {"X-API-Key": api_key},
+        {"Api-Key": api_key},
+        {"X-Api-Key": api_key},
+        # No auth header (maybe it works without?)
     ]
     
-    # Try different payload structures
-    payloads = [
-        # Standard TTS payload
-        {"text": lyrics, "prompt": prompt, "style": "singing", "voice": voice, "duration": duration, "response_format": "mp3"},
-        # Alternative: use "input" instead of "text"
-        {"input": lyrics, "prompt": prompt, "style": "singing", "voice": voice, "duration": duration, "response_format": "mp3"},
-        # For chat completions style (if supported)
-        {"model": "higgs-audio", "messages": [{"role": "user", "content": f"{prompt}\n\n{lyrics}"}], "style": "singing", "duration": duration}
-    ]
-    
-    last_error = None
-    for endpoint in endpoints:
-        for payload in payloads:
-            try:
-                print(f"  [Boson] Trying {endpoint} with payload keys: {list(payload.keys())}")
-                response = requests.post(endpoint, json=payload, headers=headers, timeout=120)
-                if response.status_code == 200:
-                    data = response.json()
-                    # Extract audio from various possible fields
-                    audio_b64 = data.get("audio") or data.get("data", {}).get("audio") or data.get("output", {}).get("audio")
-                    if audio_b64:
-                        return base64.b64decode(audio_b64)
-                    audio_url = data.get("audio_url") or data.get("data", {}).get("audio_url") or data.get("output", {}).get("audio_url")
-                    if audio_url:
-                        audio_resp = requests.get(audio_url, timeout=60)
-                        if audio_resp.status_code == 200:
-                            return audio_resp.content
-                    # If audio is in a different field, try to find it
-                    if "choices" in data and data["choices"]:
-                        choice = data["choices"][0]
-                        audio_b64 = choice.get("message", {}).get("audio")
-                        if audio_b64:
-                            return base64.b64decode(audio_b64)
-                    # If all fail, raise
-                    raise Exception("No audio found in successful response")
-                else:
-                    if response.status_code != 404:
-                        print(f"  [Boson] {endpoint} returned {response.status_code}: {response.text[:100]}")
-                    last_error = f"{response.status_code} - {response.text[:200]}"
-            except Exception as e:
-                print(f"  [Boson] Error with {endpoint}: {e}")
-                last_error = str(e)
-            time.sleep(0.2)  # brief pause between attempts
-    
-    # If all endpoints failed, try the old ACE Music API as a fallback if token exists
-    ace_token = os.environ.get("ACE_SESSION_TOKEN")
-    if ace_token:
-        print("  [Boson] All endpoints failed. Trying ACE Music API as fallback...")
+    for method_idx, auth_header in enumerate(auth_methods):
+        headers = {
+            "Origin": "https://acemusic.ai",
+            "Referer": "https://acemusic.ai/",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0"
+        }
+        headers.update(auth_header)
         try:
-            return generate_music_ace_fallback(prompt, lyrics, duration)
-        except Exception as e:
-            print(f"  [Fallback] ACE failed: {e}")
-    
-    raise Exception(f"All Boson endpoints failed. Last error: {last_error}")
+            resp = requests.get(url, headers=headers, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                token = data.get("token") or data.get("data", {}).get("token")
+                if token:
+                    print(f"  [ACE] Token obtained with auth method {method_idx}")
+                    return token
+        except:
+            pass
+    return None
 
-def generate_music_ace_fallback(prompt, lyrics="", duration=30):
+def generate_song_ace(prompt, lyrics="", duration=30):
     """
-    Fallback to ACE Music API if Boson fails and we have a session token.
+    Use ACE Music API with a fresh token.
     """
-    token = os.environ.get("ACE_SESSION_TOKEN")
+    token = refresh_ace_token()
     if not token:
-        raise Exception("ACE_SESSION_TOKEN not set for fallback")
+        raise Exception("Could not obtain ACE token")
     
     headers = {
         "Origin": "https://acemusic.ai",
         "Referer": "https://acemusic.ai/",
         "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0"
     }
     data = {
         "task_type": "generate",
@@ -157,6 +161,7 @@ def generate_music_ace_fallback(prompt, lyrics="", duration=30):
         "sample_mode": "false",
         "seed": "-1",
     }
+    
     resp = requests.post(
         "https://ai-api.acemusic.ai/engine/api/engine/release_task",
         data=data,
@@ -164,15 +169,17 @@ def generate_music_ace_fallback(prompt, lyrics="", duration=30):
         timeout=60
     )
     if resp.status_code != 200:
-        raise Exception(f"ACE fallback failed: {resp.status_code}")
+        raise Exception(f"ACE submission failed: {resp.status_code} - {resp.text}")
+    
     result = resp.json()
     task_id = result.get("task_id")
     if not task_id:
         raise Exception("No task_id from ACE")
-    # Poll for result (simplified)
-    for _ in range(30):
+    
+    # Poll for result
+    for attempt in range(30):
         status = requests.get(
-            f"https://ai-api.acemusic.ai/engine/api/engine/status",
+            "https://ai-api.acemusic.ai/engine/api/engine/status",
             params={"task_id": task_id},
             headers=headers
         )
@@ -182,7 +189,7 @@ def generate_music_ace_fallback(prompt, lyrics="", duration=30):
         status_data = status.json()
         if status_data.get("status") == "succeeded":
             result_resp = requests.get(
-                f"https://ai-api.acemusic.ai/engine/api/engine/query_result",
+                "https://ai-api.acemusic.ai/engine/api/engine/query_result",
                 params={"task_id": task_id},
                 headers=headers
             )
@@ -198,9 +205,27 @@ def generate_music_ace_fallback(prompt, lyrics="", duration=30):
                         return audio.content
             break
         time.sleep(5)
-    raise Exception("ACE fallback timed out")
+    raise Exception("ACE generation timed out")
 
-# --- Helper functions (unchanged) ---
+# ============================================================
+# Main generation function – tries ACE first, falls back to Bark
+# ============================================================
+def generate_song(prompt, lyrics="", duration=30):
+    """
+    Try ACE Music API first (if token available), then fall back to Bark.
+    """
+    # First, try ACE with a fresh token
+    try:
+        print("  [Music] Attempting ACE Music API...")
+        return generate_song_ace(prompt, lyrics, duration)
+    except Exception as e:
+        print(f"  [Music] ACE failed: {e}")
+        print("  [Music] Falling back to Bark (local)...")
+        return generate_song_bark(prompt, lyrics, duration)
+
+# ============================================================
+# Helper functions (unchanged)
+# ============================================================
 def detect_mood(style_text):
     style_lower = style_text.lower()
     if "romantic" in style_lower or "love" in style_lower:
@@ -224,18 +249,17 @@ def get_saved_song():
     s   = songs[idx]
     return str(s), s.stem.replace("_"," ").replace("-"," ").title()
 
-# --- Main pipeline ---
+# ============================================================
+# Main pipeline
+# ============================================================
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
-    BOSON_API_KEY       = os.environ.get("BOSON_API_KEY")
 
     if not HF_TOKEN:
         raise EnvironmentError("HF_TOKEN not set")
     if not YOUTUBE_CREDENTIALS:
         raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
-    if not BOSON_API_KEY:
-        raise EnvironmentError("BOSON_API_KEY not set")
 
     print(f"\n{'='*60}")
     print(f"  Pipeline : Romantic Song Video + Short (Weekly, Fully Automated)")
@@ -253,24 +277,22 @@ def run():
             {"type": "chorus", "lines": song["prompt"].split("\n")[4:8]},
         ]
 
-        # Try saved song first (manual uploads)
+        # Try saved song first
         saved, saved_title = get_saved_song()
         if saved:
             song_mp3 = saved
             title = saved_title
             print(f"🎵  Using saved song: {title}")
         else:
-            print("🎵  Generating singing with Boson AI Higgs Audio...")
+            print("🎵  Generating song...")
             mood = detect_mood(style_used)
             music_prompt = f"{style_used}, {mood} mood"
             full_lyrics = "\n".join(["\n".join(sec.get("lines", [])) for sec in sections])
 
-            # Generate audio via Boson AI
-            audio_data = generate_song_boson(
+            audio_data = generate_song(
                 prompt=music_prompt,
                 lyrics=full_lyrics,
-                duration=DURATION,
-                voice="female-1"
+                duration=DURATION
             )
 
             song_mp3 = str(tmp / "generated_song.mp3")
@@ -279,7 +301,7 @@ def run():
 
             print(f"  → Song generated: '{title}' ✓")
 
-        # Loop if needed
+        # Loop to fill duration
         dur = probe_duration(song_mp3)
         if dur < DURATION - 10:
             looped = str(tmp / "looped.mp3")
