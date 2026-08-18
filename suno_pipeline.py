@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """
 suno_pipeline.py — Weekly Romantic Song Video + Short
-Primary: Hugging Face Bark (Inference API) – free, reliable with retries
-Fallback: ACE Music API (if token available)
-Last resort: procedural tone
+Uses ACE Music API with a fresh token (provided by refresh_token.py).
 """
 import os
 import random
@@ -15,8 +13,6 @@ from datetime import datetime
 import time
 import base64
 import requests
-import json
-import re
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from image_gen       import generate_images
@@ -48,49 +44,8 @@ BG_PROMPTS = [
     "first dance at wedding with sparklers and fairy lights around them",
 ]
 
-# ============================================================
-# 1. HUGGING FACE BARK (Primary – free, rate-limited)
-# ============================================================
-def generate_song_bark(prompt, lyrics="", duration=30):
-    """
-    Generate singing using Bark via Hugging Face Inference API.
-    Free tier: ~1000 requests/day (sufficient for weekly runs).
-    """
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise Exception("HF_TOKEN not set")
-    
-    text = f"♪ ({prompt}) {lyrics} ♪"
-    headers = {"Authorization": f"Bearer {hf_token}"}
-    payload = {"inputs": text, "parameters": {"do_sample": True, "temperature": 0.6}}
-    
-    # Retry with backoff
-    for attempt in range(5):
-        try:
-            resp = requests.post(
-                "https://api-inference.huggingface.co/models/suno/bark",
-                json=payload,
-                headers=headers,
-                timeout=120
-            )
-            if resp.status_code == 200:
-                return resp.content  # returns WAV
-            elif resp.status_code == 503:
-                print(f"  [Bark] Model loading, waiting {10*(attempt+1)}s...")
-                time.sleep(10*(attempt+1))
-                continue
-            else:
-                print(f"  [Bark] Attempt {attempt+1} failed: {resp.status_code}")
-                time.sleep(3)
-        except Exception as e:
-            print(f"  [Bark] Attempt {attempt+1} error: {e}")
-            time.sleep(5)
-    raise Exception("Bark failed after retries")
-
-# ============================================================
-# 2. ACE MUSIC API (Fallback – if token is valid)
-# ============================================================
 def generate_song_ace(prompt, lyrics, duration):
+    """Generate using ACE Music API with fresh token from environment."""
     token = os.environ.get("ACE_SESSION_TOKEN")
     if not token:
         raise Exception("ACE_SESSION_TOKEN not set")
@@ -123,7 +78,7 @@ def generate_song_ace(prompt, lyrics, duration):
         timeout=60
     )
     if resp.status_code != 200:
-        raise Exception(f"ACE submission failed: {resp.status_code}")
+        raise Exception(f"ACE submission failed: {resp.status_code} - {resp.text}")
     result = resp.json()
     task_id = result.get("task_id")
     if not task_id:
@@ -158,9 +113,6 @@ def generate_song_ace(prompt, lyrics, duration):
         time.sleep(5)
     raise Exception("ACE generation timed out")
 
-# ============================================================
-# 3. PROCEDURAL TONE (Last resort)
-# ============================================================
 def generate_procedural_tone(duration):
     import numpy as np
     import scipy.io.wavfile as wavfile
@@ -178,31 +130,14 @@ def generate_procedural_tone(duration):
     os.unlink(buf.name)
     return audio_bytes
 
-# ============================================================
-# MAIN GENERATE FUNCTION
-# ============================================================
-def generate_song(prompt, lyrics, title, duration):
-    # 1. Try Bark
+def generate_song(prompt, lyrics, duration):
     try:
-        print("  [Music] Attempting Hugging Face Bark...")
-        return generate_song_bark(prompt, lyrics, duration)
-    except Exception as e:
-        print(f"  [Music] Bark failed: {e}")
-    
-    # 2. Try ACE (if token available)
-    try:
-        print("  [Music] Attempting ACE Music API...")
         return generate_song_ace(prompt, lyrics, duration)
     except Exception as e:
         print(f"  [Music] ACE failed: {e}")
-    
-    # 3. Procedural
-    print("  [Music] All APIs failed. Generating procedural tone...")
-    return generate_procedural_tone(duration)
+        print("  [Music] Generating procedural tone...")
+        return generate_procedural_tone(duration)
 
-# ============================================================
-# Helper functions (unchanged – keep these)
-# ============================================================
 def detect_mood(style_text):
     style_lower = style_text.lower()
     if "romantic" in style_lower or "love" in style_lower:
@@ -226,9 +161,6 @@ def get_saved_song():
     s   = songs[idx]
     return str(s), s.stem.replace("_"," ").replace("-"," ").title()
 
-# ============================================================
-# MAIN PIPELINE
-# ============================================================
 def run():
     HF_TOKEN            = os.environ.get("HF_TOKEN", "")
     YOUTUBE_CREDENTIALS = os.environ.get("YOUTUBE_CREDENTIALS")
@@ -267,7 +199,6 @@ def run():
             audio_data = generate_song(
                 prompt=music_prompt,
                 lyrics=full_lyrics,
-                title=title,
                 duration=DURATION
             )
 
