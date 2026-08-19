@@ -1,27 +1,16 @@
-name: 🌹 Daily Romantic Song Upload
-
-# ── Completely separate from daily_upload.yml ──────────────────────────────
-# Main pipeline   : runs at 10:00 AM UTC (3:30 PM IST)
-# Romantic pipeline: runs every Friday at 14:00 UTC (7:30 PM IST)
+name: 🎵 Weekly Suno Romantic Song Video + Short
 
 on:
   schedule:
-    - cron: "0 14 * * *"    # Every day at 7:30 PM IST
-
+    - cron: "30 15 * * 6"
   workflow_dispatch:
-    inputs:
-      test_mode:
-        description: "true = skip YouTube upload (for testing)"
-        required: false
-        default: "false"
 
 jobs:
-  romantic-upload:
+  suno-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
 
     steps:
-
       - name: 📦 Checkout
         uses: actions/checkout@v4
 
@@ -31,31 +20,42 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: 🔧 System dependencies
+      - name: 🔧 Install ffmpeg (static binary)
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            ffmpeg fonts-dejavu-core fonts-liberation
+          curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
+          sudo cp ffmpeg-*-static/ffmpeg /usr/local/bin/
+          sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
+          ffmpeg -version
 
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: 🌹 Run Romantic Song Pipeline
+      - name: 📝 Generate lyrics for Kaggle
+        run: python prepare_kaggle.py
+
+      - name: 🎵 Generate Song on Kaggle Free GPU
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          echo "📤 Pushing script to Kaggle..."
+          kaggle kernels push -p kaggle_music
+          echo "⏳ Waiting for Kaggle GPU to finish (about 3-5 minutes)..."
+          sleep 300
+          echo "📥 Downloading generated song..."
+          kaggle kernels output bansalabhishek99/weekly-song-generator -p temp_audio
+          echo "✅ Song downloaded to temp_audio/output.mp3"
+
+      - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
-          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
-        run: |
-          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
-            echo "Test mode — pipeline would run here"
-          else
-            python romantic_pipeline.py
-          fi
+          ACESTEP_AUDIO:       temp_audio/output.mp3
+        run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: romantic-failure-logs
+          name: suno-failure-logs
           path: "*.log"
           retention-days: 7
