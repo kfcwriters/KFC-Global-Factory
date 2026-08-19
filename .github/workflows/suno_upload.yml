@@ -20,7 +20,6 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      # --- FAST ffmpeg (static binary, no apt-get) ---
       - name: 🔧 Install ffmpeg (static binary)
         run: |
           curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
@@ -29,10 +28,22 @@ jobs:
           ffmpeg -version
 
       - name: 📥 Python dependencies
-        run: pip install --upgrade pip && pip install -r requirements.txt
+        run: pip install --upgrade pip && pip install -r requirements.txt kaggle
 
-      - name: 🎵 Generate song via YuE Gradio API
-        run: python yue_generator.py
+      - name: 🎵 Generate Song on Kaggle Free GPU
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          echo "📤 Pushing script to Kaggle..."
+          kaggle kernels push -p kaggle_music
+
+          echo "⏳ Waiting for Kaggle GPU to finish (about 2-3 minutes)..."
+          sleep 180
+
+          echo "📥 Downloading generated song..."
+          kaggle kernels output bansalabhishek99/weekly-song-generator -p temp_audio
+
+          echo "✅ Song downloaded to temp_audio/output.mp3"
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
