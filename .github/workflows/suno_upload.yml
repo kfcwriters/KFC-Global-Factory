@@ -38,33 +38,42 @@ jobs:
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
         run: |
+          # Create temp_audio directory
+          mkdir -p temp_audio
+
           echo "📤 Pushing script to Kaggle..."
           kaggle kernels push -p kaggle_music
 
-          echo "⏳ Waiting for Kaggle GPU to finish (about 3-5 minutes)..."
-          sleep 300
-
-          echo "🔍 Checking kernel status..."
-          kaggle kernels status bansalabhishek99/weekly-song-generator
+          echo "⏳ Waiting for Kaggle GPU to finish..."
+          # Poll status every 30 seconds until completed
+          while true; do
+            STATUS=$(kaggle kernels status bansalabhishek99/weekly-song-generator | grep -oE '"(KernelWorkerStatus\.[A-Z]+)"' | tr -d '"')
+            echo "Current status: $STATUS"
+            if [[ "$STATUS" == "KernelWorkerStatus.COMPLETED" || "$STATUS" == "KernelWorkerStatus.SUCCEEDED" ]]; then
+              echo "✅ Kernel completed!"
+              break
+            elif [[ "$STATUS" == "KernelWorkerStatus.FAILED" || "$STATUS" == "KernelWorkerStatus.ERROR" ]]; then
+              echo "❌ Kernel failed!"
+              break
+            fi
+            sleep 30
+          done
 
           echo "📋 Fetching kernel logs..."
-          # Redirect logs to a file (no -p flag)
           kaggle kernels logs bansalabhishek99/weekly-song-generator > temp_audio/kernel.log
 
           echo "📥 Downloading generated song..."
           kaggle kernels output bansalabhishek99/weekly-song-generator -p temp_audio
 
-          echo "✅ Song downloaded to temp_audio/output.mp3"
+          echo "✅ Song download attempted"
 
       - name: 📋 Display Kaggle logs
         run: |
           echo "=== Kaggle Log ==="
           if [ -f temp_audio/kernel.log ]; then
             cat temp_audio/kernel.log
-          elif [ -f temp_audio/weekly-song-generator.log ]; then
-            cat temp_audio/weekly-song-generator.log
           else
-            echo "⚠️ No log file found. Check the Kaggle kernel at https://www.kaggle.com/code/bansalabhishek99/weekly-song-generator"
+            echo "⚠️ Kernel log not found"
           fi
 
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
