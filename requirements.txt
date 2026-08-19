@@ -13,7 +13,9 @@ google-api-python-client>=2.118.0
 google-auth>=2.28.0
 google-auth-oauthlib>=1.2.0
 google-auth-httplib2>=0.2.0
+
+# Hugging Face Spaces client (for YuE fallback, if still used)
 gradio_client>=1.0.0
 
-# For Hugging Face Spaces (if still used)
-gradio_client>=1.0.0
+# Kaggle CLI – required to push and download from Kaggle kernels
+kaggle>=1.5.0
