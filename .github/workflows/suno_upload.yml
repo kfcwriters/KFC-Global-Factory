@@ -8,7 +8,7 @@ on:
 jobs:
   suno-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
 
     steps:
       - name: 📦 Checkout
@@ -20,100 +20,74 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      # --- Install ffmpeg + ffprobe (static binary) ---
-      - name: 🔧 Install ffmpeg + ffprobe
-        run: |
-          curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
-          sudo cp ffmpeg-*-static/ffmpeg /usr/local/bin/
-          sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
-          ffmpeg -version && ffprobe -version
-
-      # --- Install BLAS and build tools ---
-      - name: 📦 Install build dependencies (BLAS)
+      - name: 🔧 Install ffmpeg
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake \
-            libopenblas-dev \
-            liblapack-dev
+          sudo apt-get install -y --no-install-recommends ffmpeg jq
+          ffmpeg -version
 
-      # --- Python dependencies ---
       - name: 📥 Python dependencies
-        run: pip install --upgrade pip && pip install -r requirements.txt
+        run: pip install --upgrade pip && pip install -r requirements.txt huggingface-hub
 
-      # --- Cache acestep.cpp build & models ---
-      - name: 💾 Cache acestep.cpp
-        id: cache-acestep
+      # --- Cache models (7.7 GB) ---
+      - name: 💾 Cache GGUF models
+        id: cache-models
         uses: actions/cache@v4
         with:
-          path: |
-            acestep.cpp
-            acestep.cpp/models
-          key: acestep-${{ runner.os }}-v2
+          path: models
+          key: acestep-models-${{ runner.os }}-v1
 
-      - name: 🔧 Build acestep.cpp (CPU)
-        if: steps.cache-acestep.outputs.cache-hit != 'true'
+      - name: 📥 Download models (if not cached)
+        if: steps.cache-models.outputs.cache-hit != 'true'
         run: |
-          git clone --recurse-submodules https://github.com/ServeurpersoCom/acestep.cpp.git
-          cd acestep.cpp
-          # Use a more reliable build approach
-          mkdir -p build
-          cd build
-          cmake .. -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS
-          make -j$(nproc)
-          # Create symlink to the server binary
-          ln -sf build/bin/server ../server
-
-      - name: 📥 Download Quantized Models (if not cached)
-        if: steps.cache-acestep.outputs.cache-hit != 'true'
-        run: |
-          cd acestep.cpp
-          pip install huggingface-hub
+          mkdir -p models
           huggingface-cli download Serveurperso/ACE-Step-1.5-GGUF \
             acestep-5Hz-lm-4B-Q8_0.gguf \
+            Qwen3-Embedding-0.6B-Q8_0.gguf \
             acestep-v15-turbo-Q8_0.gguf \
-            --local-dir ./models
+            vae-BF16.gguf \
+            --local-dir models
+
+      # --- Download pre-built AppImage ---
+      - name: 🎵 Download acestep-cpp-ui AppImage
+        run: |
+          curl -L -o acestep-cpp-ui.AppImage \
+            https://github.com/audiohacking/acestep-cpp-ui/releases/latest/download/ACE-Step-CPP-UI-x86_64.AppImage
+          chmod +x acestep-cpp-ui.AppImage
 
       # --- Generate song ---
       - name: 🎵 Generate song with acestep.cpp
         id: acestep
         run: |
-          cd acestep.cpp
           # Start the server in the background
-          ./server &
-          # Wait for it to be ready (up to 60 seconds)
+          ./acestep-cpp-ui.AppImage --server --models ./models --port 8085 &
+          
+          # Wait for server to be ready
+          echo "⏳ Waiting for server..."
           for i in {1..60}; do
-            if curl -s http://localhost:8080/health > /dev/null; then
-              echo "Server is ready"
+            if curl -s http://localhost:8085 > /dev/null; then
+              echo "✅ Server ready!"
               break
             fi
-            echo "Waiting for server... ($i/60)"
-            sleep 2
+            echo "Waiting... ($i/60)"
+            sleep 3
           done
 
-          # Prepare lyrics (use your generated lyrics or fallback)
-          cat > lyrics.txt << 'EOF'
-          [Verse 1]
-          My heart knows the way
-          Through the darkest night
-          [Chorus]
-          You are my light
-          Forever by my side
-          EOF
-
-          # Generate audio
-          curl -X POST http://localhost:8080/generate \
+          # Generate the song (210 seconds = 3.5 minutes)
+          curl -X POST http://localhost:8085/v1/music/generate \
             -H "Content-Type: application/json" \
-            -d "{
-              \"prompt\": \"orchestral romantic, strings and piano, powerful female vocal\",
-              \"lyrics\": $(jq -Rs . < lyrics.txt),
-              \"duration\": 210
-            }" --output song.mp3
+            -d '{
+              "caption": "orchestral romantic, strings and piano, powerful female vocal",
+              "lyrics": "[Verse 1]\nMy heart knows the way\nThrough the darkest night\n\n[Chorus]\nYou are my light\nForever by my side",
+              "audio_duration": 210,
+              "vocal_language": "en",
+              "audio_format": "mp3"
+            }' --output song.mp3
 
-          # Save to the expected location
+          # Save to expected location
           mkdir -p ${{ runner.temp }}/acestep
           cp song.mp3 ${{ runner.temp }}/acestep/output.mp3
-          echo "✅ Song generated at ${{ runner.temp }}/acestep/output.mp3"
+          echo "✅ Song generated!"
 
       # --- Run the rest of the pipeline ---
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
