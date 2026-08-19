@@ -20,7 +20,6 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      # --- FIXED: ffmpeg using git master build (reliable) ---
       - name: 🔧 Install ffmpeg (static binary)
         run: |
           wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
@@ -32,11 +31,9 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- Generate lyrics and save to kaggle_music/lyrics.txt ---
       - name: 📝 Generate lyrics for Kaggle
         run: python prepare_kaggle.py
 
-      # --- Push to Kaggle, wait, and download ---
       - name: 🎵 Generate Song on Kaggle Free GPU
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
@@ -47,22 +44,28 @@ jobs:
           echo "⏳ Waiting for Kaggle GPU to finish (about 3-5 minutes)..."
           sleep 300
 
+          echo "🔍 Checking kernel status..."
+          kaggle kernels status bansalabhishek99/weekly-song-generator
+
+          echo "📋 Fetching kernel logs..."
+          kaggle kernels logs bansalabhishek99/weekly-song-generator -p temp_audio
+
           echo "📥 Downloading generated song..."
           kaggle kernels output bansalabhishek99/weekly-song-generator -p temp_audio
 
           echo "✅ Song downloaded to temp_audio/output.mp3"
 
-      # --- Check Kaggle log for debugging ---
-      - name: 📋 Check Kaggle log
+      - name: 📋 Display Kaggle logs
         run: |
           echo "=== Kaggle Log ==="
-          if [ -f temp_audio/weekly-song-generator.log ]; then
+          if [ -f temp_audio/kernel.log ]; then
+            cat temp_audio/kernel.log
+          elif [ -f temp_audio/weekly-song-generator.log ]; then
             cat temp_audio/weekly-song-generator.log
           else
-            echo "⚠️ Log file not found"
+            echo "⚠️ No log file found. Check the Kaggle kernel at https://www.kaggle.com/code/bansalabhishek99/weekly-song-generator"
           fi
 
-      # --- Run the main pipeline ---
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
@@ -70,7 +73,6 @@ jobs:
           ACESTEP_AUDIO:       temp_audio/output.mp3
         run: python suno_pipeline.py
 
-      # --- Upload logs on failure ---
       - name: 📋 Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
