@@ -20,20 +20,20 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: 🔧 Install ffmpeg
+      # --- FAST ffmpeg (static binary, no apt-get) ---
+      - name: 🔧 Install ffmpeg (static binary)
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg jq
+          curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
+          sudo cp ffmpeg-*-static/ffmpeg /usr/local/bin/
+          sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
           ffmpeg -version
 
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- YuE generation via Hugging Face Space (free, no GPU) ---
       - name: 🎵 Generate song via YuE Gradio API
         run: python yue_generator.py
 
-      # --- The generated audio is saved to temp_audio/output.mp3 ---
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
