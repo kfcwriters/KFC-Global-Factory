@@ -48,7 +48,8 @@ jobs:
           kaggle kernels status bansalabhishek99/weekly-song-generator
 
           echo "📋 Fetching kernel logs..."
-          kaggle kernels logs bansalabhishek99/weekly-song-generator -p temp_audio
+          # Redirect logs to a file (no -p flag)
+          kaggle kernels logs bansalabhishek99/weekly-song-generator > temp_audio/kernel.log
 
           echo "📥 Downloading generated song..."
           kaggle kernels output bansalabhishek99/weekly-song-generator -p temp_audio
