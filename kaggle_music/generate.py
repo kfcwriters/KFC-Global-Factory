@@ -1,22 +1,87 @@
-# generate.py
+#!/usr/bin/env python3
+"""
+generate.py — HeartMuLa on Kaggle GPU
+Generates full songs with vocals + instrumental from lyrics and style tags.
+"""
+
 import os
+import subprocess
+import sys
 import torch
 import torchaudio
-from audiocraft.models import MusicGen
+import numpy as np
 
-print("🚀 Booting up MusicGen on Kaggle's free GPU...")
+# ============================================================
+# 1. Install heartlib if not already installed
+# ============================================================
+print("🚀 Setting up HeartMuLa...")
 
-# Load the model using the GPU
-model = MusicGen.get_pretrained('facebook/musicgen-melody')
-model.set_generation_params(duration=30)
+try:
+    import heartlib
+except ImportError:
+    print("📦 Installing heartlib from GitHub...")
+    subprocess.run([
+        sys.executable, "-m", "pip", "install",
+        "git+https://github.com/HeartMuLa/heartlib.git"
+    ], check=True)
+    import heartlib
 
-prompt = "orchestral romantic, strings and piano, powerful female vocal singing"
+from heartlib import HeartMuLa
 
-# Generate the audio
-wav = model.generate([prompt])
+# ============================================================
+# 2. Prepare input data
+# ============================================================
+# Style tags (genre, mood, instruments)
+style_tags = "orchestral romantic, strings and piano, powerful female vocal"
 
-# Kaggle automatically saves anything written to /kaggle/working/
+# Lyrics (use default if no file found)
+lyrics_path = "lyrics.txt"
+if os.path.exists(lyrics_path):
+    with open(lyrics_path, "r") as f:
+        lyrics = f.read()
+else:
+    print("⚠️ No lyrics.txt found. Using default lyrics.")
+    lyrics = """
+[Verse 1]
+My heart knows the way
+Through the darkest night
+
+[Chorus]
+You are my light
+Forever by my side
+"""
+
+# ============================================================
+# 3. Load model with memory-efficient settings
+# ============================================================
+print("🎵 Loading HeartMuLa model (lazy_load + fp16)...")
+model = HeartMuLa.from_pretrained(
+    "HeartMuLa/HeartMuLa-oss-3B-happy-new-year",
+    device="cuda",
+    lazy_load=True,      # Keeps VRAM low (~6GB)
+    fp16=True            # Faster and memory-efficient
+)
+
+# ============================================================
+# 4. Generate the full song
+# ============================================================
+print("🎤 Generating song... (this takes 2-4 minutes)")
+output = model.generate(
+    lyrics=lyrics,
+    tags=style_tags,
+    duration=30,         # Seconds – increase for longer songs
+    language="en"
+)
+
+# ============================================================
+# 5. Save as MP3
+# ============================================================
 output_path = "/kaggle/working/output.mp3"
-torchaudio.save(output_path, wav[0].cpu(), model.sample_rate, format="mp3")
+torchaudio.save(
+    output_path,
+    output.unsqueeze(0).cpu(),
+    sample_rate=44100,
+    format="mp3"
+)
 
-print("✅ Song successfully saved to Kaggle output!")
+print(f"✅ Song saved to {output_path}")
