@@ -20,11 +20,13 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
+      # --- FIXED: ffmpeg using git master build (reliable) ---
       - name: 🔧 Install ffmpeg (static binary)
         run: |
-          curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
-          sudo cp ffmpeg-*-static/ffmpeg /usr/local/bin/
-          sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
+          wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
+          tar -xf ffmpeg-git-amd64-static.tar.xz
+          sudo cp ffmpeg-git-*-static/ffmpeg /usr/local/bin/
+          sudo cp ffmpeg-git-*-static/ffprobe /usr/local/bin/
           ffmpeg -version
 
       - name: 📥 Python dependencies
