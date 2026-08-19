@@ -8,7 +8,7 @@ on:
 jobs:
   suno-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 120   # Allow extra time for build & generation
+    timeout-minutes: 120
 
     steps:
       - name: 📦 Checkout
@@ -28,11 +28,20 @@ jobs:
           sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
           ffmpeg -version && ffprobe -version
 
+      # --- Install BLAS and build tools ---
+      - name: 📦 Install build dependencies (BLAS)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libopenblas-dev \
+            liblapack-dev
+
       # --- Python dependencies ---
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- Cache acestep.cpp build & models (speeds up subsequent runs) ---
+      # --- Cache acestep.cpp build & models ---
       - name: 💾 Cache acestep.cpp
         id: cache-acestep
         uses: actions/cache@v4
@@ -40,14 +49,20 @@ jobs:
           path: |
             acestep.cpp
             acestep.cpp/models
-          key: acestep-${{ runner.os }}-v1
+          key: acestep-${{ runner.os }}-v2
 
       - name: 🔧 Build acestep.cpp (CPU)
         if: steps.cache-acestep.outputs.cache-hit != 'true'
         run: |
           git clone --recurse-submodules https://github.com/ServeurpersoCom/acestep.cpp.git
           cd acestep.cpp
-          ./buildcpu.sh
+          # Use a more reliable build approach
+          mkdir -p build
+          cd build
+          cmake .. -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS
+          make -j$(nproc)
+          # Create symlink to the server binary
+          ln -sf build/bin/server ../server
 
       - name: 📥 Download Quantized Models (if not cached)
         if: steps.cache-acestep.outputs.cache-hit != 'true'
@@ -65,7 +80,7 @@ jobs:
         run: |
           cd acestep.cpp
           # Start the server in the background
-          ./server.sh &
+          ./server &
           # Wait for it to be ready (up to 60 seconds)
           for i in {1..60}; do
             if curl -s http://localhost:8080/health > /dev/null; then
