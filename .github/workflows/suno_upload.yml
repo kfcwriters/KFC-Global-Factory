@@ -8,7 +8,7 @@ on:
 jobs:
   suno-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120   # Allow extra time for build & generation
 
     steps:
       - name: 📦 Checkout
@@ -20,32 +20,87 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      # --- Install ffmpeg + ffprobe via static binary (fast) ---
-      - name: 🔧 Install ffmpeg + ffprobe (static binary)
+      # --- Install ffmpeg + ffprobe (static binary) ---
+      - name: 🔧 Install ffmpeg + ffprobe
         run: |
           curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ
           sudo cp ffmpeg-*-static/ffmpeg /usr/local/bin/
           sudo cp ffmpeg-*-static/ffprobe /usr/local/bin/
-          ffmpeg -version
-          ffprobe -version
-          echo "✅ ffmpeg and ffprobe are ready"
+          ffmpeg -version && ffprobe -version
 
+      # --- Python dependencies ---
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: 🎵 Generate music with ACE-Step (15s test)
-        id: acestep
-        uses: audiohacking/acestep-action@main
-        continue-on-error: true
+      # --- Cache acestep.cpp build & models (speeds up subsequent runs) ---
+      - name: 💾 Cache acestep.cpp
+        id: cache-acestep
+        uses: actions/cache@v4
         with:
-          prompt: 'orchestral romantic, strings and piano'
-          lyrics: |
-            [Verse 1]
-            My heart knows the way
-            [Chorus]
-            You are my light
-          duration: '15'
+          path: |
+            acestep.cpp
+            acestep.cpp/models
+          key: acestep-${{ runner.os }}-v1
 
+      - name: 🔧 Build acestep.cpp (CPU)
+        if: steps.cache-acestep.outputs.cache-hit != 'true'
+        run: |
+          git clone --recurse-submodules https://github.com/ServeurpersoCom/acestep.cpp.git
+          cd acestep.cpp
+          ./buildcpu.sh
+
+      - name: 📥 Download Quantized Models (if not cached)
+        if: steps.cache-acestep.outputs.cache-hit != 'true'
+        run: |
+          cd acestep.cpp
+          pip install huggingface-hub
+          huggingface-cli download Serveurperso/ACE-Step-1.5-GGUF \
+            acestep-5Hz-lm-4B-Q8_0.gguf \
+            acestep-v15-turbo-Q8_0.gguf \
+            --local-dir ./models
+
+      # --- Generate song ---
+      - name: 🎵 Generate song with acestep.cpp
+        id: acestep
+        run: |
+          cd acestep.cpp
+          # Start the server in the background
+          ./server.sh &
+          # Wait for it to be ready (up to 60 seconds)
+          for i in {1..60}; do
+            if curl -s http://localhost:8080/health > /dev/null; then
+              echo "Server is ready"
+              break
+            fi
+            echo "Waiting for server... ($i/60)"
+            sleep 2
+          done
+
+          # Prepare lyrics (use your generated lyrics or fallback)
+          cat > lyrics.txt << 'EOF'
+          [Verse 1]
+          My heart knows the way
+          Through the darkest night
+          [Chorus]
+          You are my light
+          Forever by my side
+          EOF
+
+          # Generate audio
+          curl -X POST http://localhost:8080/generate \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"prompt\": \"orchestral romantic, strings and piano, powerful female vocal\",
+              \"lyrics\": $(jq -Rs . < lyrics.txt),
+              \"duration\": 210
+            }" --output song.mp3
+
+          # Save to the expected location
+          mkdir -p ${{ runner.temp }}/acestep
+          cp song.mp3 ${{ runner.temp }}/acestep/output.mp3
+          echo "✅ Song generated at ${{ runner.temp }}/acestep/output.mp3"
+
+      # --- Run the rest of the pipeline ---
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
