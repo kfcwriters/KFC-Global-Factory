@@ -30,21 +30,8 @@ jobs:
       - name: 📥 Python dependencies
         run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- NEW: Generate lyrics and save to kaggle_music/lyrics.txt ---
       - name: 📝 Generate lyrics for Kaggle
-        run: |
-          python -c "
-import sys
-sys.path.insert(0, '.')
-from src.lyrics_writer import generate_weekly_lyrics
-
-song = generate_weekly_lyrics()
-sections = song.get('sections', [])
-lyrics = '\n'.join(['\n'.join(sec.get('lines', [])) for sec in sections])
-with open('kaggle_music/lyrics.txt', 'w') as f:
-    f.write(lyrics)
-print('✅ Lyrics saved to kaggle_music/lyrics.txt')
-"
+        run: python prepare_kaggle.py
 
       - name: 🎵 Generate Song on Kaggle Free GPU
         env:
