@@ -27,74 +27,18 @@ jobs:
           ffmpeg -version
 
       - name: 📥 Python dependencies
-        run: pip install --upgrade pip && pip install -r requirements.txt huggingface-hub
+        run: pip install --upgrade pip && pip install -r requirements.txt
 
-      # --- Cache models (7.7 GB) ---
-      - name: 💾 Cache GGUF models
-        id: cache-models
-        uses: actions/cache@v4
-        with:
-          path: models
-          key: acestep-models-${{ runner.os }}-v1
+      # --- YuE generation via Hugging Face Space (free, no GPU) ---
+      - name: 🎵 Generate song via YuE Gradio API
+        run: python yue_generator.py
 
-      - name: 📥 Download models (if not cached)
-        if: steps.cache-models.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p models
-          huggingface-cli download Serveurperso/ACE-Step-1.5-GGUF \
-            acestep-5Hz-lm-4B-Q8_0.gguf \
-            Qwen3-Embedding-0.6B-Q8_0.gguf \
-            acestep-v15-turbo-Q8_0.gguf \
-            vae-BF16.gguf \
-            --local-dir models
-
-      # --- Download pre-built AppImage ---
-      - name: 🎵 Download acestep-cpp-ui AppImage
-        run: |
-          curl -L -o acestep-cpp-ui.AppImage \
-            https://github.com/audiohacking/acestep-cpp-ui/releases/latest/download/ACE-Step-CPP-UI-x86_64.AppImage
-          chmod +x acestep-cpp-ui.AppImage
-
-      # --- Generate song ---
-      - name: 🎵 Generate song with acestep.cpp
-        id: acestep
-        run: |
-          # Start the server in the background
-          ./acestep-cpp-ui.AppImage --server --models ./models --port 8085 &
-          
-          # Wait for server to be ready
-          echo "⏳ Waiting for server..."
-          for i in {1..60}; do
-            if curl -s http://localhost:8085 > /dev/null; then
-              echo "✅ Server ready!"
-              break
-            fi
-            echo "Waiting... ($i/60)"
-            sleep 3
-          done
-
-          # Generate the song (210 seconds = 3.5 minutes)
-          curl -X POST http://localhost:8085/v1/music/generate \
-            -H "Content-Type: application/json" \
-            -d '{
-              "caption": "orchestral romantic, strings and piano, powerful female vocal",
-              "lyrics": "[Verse 1]\nMy heart knows the way\nThrough the darkest night\n\n[Chorus]\nYou are my light\nForever by my side",
-              "audio_duration": 210,
-              "vocal_language": "en",
-              "audio_format": "mp3"
-            }' --output song.mp3
-
-          # Save to expected location
-          mkdir -p ${{ runner.temp }}/acestep
-          cp song.mp3 ${{ runner.temp }}/acestep/output.mp3
-          echo "✅ Song generated!"
-
-      # --- Run the rest of the pipeline ---
+      # --- The generated audio is saved to temp_audio/output.mp3 ---
       - name: 🎵 Run Weekly Romantic Song + Short Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
-          ACESTEP_AUDIO:       ${{ runner.temp }}/acestep/output.mp3
+          ACESTEP_AUDIO:       temp_audio/output.mp3
         run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
