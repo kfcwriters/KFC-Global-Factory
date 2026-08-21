@@ -2,7 +2,7 @@ name: 🎵 Weekly Suno Romantic Song Video + Short
 
 on:
   schedule:
-    - cron: "30 15 * * 6"
+    - cron: "30 15 * * 6"   # Every Saturday 9:00 PM IST
   workflow_dispatch:
 
 jobs:
@@ -20,67 +20,24 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: 🔧 Install ffmpeg (static binary)
+      - name: 🔧 System dependencies
         run: |
-          wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
-          tar -xf ffmpeg-git-amd64-static.tar.xz
-          sudo cp ffmpeg-git-*-static/ffmpeg /usr/local/bin/
-          sudo cp ffmpeg-git-*-static/ffprobe /usr/local/bin/
-          ffmpeg -version
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg fonts-dejavu-core fonts-liberation
 
       - name: 📥 Python dependencies
-        run: pip install --upgrade pip && pip install -r requirements.txt
-
-      - name: 📝 Generate lyrics for Kaggle
-        run: python prepare_kaggle.py
-
-      - name: 🎵 Generate Song on Kaggle Free GPU
-        env:
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
         run: |
-          # Create temp_audio directory
-          mkdir -p temp_audio
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install kaggle --quiet
 
-          echo "📤 Pushing script to Kaggle..."
-          kaggle kernels push -p kaggle_music
-
-          echo "⏳ Waiting for Kaggle GPU to finish..."
-          # Poll status every 30 seconds until completed
-          while true; do
-            STATUS=$(kaggle kernels status bansalabhishek99/weekly-song-generator | grep -oE '"(KernelWorkerStatus\.[A-Z]+)"' | tr -d '"')
-            echo "Current status: $STATUS"
-            if [[ "$STATUS" == "KernelWorkerStatus.COMPLETED" || "$STATUS" == "KernelWorkerStatus.SUCCEEDED" ]]; then
-              echo "✅ Kernel completed!"
-              break
-            elif [[ "$STATUS" == "KernelWorkerStatus.FAILED" || "$STATUS" == "KernelWorkerStatus.ERROR" ]]; then
-              echo "❌ Kernel failed!"
-              break
-            fi
-            sleep 30
-          done
-
-          echo "📋 Fetching kernel logs..."
-          kaggle kernels logs bansalabhishek99/weekly-song-generator > temp_audio/kernel.log
-
-          echo "📥 Downloading generated song..."
-          kaggle kernels output bansalabhishek99/weekly-song-generator -p temp_audio
-
-          echo "✅ Song download attempted"
-
-      - name: 📋 Display Kaggle logs
-        run: |
-          echo "=== Kaggle Log ==="
-          if [ -f temp_audio/kernel.log ]; then
-            cat temp_audio/kernel.log
-          else
-            echo "⚠️ Kernel log not found"
-          fi
-
-      - name: 🎵 Run Weekly Romantic Song + Short Pipeline
+      - name: 🎵 Run Weekly Romantic Song Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
-          ACESTEP_AUDIO:       temp_audio/output.mp3
+          KAGGLE_USERNAME:     ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY:          ${{ secrets.KAGGLE_KEY }}
         run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
@@ -88,7 +45,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: suno-failure-logs
-          path: |
-            *.log
-            temp_audio/*.log
+          path: "*.log"
           retention-days: 7
