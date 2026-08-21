@@ -1,0 +1,13 @@
+{
+  "id": "kfcwriters/acestep-music-generator",
+  "title": "ACE-Step Music Generator",
+  "code_file": "run_acestep.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["kfcwriters/song-params"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
