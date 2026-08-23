@@ -84,10 +84,30 @@ def upload_params_dataset(username: str, lyrics: str, style: str,
 
 
 def trigger_kernel(username: str, kaggle_dir: Path):
-    """Push and trigger the ACE-Step kernel."""
-    kernel_slug = f"{username}/acestep-music-generator"
-    print(f"  [kaggle] Triggering kernel: {kernel_slug} ...")
-    _run(["kaggle", "kernels", "push", "-p", str(kaggle_dir)])
+    """
+    Push and trigger the ACE-Step kernel with T4 GPU explicitly requested.
+    P100 (Kaggle's silent default via API push) has CUDA capability 6.0,
+    which is TOO OLD for modern PyTorch (needs 7.0+). T4 has capability 7.5.
+    """
+    kernel_slug = f"{username}/ace-step-music-generator"
+    print(f"  [kaggle] Triggering kernel: {kernel_slug} (T4 GPU) ...")
+
+    # Try with explicit T4 accelerator flag (newer kaggle-cli)
+    result = _run(
+        ["kaggle", "kernels", "push", "-p", str(kaggle_dir),
+         "--accelerator", "NvidiaTeslaT4"],
+        check=False
+    )
+
+    if result.returncode != 0:
+        err = (result.stdout + result.stderr).lower()
+        if "unrecognized" in err or "no such option" in err or "unexpected" in err:
+            print(f"  [kaggle] --accelerator flag not supported by this CLI version, "
+                  f"pushing without it (will use account default GPU) ...")
+            _run(["kaggle", "kernels", "push", "-p", str(kaggle_dir)])
+        else:
+            raise RuntimeError(f"Kernel push failed:\n{result.stdout}\n{result.stderr}")
+
     print(f"  [kaggle] Kernel triggered ✓")
     return kernel_slug
 
@@ -153,9 +173,9 @@ def generate_song_kaggle(lyrics: str, style: str, title: str,
     _setup_kaggle_credentials(kaggle_username, kaggle_key)
 
     kaggle_dir = Path(__file__).parent.parent / "kaggle"
-    kernel_slug = f"{kaggle_username}/acestep-music-generator"
+    kernel_slug = f"{kaggle_username}/ace-step-music-generator"
 
     upload_params_dataset(kaggle_username, lyrics, style, title, duration)
     trigger_kernel(kaggle_username, kaggle_dir)
-    wait_for_kernel(kernel_slug, timeout_min=20)
+    wait_for_kernel(kernel_slug, timeout_min=25)
     return download_output(kernel_slug)
