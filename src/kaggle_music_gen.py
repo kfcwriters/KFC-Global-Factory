@@ -8,12 +8,28 @@ from pathlib import Path
 
 
 def _setup_kaggle_credentials(username: str, key: str):
+    """
+    Supports BOTH Kaggle credential formats:
+      - NEW: single API token (starts with 'KGAT_') via access_token file
+      - OLD: username+key pair via kaggle.json
+    Auto-detects which format was provided.
+    """
     kaggle_dir = Path.home() / ".kaggle"
     kaggle_dir.mkdir(exist_ok=True)
-    creds_file = kaggle_dir / "kaggle.json"
-    creds_file.write_text(json.dumps({"username": username, "key": key}))
-    creds_file.chmod(0o600)
-    print(f"  [kaggle] Credentials set for user: {username}")
+
+    if key.startswith("KGAT_") or (not username and key):
+        # New single-token format
+        token_file = kaggle_dir / "access_token"
+        token_file.write_text(key.strip())
+        token_file.chmod(0o600)
+        os.environ["KAGGLE_API_TOKEN"] = key.strip()
+        print(f"  [kaggle] New-format API token set (KGAT_...) ✓")
+    else:
+        # Legacy username+key format
+        creds_file = kaggle_dir / "kaggle.json"
+        creds_file.write_text(json.dumps({"username": username, "key": key}))
+        creds_file.chmod(0o600)
+        print(f"  [kaggle] Legacy credentials set for user: {username}")
 
 
 def _run(cmd: list, check=True) -> subprocess.CompletedProcess:
