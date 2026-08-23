@@ -2,14 +2,13 @@
 """
 run_acestep.py — Runs on Kaggle GPU notebook
 Generates a full romantic song with real vocals using ACE-Step.
-Called automatically via Kaggle API from GitHub Actions.
 
-Input: /kaggle/input/song-params/params.json
-Output: /kaggle/working/generated_song.mp3
+FIXED: "acestep" is NOT on PyPI under that name for pip install.
+Correct install is directly from GitHub:
+  pip install git+https://github.com/ace-step/ACE-Step.git
 """
 import json, os, subprocess, sys
 
-# ── Read parameters from input dataset ────────────────────────────────────────
 params_path = "/kaggle/input/song-params/params.json"
 if os.path.exists(params_path):
     with open(params_path) as f:
@@ -26,26 +25,34 @@ print(f"Generating: {params['title']}")
 print(f"Style: {params['style'][:60]}")
 print(f"Duration: {params.get('duration', 180)}s")
 
-# ── Install ACE-Step ──────────────────────────────────────────────────────────
-print("\nInstalling ACE-Step...")
+# ── Install ACE-Step from GitHub (correct method — not on PyPI as 'acestep') ──
+print("\nInstalling ACE-Step from GitHub source...")
 subprocess.run([
     sys.executable, "-m", "pip", "install",
-    "acestep", "--quiet"
+    "git+https://github.com/ace-step/ACE-Step.git",
+    "--quiet"
 ], check=True)
+
+print("Installing ffmpeg-python and torchaudio (if missing)...")
+subprocess.run([
+    sys.executable, "-m", "pip", "install",
+    "torchaudio", "--quiet"
+], check=False)   # may already be present in Kaggle image
 
 # ── Generate song ─────────────────────────────────────────────────────────────
 print("\nGenerating song with ACE-Step on GPU...")
 
-from acestep.pipeline import ACEStepPipeline
+from acestep.pipeline_ace_step import ACEStepPipeline
 
-pipe = ACEStepPipeline.from_pretrained(
-    "ACE-Step/ACE-Step-v1",
-    torch_dtype="float16"
+pipe = ACEStepPipeline(
+    checkpoint_dir=None,   # auto-downloads to ~/.cache/ace-step/checkpoints
+    dtype="float16",
+    torch_compile=False,
 )
-pipe = pipe.to("cuda")
 
 duration = float(params.get("duration", 180))
-result = pipe(
+
+output_paths = pipe(
     audio_duration=duration,
     prompt=params["style"],
     lyrics=params["lyrics"],
@@ -53,30 +60,41 @@ result = pipe(
     guidance_scale=15.0,
     scheduler_type="euler",
     cfg_type="apg",
-    use_erg_tag=True,
-    use_erg_lyric=True,
-    use_erg_diffusion=True,
+    omega_scale=10.0,
     guidance_interval=0.5,
     guidance_interval_decay=0.0,
     min_guidance_scale=3.0,
-    granularity_scale=10.0,
+    use_erg_tag=True,
+    use_erg_lyric=True,
+    use_erg_diffusion=True,
+    save_path="/kaggle/working/",
 )
 
-# Save output
-out_wav = "/kaggle/working/generated_song.wav"
-out_mp3 = "/kaggle/working/generated_song.mp3"
+print(f"\nOutput paths: {output_paths}")
 
-import torchaudio
-torchaudio.save(out_wav, result["waveform"].squeeze(0).cpu(), result["sample_rate"])
-print(f"WAV saved: {out_wav}")
+# Find the generated audio file
+import glob
+audio_files = glob.glob("/kaggle/working/*.wav") + glob.glob("/kaggle/working/*.mp3")
 
-# Convert to MP3
-subprocess.run([
-    "ffmpeg", "-y", "-i", out_wav,
-    "-codec:a", "libmp3lame", "-qscale:a", "2",
-    out_mp3
-], check=True)
+if not audio_files:
+    raise RuntimeError(f"No audio file found in /kaggle/working/. Contents: {os.listdir('/kaggle/working/')}")
 
-size = os.path.getsize(out_mp3) // 1024
-print(f"\n✅ Song generated: {out_mp3} ({size} KB)")
+source_file = audio_files[0]
+print(f"Found generated file: {source_file}")
+
+# Ensure final output is named generated_song.mp3
+final_mp3 = "/kaggle/working/generated_song.mp3"
+if source_file.endswith(".wav"):
+    subprocess.run([
+        "ffmpeg", "-y", "-i", source_file,
+        "-codec:a", "libmp3lame", "-qscale:a", "2",
+        final_mp3
+    ], check=True)
+else:
+    import shutil
+    if source_file != final_mp3:
+        shutil.copy(source_file, final_mp3)
+
+size = os.path.getsize(final_mp3) // 1024
+print(f"\n✅ Song generated: {final_mp3} ({size} KB)")
 print(f"Title: {params['title']}")
