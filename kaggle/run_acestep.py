@@ -9,6 +9,10 @@ Correct install is directly from GitHub:
 """
 import json, os, subprocess, sys
 
+# Reduce CUDA memory fragmentation (T4 has limited VRAM ~15GB usable)
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 params_path = "/kaggle/input/song-params/params.json"
 if os.path.exists(params_path):
     with open(params_path) as f:
@@ -42,12 +46,17 @@ subprocess.run([
 # ── Generate song ─────────────────────────────────────────────────────────────
 print("\nGenerating song with ACE-Step on GPU...")
 
+import torch
 from acestep.pipeline_ace_step import ACEStepPipeline
 
+# Free any cached memory before loading
+torch.cuda.empty_cache()
+
 pipe = ACEStepPipeline(
-    checkpoint_dir=None,   # auto-downloads to ~/.cache/ace-step/checkpoints
+    checkpoint_dir=None,       # auto-downloads to ~/.cache/ace-step/checkpoints
     dtype="float16",
     torch_compile=False,
+    cpu_offload=True,          # offload unused layers to CPU RAM — fixes OOM on 16GB GPUs
 )
 
 duration = float(params.get("duration", 180))
