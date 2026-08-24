@@ -40,12 +40,17 @@ jobs:
             ffmpeg fonts-dejavu-core fonts-liberation espeak-ng
 
       - name: 📥 Python dependencies
-        run: pip install --upgrade pip && pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install kaggle --quiet
 
       - name: 🎨 Run Kids Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+          KAGGLE_USERNAME_2:   ${{ secrets.KAGGLE_USERNAME_2 }}
+          KAGGLE_KEY_2:        ${{ secrets.KAGGLE_KEY_2 }}
           UPLOAD_NUM:          ${{ github.event.inputs.upload_num || '0' }}
         run: python kids_pipeline.py
 
