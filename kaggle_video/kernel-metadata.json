@@ -1,0 +1,16 @@
+{
+  "id": "kfcwriters/animatediff-cartoon-generator",
+  "title": "AnimateDiff Cartoon Generator",
+  "code_file": "run_animatediff.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "enable_tpu": false,
+  "docker_image_pinning_type": "original",
+  "dataset_sources": ["kfcwriters/cartoon-params"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
