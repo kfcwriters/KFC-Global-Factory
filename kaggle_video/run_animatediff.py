@@ -62,7 +62,17 @@ pipe.scheduler = EulerDiscreteScheduler.from_config(
 )
 
 pipe.enable_model_cpu_offload()
-pipe.enable_vae_slicing()
+
+# enable_vae_slicing() was removed/moved in newer diffusers versions.
+# Try it, but don't fail the whole run if it's unavailable — it's a
+# memory optimization, not a hard requirement for generation to work.
+try:
+    pipe.vae.enable_slicing()
+except AttributeError:
+    try:
+        pipe.enable_vae_slicing()
+    except AttributeError:
+        print("  (vae slicing not available in this diffusers version — skipping, not required)")
 
 print("Pipeline loaded ✓\n")
 
