@@ -1,59 +1,59 @@
 """
 lyrics_writer_hindi.py
-Generates 100% unique Hindi (Romanized) romantic song lyrics every week.
-Pure Python — no API needed, completely free, works forever.
-Same technique as lyrics_writer.py (English) — different word banks.
+Generates 100% unique Hindi song lyrics every week — in ACTUAL DEVANAGARI
+SCRIPT (not Romanized), because ACE-Step auto-detects language from the
+script/alphabet used. Romanized Hindi (Latin letters) gets detected as
+English and sung with English phonetics — this is the bug we just fixed.
 
-Uses Romanized Hindi (Hindi words in English script) since ACE-Step's
-text encoder handles Latin script much better than Devanagari for singing.
+Pure Python — no API needed, completely free, works forever.
 """
 import random
 from datetime import datetime
 
 
-# ── Hindi word banks (Romanized) ──────────────────────────────────────────────
+# ── Hindi word banks — DEVANAGARI SCRIPT (for correct language detection) ─────
 NAMES_OF_LOVE = [
-    "meri jaan", "mera dil", "meri zindagi", "mera pyaar", "meri dhadkan",
-    "mera chand", "mera sitara", "meri khushi", "mera sukoon", "meri duniya",
-    "meri saans", "mera nasha", "meri mohabbat", "mera armaan",
+    "मेरी जान", "मेरा दिल", "मेरी ज़िंदगी", "मेरा प्यार", "मेरी धड़कन",
+    "मेरा चाँद", "मेरा सितारा", "मेरी खुशी", "मेरा सुकून", "मेरी दुनिया",
+    "मेरी साँस", "मेरा नशा", "मेरी मोहब्बत", "मेरा अरमान",
 ]
 
 FEELINGS = [
-    "tujhse pyaar ho gaya", "tere bina adhoora hoon",
-    "tujhe dekh ke sukoon milta hai", "zindagi khoobsurat lagti hai",
-    "dil ki dhadkan badh jaati hai", "har gham bhool jaata hoon",
-    "naya jahan mil gaya", "khushiyon ka ehsaas hota hai",
-    "tere ishq mein doob gaya", "har pal tera intezaar karta hoon",
+    "तुझसे प्यार हो गया", "तेरे बिना अधूरा हूँ",
+    "तुझे देख के सुकून मिलता है", "ज़िंदगी खूबसूरत लगती है",
+    "दिल की धड़कन बढ़ जाती है", "हर ग़म भूल जाता हूँ",
+    "नया जहान मिल गया", "खुशियों का एहसास होता है",
+    "तेरे इश्क़ में डूब गया", "हर पल तेरा इंतज़ार करता हूँ",
 ]
 
 NATURE_IMAGES = [
-    "chaand roshni bikhrata hai", "sitare aasman mein chamakte hain",
-    "phool khilte hain baagon mein", "baarish barasti hai dheere dheere",
-    "hawa tera naam leti hai", "samandar ki lehrein gaati hain",
-    "suraj dhalta hai shaam mein", "titliyan udti hain baagon mein",
-    "kohra chaaya hai pahaadon par", "patte girte hain khamoshi se",
+    "चाँद रोशनी बिखेरता है", "सितारे आसमान में चमकते हैं",
+    "फूल खिलते हैं बागों में", "बारिश बरसती है धीरे धीरे",
+    "हवा तेरा नाम लेती है", "समंदर की लहरें गाती हैं",
+    "सूरज ढलता है शाम में", "तितलियाँ उड़ती हैं बागों में",
+    "कोहरा छाया है पहाड़ों पर", "पत्ते गिरते हैं ख़ामोशी से",
 ]
 
 PROMISES = [
-    "main tujhe kabhi nahi chhodunga",
-    "hamesha tera saath dunga",
-    "main tere saath hoon har pal",
-    "tujhe kabhi akela nahi chhodunga",
-    "har janam mein tujhe chahunga",
-    "tera haath kabhi nahi chhodunga",
-    "zindagi bhar tera intezaar karunga",
-    "tujhse pyaar karta rahunga hamesha",
+    "मैं तुझे कभी नहीं छोड़ूंगा",
+    "हमेशा तेरा साथ दूंगा",
+    "मैं तेरे साथ हूँ हर पल",
+    "तुझे कभी अकेला नहीं छोड़ूंगा",
+    "हर जनम में तुझे चाहूंगा",
+    "तेरा हाथ कभी नहीं छोड़ूंगा",
+    "ज़िंदगी भर तेरा इंतज़ार करूंगा",
+    "तुझसे प्यार करता रहूंगा हमेशा",
 ]
 
-ENGLISH_MIX_LINES = [
-    ("You are my everything", "Tu hi meri sab kuch hai"),
-    ("I will always love you", "Main hamesha tujhe pyaar karunga"),
-    ("Forever and always", "Hamesha aur hamesha"),
-    ("You complete my heart", "Tu mera dil poora karta hai"),
-    ("My heart beats for you", "Mera dil tere liye dhadakta hai"),
-    ("You are my dream come true", "Tu meri poori hui khwaish hai"),
-    ("Stay with me forever", "Mere saath hamesha reh"),
-    ("I found my home in you", "Tujhme mera ghar mil gaya"),
+BRIDGE_LINES = [
+    "तू ही मेरी सब कुछ है",
+    "मैं हमेशा तुझे प्यार करूंगा",
+    "हमेशा और हमेशा",
+    "तू मेरा दिल पूरा करता है",
+    "मेरा दिल तेरे लिए धड़कता है",
+    "तू मेरी पूरी हुई ख्वाहिश है",
+    "मेरे साथ हमेशा रह",
+    "तुझमें मेरा घर मिल गया",
 ]
 
 MOODS = [
@@ -64,19 +64,24 @@ MOODS = [
     "dil se dil ki baat", "pehla ishq",
 ]
 
+# Style tags stay in English (these guide the MUSIC style, not the lyrics
+# language — ACE-Step's UMT5 prompt encoder handles English tags fine
+# regardless of lyric language)
 MUSIC_STYLES = [
-    "bollywood romantic ballad, soft piano, emotional female vocals, slow tempo",
-    "sad hindi ballad, piano and violin, melancholic female vocals",
-    "upbeat hindi pop, dhol and guitar, happy female vocals",
-    "bollywood fusion, sitar and tabla, Hindi female vocals, soulful",
-    "orchestral hindi romantic, strings and piano, powerful female vocals",
-    "soft intimate hindi ballad, acoustic guitar, whispery female vocals",
-    "monsoon hindi romantic, piano and rain sounds, dreamy female vocals",
-    "hindi wedding song, dhol and shehnai, uplifting female vocals",
-    "hindi qawwali inspired, harmonium and tabla, soulful female vocals",
-    "bollywood RnB, piano and beats, deep emotional female vocals",
+    "bollywood romantic ballad, soft piano, emotional female vocals, slow tempo, hindi",
+    "sad hindi ballad, piano and violin, melancholic female vocals, hindi language",
+    "upbeat hindi pop, dhol and guitar, happy female vocals, hindi language",
+    "bollywood fusion, sitar and tabla, hindi female vocals, soulful",
+    "orchestral hindi romantic, strings and piano, powerful female vocals, hindi",
+    "soft intimate hindi ballad, acoustic guitar, whispery female vocals, hindi",
+    "monsoon hindi romantic, piano and rain sounds, dreamy female vocals, hindi",
+    "hindi wedding song, dhol and shehnai, uplifting female vocals, hindi",
+    "hindi qawwali inspired, harmonium and tabla, soulful female vocals, hindi",
+    "bollywood RnB, piano and beats, deep emotional female vocals, hindi language",
 ]
 
+# Titles shown in YouTube metadata — Romanized is fine here since this is
+# just DISPLAY text, not sung lyrics
 SONG_TITLES = [
     "Tere Bina", "Mera Ishq", "Dil Ki Baat", "Pyaar Ka Rang",
     "Tu Hi Meri Duniya", "Judaai", "Milan", "Zindagi Tere Naam",
@@ -93,70 +98,55 @@ def _title(week: int) -> str:
 def _verse(week: int, verse_num: int) -> list:
     seed = week * 10 + verse_num
     r    = random.Random(seed)
-
-    lines = [
-        f"{r.choice(NATURE_IMAGES).capitalize()}",
-        f"Aur {r.choice(FEELINGS)}",
-        f"Tu hai {r.choice(NAMES_OF_LOVE)}",
-        f"{r.choice(PROMISES)}",
+    return [
+        r.choice(NATURE_IMAGES),
+        f"और {r.choice(FEELINGS)}",
+        f"तू है {r.choice(NAMES_OF_LOVE)}",
+        r.choice(PROMISES),
     ]
-    return lines
 
 
 def _chorus(week: int) -> list:
     r = random.Random(week * 100)
-    eng, hin = r.choice(ENGLISH_MIX_LINES)
-
-    lines = [
-        f"Tu hai {r.choice(NAMES_OF_LOVE)}, tu hi sab kuch hai",
-        f"{hin}",
-        f"{r.choice(PROMISES)}",
-        f"Tu hai {r.choice(NAMES_OF_LOVE)}, mera pyaar hamesha",
+    return [
+        f"तू है {r.choice(NAMES_OF_LOVE)}, तू ही सब कुछ है",
+        r.choice(BRIDGE_LINES),
+        r.choice(PROMISES),
+        f"तू है {r.choice(NAMES_OF_LOVE)}, मेरा प्यार हमेशा",
     ]
-    return lines
 
 
 def _bridge(week: int) -> list:
     r = random.Random(week * 200)
-    eng, hin = r.choice(ENGLISH_MIX_LINES)
-
-    lines = [
-        f"{hin}",
-        f"{eng}",
-        f"{r.choice(PROMISES)}",
-        f"Tu hai {r.choice(NAMES_OF_LOVE)} hamesha ke liye",
+    return [
+        r.choice(BRIDGE_LINES),
+        r.choice(BRIDGE_LINES),
+        r.choice(PROMISES),
+        f"तू है {r.choice(NAMES_OF_LOVE)} हमेशा के लिए",
     ]
-    return lines
 
 
 def generate_weekly_lyrics_hindi() -> dict:
     """
-    Generate completely unique Hindi lyrics every week.
-    Same seeding technique as English version — reproducible per week,
-    different across weeks.
+    Generate completely unique Hindi lyrics (Devanagari script) every week.
     """
-    week  = datetime.utcnow().isocalendar()[1]
-    year  = datetime.utcnow().year
-    seed  = week + year * 100 + 500   # offset so it differs from English seed
+    week = datetime.utcnow().isocalendar()[1]
+    year = datetime.utcnow().year
+    seed = week + year * 100 + 500
 
     random.seed(seed)
 
-    title  = _title(week)
-    style  = MUSIC_STYLES[week % len(MUSIC_STYLES)]
-    mood   = MOODS[week % len(MOODS)]
-
-    verse1 = _verse(week, 1)
-    verse2 = _verse(week, 2)
-    chorus = _chorus(week)
-    bridge = _bridge(week)
+    title = _title(week)
+    style = MUSIC_STYLES[week % len(MUSIC_STYLES)]
+    mood  = MOODS[week % len(MOODS)]
 
     sections = [
-        {"type": "verse",  "lines": verse1},
-        {"type": "chorus", "lines": chorus},
-        {"type": "verse",  "lines": verse2},
-        {"type": "chorus", "lines": chorus},
-        {"type": "bridge", "lines": bridge},
-        {"type": "chorus", "lines": chorus},
+        {"type": "verse",  "lines": _verse(week, 1)},
+        {"type": "chorus", "lines": _chorus(week)},
+        {"type": "verse",  "lines": _verse(week, 2)},
+        {"type": "chorus", "lines": _chorus(week)},
+        {"type": "bridge", "lines": _bridge(week)},
+        {"type": "chorus", "lines": _chorus(week)},
     ]
 
     prompt = "\n\n".join(
@@ -165,6 +155,7 @@ def generate_weekly_lyrics_hindi() -> dict:
 
     print(f"  [lyrics-hindi] Week {week}/{year}: '{title}' ({mood})")
     print(f"  [lyrics-hindi] Style: {style[:50]}...")
+    print(f"  [lyrics-hindi] Script: Devanagari (हिंदी) — for correct pronunciation")
 
     return {
         "title"    : title,
