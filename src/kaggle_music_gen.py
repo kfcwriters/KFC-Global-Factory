@@ -2,66 +2,81 @@
 kaggle_music_gen.py
 Generates full AI songs with REAL VOCALS by running ACE-Step on
 Kaggle's FREE T4 GPU (16GB VRAM, 30 hours/week).
+
+FIXED: Explicit UTF-8 encoding throughout — without this, Devanagari
+Hindi text (or any non-ASCII script) can get mangled when written to
+disk/JSON, causing ACE-Step to receive corrupted or fallback-to-English
+text even though the Python string itself was correct.
 """
 import json, os, time, subprocess, tempfile
 from pathlib import Path
 
 
 def _setup_kaggle_credentials(username: str, key: str):
-    """
-    Supports BOTH Kaggle credential formats:
-      - NEW: single API token (starts with 'KGAT_') via access_token file
-      - OLD: username+key pair via kaggle.json
-    Auto-detects which format was provided.
-    """
     kaggle_dir = Path.home() / ".kaggle"
     kaggle_dir.mkdir(exist_ok=True)
 
     if key.startswith("KGAT_") or (not username and key):
-        # New single-token format
         token_file = kaggle_dir / "access_token"
-        token_file.write_text(key.strip())
+        token_file.write_text(key.strip(), encoding="utf-8")
         token_file.chmod(0o600)
         os.environ["KAGGLE_API_TOKEN"] = key.strip()
-        print(f"  [kaggle] New-format API token set (KGAT_...) ✓")
+        print(f"  [kaggle] New-format API token set ✓")
     else:
-        # Legacy username+key format
         creds_file = kaggle_dir / "kaggle.json"
-        creds_file.write_text(json.dumps({"username": username, "key": key}))
+        creds_file.write_text(
+            json.dumps({"username": username, "key": key}),
+            encoding="utf-8"
+        )
         creds_file.chmod(0o600)
-        print(f"  [kaggle] Legacy credentials set for user: {username}")
+        print(f"  [kaggle] Legacy credentials set for: {username}")
 
 
 def _run(cmd: list, check=True) -> subprocess.CompletedProcess:
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
     if check and result.returncode != 0:
         raise RuntimeError(
             f"Command failed: {' '.join(cmd)}\n"
-            f"stdout: {result.stdout[:300]}\n"
-            f"stderr: {result.stderr[:300]}"
+            f"stdout: {result.stdout[:400]}\nstderr: {result.stderr[:400]}"
         )
     return result
 
 
 def upload_params_dataset(username: str, lyrics: str, style: str,
                           title: str, duration: int = 180) -> str:
-    """Upload song parameters as a Kaggle dataset."""
+    """
+    Upload song parameters as a Kaggle dataset.
+
+    CRITICAL FIX: Both json.dumps(..., ensure_ascii=False) AND
+    write_text(..., encoding="utf-8") are required together.
+    - ensure_ascii=False keeps Devanagari/non-Latin chars as real UTF-8
+      bytes in the file (readable, not \\uXXXX escapes)
+    - encoding="utf-8" ensures Path.write_text() doesn't fall back to
+      a platform-default encoding (which can differ on some runners)
+    """
     params = {"lyrics": lyrics, "style": style, "title": title, "duration": duration}
     dataset_slug = f"{username}/song-params"
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        (tmp / "params.json").write_text(json.dumps(params, indent=2))
+
+        params_json = json.dumps(params, indent=2, ensure_ascii=False)
+        (tmp / "params.json").write_text(params_json, encoding="utf-8")
+
+        # Debug: confirm what's actually being written
+        print(f"  [kaggle] Lyrics preview (first 100 chars): {lyrics[:100]}")
+
         meta = {
             "title": "Song Parameters",
             "id": dataset_slug,
             "licenses": [{"name": "CC0-1.0"}]
         }
-        (tmp / "dataset-metadata.json").write_text(json.dumps(meta))
+        (tmp / "dataset-metadata.json").write_text(
+            json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+        )
 
         print(f"  [kaggle] Uploading params dataset ...")
 
-        # Try create first, fall back to version if it already exists
         create_result = _run(
             ["kaggle", "datasets", "create", "-p", str(tmp), "--quiet"],
             check=False
@@ -69,7 +84,7 @@ def upload_params_dataset(username: str, lyrics: str, style: str,
 
         if create_result.returncode != 0:
             err = (create_result.stdout + create_result.stderr).lower()
-            if "already exists" in err or "already have" in err or "409" in err or "exists" in err:
+            if any(w in err for w in ["already exists", "already have", "409", "exists"]):
                 print(f"  [kaggle] Dataset exists — updating ...")
                 _run(["kaggle", "datasets", "version", "-p", str(tmp),
                       "-m", "updated", "--quiet"])
@@ -84,15 +99,10 @@ def upload_params_dataset(username: str, lyrics: str, style: str,
 
 
 def trigger_kernel(username: str, kaggle_dir: Path):
-    """
-    Push and trigger the ACE-Step kernel with T4 GPU explicitly requested.
-    P100 (Kaggle's silent default via API push) has CUDA capability 6.0,
-    which is TOO OLD for modern PyTorch (needs 7.0+). T4 has capability 7.5.
-    """
+    """Push kernel with T4 GPU explicitly requested."""
     kernel_slug = f"{username}/ace-step-music-generator"
     print(f"  [kaggle] Triggering kernel: {kernel_slug} (T4 GPU) ...")
 
-    # Try with explicit T4 accelerator flag (newer kaggle-cli)
     result = _run(
         ["kaggle", "kernels", "push", "-p", str(kaggle_dir),
          "--accelerator", "NvidiaTeslaT4"],
@@ -102,8 +112,7 @@ def trigger_kernel(username: str, kaggle_dir: Path):
     if result.returncode != 0:
         err = (result.stdout + result.stderr).lower()
         if "unrecognized" in err or "no such option" in err or "unexpected" in err:
-            print(f"  [kaggle] --accelerator flag not supported by this CLI version, "
-                  f"pushing without it (will use account default GPU) ...")
+            print(f"  [kaggle] --accelerator flag not supported, pushing without it ...")
             _run(["kaggle", "kernels", "push", "-p", str(kaggle_dir)])
         else:
             raise RuntimeError(f"Kernel push failed:\n{result.stdout}\n{result.stderr}")
@@ -112,15 +121,14 @@ def trigger_kernel(username: str, kaggle_dir: Path):
     return kernel_slug
 
 
-def wait_for_kernel(kernel_slug: str, timeout_min: int = 20) -> bool:
-    """Poll kernel status until complete or failed."""
+def wait_for_kernel(kernel_slug: str, timeout_min: int = 25) -> bool:
     print(f"  [kaggle] Waiting for kernel (up to {timeout_min} min) ...")
     max_polls = timeout_min * 4
     for attempt in range(max_polls):
         time.sleep(15)
         result = subprocess.run(
             ["kaggle", "kernels", "status", kernel_slug],
-            capture_output=True, text=True
+            capture_output=True, text=True, encoding="utf-8"
         )
         output = (result.stdout + result.stderr).lower()
         status_line = result.stdout.strip()
@@ -136,7 +144,6 @@ def wait_for_kernel(kernel_slug: str, timeout_min: int = 20) -> bool:
 
 
 def download_output(kernel_slug: str) -> bytes:
-    """Download the generated MP3/WAV from kernel output."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         print(f"  [kaggle] Downloading kernel output ...")
