@@ -3,10 +3,15 @@ kaggle_music_gen.py
 Generates full AI songs with REAL VOCALS by running ACE-Step on
 Kaggle's FREE T4 GPU (16GB VRAM, 30 hours/week).
 
-FIXED: Explicit UTF-8 encoding throughout — without this, Devanagari
-Hindi text (or any non-ASCII script) can get mangled when written to
-disk/JSON, causing ACE-Step to receive corrupted or fallback-to-English
-text even though the Python string itself was correct.
+REDESIGNED: No longer uses a separate Kaggle "dataset" for params —
+that mechanism proved unreliable (kernel kept using a stale/cached
+dataset snapshot instead of the freshly uploaded one, likely because
+the kernel was manually edited via browser at some point).
+
+NEW APPROACH: params.json is written directly into the same kaggle/
+folder as run_acestep.py, so it gets pushed as part of the kernel's
+own code files every single time — no dataset attachment, no caching
+ambiguity, no versioning issues.
 """
 import json, os, time, subprocess, tempfile
 from pathlib import Path
@@ -42,64 +47,25 @@ def _run(cmd: list, check=True) -> subprocess.CompletedProcess:
     return result
 
 
-def upload_params_dataset(username: str, lyrics: str, style: str,
-                          title: str, duration: int = 180) -> str:
+def write_params_file(kaggle_dir: Path, lyrics: str, style: str,
+                      title: str, duration: int = 180):
     """
-    Upload song parameters as a Kaggle dataset.
-
-    CRITICAL FIX: Both json.dumps(..., ensure_ascii=False) AND
-    write_text(..., encoding="utf-8") are required together.
-    - ensure_ascii=False keeps Devanagari/non-Latin chars as real UTF-8
-      bytes in the file (readable, not \\uXXXX escapes)
-    - encoding="utf-8" ensures Path.write_text() doesn't fall back to
-      a platform-default encoding (which can differ on some runners)
+    Write params.json directly into the kaggle/ folder that gets pushed
+    as the kernel's own files. This replaces the old dataset-based
+    approach, which was unreliable.
     """
     params = {"lyrics": lyrics, "style": style, "title": title, "duration": duration}
-    dataset_slug = f"{username}/song-params"
+    params_json = json.dumps(params, indent=2, ensure_ascii=False)
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
+    params_path = kaggle_dir / "params.json"
+    params_path.write_text(params_json, encoding="utf-8")
 
-        params_json = json.dumps(params, indent=2, ensure_ascii=False)
-        (tmp / "params.json").write_text(params_json, encoding="utf-8")
-
-        # Debug: confirm what's actually being written
-        print(f"  [kaggle] Lyrics preview (first 100 chars): {lyrics[:100]}")
-
-        meta = {
-            "title": "Song Parameters",
-            "id": dataset_slug,
-            "licenses": [{"name": "CC0-1.0"}]
-        }
-        (tmp / "dataset-metadata.json").write_text(
-            json.dumps(meta, ensure_ascii=False), encoding="utf-8"
-        )
-
-        print(f"  [kaggle] Uploading params dataset ...")
-
-        create_result = _run(
-            ["kaggle", "datasets", "create", "-p", str(tmp), "--quiet"],
-            check=False
-        )
-
-        if create_result.returncode != 0:
-            err = (create_result.stdout + create_result.stderr).lower()
-            if any(w in err for w in ["already exists", "already have", "409", "exists"]):
-                print(f"  [kaggle] Dataset exists — updating ...")
-                _run(["kaggle", "datasets", "version", "-p", str(tmp),
-                      "-m", "updated", "--quiet"])
-            else:
-                raise RuntimeError(
-                    f"Dataset create failed:\n"
-                    f"{create_result.stdout}\n{create_result.stderr}"
-                )
-
-    print(f"  [kaggle] Params uploaded: {dataset_slug} ✓")
-    return dataset_slug
+    print(f"  [kaggle] Wrote params.json into kernel folder ✓")
+    print(f"  [kaggle] Lyrics preview: {lyrics[:100]}")
 
 
 def trigger_kernel(username: str, kaggle_dir: Path):
-    """Push kernel with T4 GPU explicitly requested."""
+    """Push kernel (including the freshly-written params.json) with T4 GPU."""
     kernel_slug = f"{username}/ace-step-music-generator"
     print(f"  [kaggle] Triggering kernel: {kernel_slug} (T4 GPU) ...")
 
@@ -176,13 +142,13 @@ def download_output(kernel_slug: str) -> bytes:
 def generate_song_kaggle(lyrics: str, style: str, title: str,
                          kaggle_username: str, kaggle_key: str,
                          duration: int = 180) -> bytes:
-    """Full pipeline: upload params → trigger kernel → wait → download."""
+    """Full pipeline: write params into kernel folder → push → wait → download."""
     _setup_kaggle_credentials(kaggle_username, kaggle_key)
 
     kaggle_dir = Path(__file__).parent.parent / "kaggle"
     kernel_slug = f"{kaggle_username}/ace-step-music-generator"
 
-    upload_params_dataset(kaggle_username, lyrics, style, title, duration)
+    write_params_file(kaggle_dir, lyrics, style, title, duration)
     trigger_kernel(kaggle_username, kaggle_dir)
     wait_for_kernel(kernel_slug, timeout_min=25)
     return download_output(kernel_slug)
