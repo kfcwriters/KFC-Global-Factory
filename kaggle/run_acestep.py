@@ -3,21 +3,34 @@
 run_acestep.py — Runs on Kaggle GPU notebook
 Generates a full romantic song with real vocals using ACE-Step.
 
-FIXED: "acestep" is NOT on PyPI under that name for pip install.
-Correct install is directly from GitHub:
-  pip install git+https://github.com/ace-step/ACE-Step.git
+UPDATED: Reads params.json from the SAME folder as this script
+(pushed together as kernel files) instead of a separate Kaggle
+dataset attachment — the dataset mechanism proved unreliable.
 """
-import json, os, subprocess, sys
+import os
 
-# Reduce CUDA memory fragmentation (T4 has limited VRAM ~15GB usable)
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-params_path = "/kaggle/input/song-params/params.json"
-if os.path.exists(params_path):
-    with open(params_path) as f:
+import json, subprocess, sys
+from pathlib import Path
+
+# Look for params.json in the same directory as this script first
+script_dir       = Path(__file__).parent
+local_params_path = script_dir / "params.json"
+# Fallback: old dataset location, in case it's ever reattached
+dataset_params_path = Path("/kaggle/input/song-params/params.json")
+
+if local_params_path.exists():
+    print(f"Reading params from local file: {local_params_path}")
+    with open(local_params_path, encoding="utf-8") as f:
+        params = json.load(f)
+elif dataset_params_path.exists():
+    print(f"Reading params from dataset: {dataset_params_path}")
+    with open(dataset_params_path, encoding="utf-8") as f:
         params = json.load(f)
 else:
+    print("WARNING: No params.json found anywhere — using hardcoded test fallback")
     params = {
         "lyrics": "[verse]\nIn the quiet of the night\nI reach out for your hand\nEvery star above us shines\n\n[chorus]\nI will never let you go\nYou are the only love I know",
         "style": "romantic ballad, soft piano, emotional female vocals, slow tempo",
@@ -28,8 +41,9 @@ else:
 print(f"Generating: {params['title']}")
 print(f"Style: {params['style'][:60]}")
 print(f"Duration: {params.get('duration', 180)}s")
+print(f"Lyrics preview: {params['lyrics'][:100]}")
 
-# ── Install ACE-Step from GitHub (correct method — not on PyPI as 'acestep') ──
+# ── Install ACE-Step from GitHub ──────────────────────────────────────────────
 print("\nInstalling ACE-Step from GitHub source...")
 subprocess.run([
     sys.executable, "-m", "pip", "install",
@@ -37,26 +51,23 @@ subprocess.run([
     "--quiet"
 ], check=True)
 
-print("Installing ffmpeg-python and torchaudio (if missing)...")
 subprocess.run([
     sys.executable, "-m", "pip", "install",
     "torchaudio", "--quiet"
-], check=False)   # may already be present in Kaggle image
+], check=False)
 
 # ── Generate song ─────────────────────────────────────────────────────────────
 print("\nGenerating song with ACE-Step on GPU...")
 
-import torch
 from acestep.pipeline_ace_step import ACEStepPipeline
-
-# Free any cached memory before loading
+import torch
 torch.cuda.empty_cache()
 
 pipe = ACEStepPipeline(
-    checkpoint_dir=None,       # auto-downloads to ~/.cache/ace-step/checkpoints
+    checkpoint_dir=None,
     dtype="float16",
     torch_compile=False,
-    cpu_offload=True,          # offload unused layers to CPU RAM — fixes OOM on 16GB GPUs
+    cpu_offload=True,
 )
 
 duration = float(params.get("duration", 180))
@@ -81,17 +92,15 @@ output_paths = pipe(
 
 print(f"\nOutput paths: {output_paths}")
 
-# Find the generated audio file
 import glob
 audio_files = glob.glob("/kaggle/working/*.wav") + glob.glob("/kaggle/working/*.mp3")
 
 if not audio_files:
-    raise RuntimeError(f"No audio file found in /kaggle/working/. Contents: {os.listdir('/kaggle/working/')}")
+    raise RuntimeError(f"No audio file found. Contents: {os.listdir('/kaggle/working/')}")
 
 source_file = audio_files[0]
 print(f"Found generated file: {source_file}")
 
-# Ensure final output is named generated_song.mp3
 final_mp3 = "/kaggle/working/generated_song.mp3"
 if source_file.endswith(".wav"):
     subprocess.run([
