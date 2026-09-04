@@ -3,15 +3,15 @@ kaggle_music_gen.py
 Generates full AI songs with REAL VOCALS by running ACE-Step on
 Kaggle's FREE T4 GPU (16GB VRAM, 30 hours/week).
 
-REDESIGNED: No longer uses a separate Kaggle "dataset" for params —
-that mechanism proved unreliable (kernel kept using a stale/cached
-dataset snapshot instead of the freshly uploaded one, likely because
-the kernel was manually edited via browser at some point).
+FINAL FIX: kaggle kernels push (kernel_type=script) only uploads the
+SINGLE code_file — it does NOT bundle sibling files in the same folder,
+and Kaggle "dataset" attachments proved unreliable (stale caching once
+a kernel was manually edited via browser).
 
-NEW APPROACH: params.json is written directly into the same kaggle/
-folder as run_acestep.py, so it gets pushed as part of the kernel's
-own code files every single time — no dataset attachment, no caching
-ambiguity, no versioning issues.
+The reliable solution: bake params directly into the Python script's
+SOURCE CODE as a JSON literal, generating run_acestep.py fresh from
+run_acestep_template.py before every single push. What we write is
+exactly what the kernel executes — no external file, no caching layer.
 """
 import json, os, time, subprocess, tempfile
 from pathlib import Path
@@ -47,25 +47,40 @@ def _run(cmd: list, check=True) -> subprocess.CompletedProcess:
     return result
 
 
-def write_params_file(kaggle_dir: Path, lyrics: str, style: str,
-                      title: str, duration: int = 180):
+def bake_params_into_script(kaggle_dir: Path, lyrics: str, style: str,
+                            title: str, duration: int = 180):
     """
-    Write params.json directly into the kaggle/ folder that gets pushed
-    as the kernel's own files. This replaces the old dataset-based
-    approach, which was unreliable.
+    Fill run_acestep_template.py's __PARAMS_JSON__ placeholder with real
+    data and write the result as run_acestep.py — the actual file that
+    gets pushed and executed. Regenerated fresh every single run.
     """
+    template_path = kaggle_dir / "run_acestep_template.py"
+    output_path   = kaggle_dir / "run_acestep.py"
+
+    if not template_path.exists():
+        raise FileNotFoundError(
+            f"Template not found: {template_path}. "
+            f"Upload run_acestep_template.py to the kaggle/ folder first."
+        )
+
+    template = template_path.read_text(encoding="utf-8")
+
     params = {"lyrics": lyrics, "style": style, "title": title, "duration": duration}
-    params_json = json.dumps(params, indent=2, ensure_ascii=False)
+    # Use a Python raw-string-safe JSON dump — escape any literal ''' sequences
+    # that could break out of the r'''...''' block in the template.
+    params_json = json.dumps(params, ensure_ascii=False)
+    params_json_safe = params_json.replace("'''", "\\'\\'\\'")
 
-    params_path = kaggle_dir / "params.json"
-    params_path.write_text(params_json, encoding="utf-8")
+    filled = template.replace("__PARAMS_JSON__", params_json_safe)
+    output_path.write_text(filled, encoding="utf-8")
 
-    print(f"  [kaggle] Wrote params.json into kernel folder ✓")
+    print(f"  [kaggle] Baked params into run_acestep.py ✓")
+    print(f"  [kaggle] Title: {title}")
     print(f"  [kaggle] Lyrics preview: {lyrics[:100]}")
 
 
 def trigger_kernel(username: str, kaggle_dir: Path):
-    """Push kernel (including the freshly-written params.json) with T4 GPU."""
+    """Push kernel (run_acestep.py now contains baked-in params) with T4 GPU."""
     kernel_slug = f"{username}/ace-step-music-generator"
     print(f"  [kaggle] Triggering kernel: {kernel_slug} (T4 GPU) ...")
 
@@ -142,13 +157,13 @@ def download_output(kernel_slug: str) -> bytes:
 def generate_song_kaggle(lyrics: str, style: str, title: str,
                          kaggle_username: str, kaggle_key: str,
                          duration: int = 180) -> bytes:
-    """Full pipeline: write params into kernel folder → push → wait → download."""
+    """Full pipeline: bake params into script → push → wait → download."""
     _setup_kaggle_credentials(kaggle_username, kaggle_key)
 
     kaggle_dir = Path(__file__).parent.parent / "kaggle"
     kernel_slug = f"{kaggle_username}/ace-step-music-generator"
 
-    write_params_file(kaggle_dir, lyrics, style, title, duration)
+    bake_params_into_script(kaggle_dir, lyrics, style, title, duration)
     trigger_kernel(kaggle_username, kaggle_dir)
     wait_for_kernel(kernel_slug, timeout_min=25)
     return download_output(kernel_slug)
