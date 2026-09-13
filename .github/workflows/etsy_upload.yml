@@ -1,0 +1,39 @@
+name: 🛍️ Weekly Etsy Digital Product Publisher
+
+on:
+  schedule:
+    # Every Monday at 9:00 AM UTC = 2:30 PM IST
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  etsy-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📥 Install dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: 🛍️ Run Etsy Pipeline
+        env:
+          ETSY_API_KEY:     ${{ secrets.ETSY_API_KEY }}
+          ETSY_OAUTH_TOKEN: ${{ secrets.ETSY_OAUTH_TOKEN }}
+        run: python etsy_pipeline.py
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: etsy-failure-logs
+          path: "*.log"
+          retention-days: 7
