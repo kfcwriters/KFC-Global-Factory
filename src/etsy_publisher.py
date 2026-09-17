@@ -9,9 +9,19 @@ import requests, time
 ETSY_BASE = "https://openapi.etsy.com/v3"
 
 
-def _headers(api_key: str, oauth_token: str = None) -> dict:
-    """Build correct headers for Etsy API v3."""
-    h = {"x-api-key": api_key}
+def _headers(api_key: str, oauth_token: str = None,
+             shared_secret: str = None) -> dict:
+    """
+    Build correct headers for Etsy API v3.
+    As of Feb 9, 2026, Etsy requires BOTH keystring AND shared secret
+    in x-api-key header, joined by colon: "keystring:shared_secret"
+    """
+    import os
+    secret = shared_secret or os.environ.get("ETSY_SHARED_SECRET", "")
+    if secret:
+        h = {"x-api-key": f"{api_key}:{secret}"}
+    else:
+        h = {"x-api-key": api_key}
     if oauth_token:
         h["Authorization"] = f"Bearer {oauth_token}"
     return h
