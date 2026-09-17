@@ -21,7 +21,10 @@ jobs:
           cache: "pip"
 
       - name: 📥 Install dependencies
-        run: pip install --upgrade pip && pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install reportlab>=4.0.0
 
       - name: 🛍️ Run Etsy Pipeline
         env:
