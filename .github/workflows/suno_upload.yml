@@ -1,4 +1,4 @@
-name: 🎵 Weekly Suno Romantic Song Video + Short
+name: 🎵 Weekly English Romantic Song — Heartfull Songs Channel
 
 on:
   schedule:
@@ -32,12 +32,13 @@ jobs:
           pip install -r requirements.txt
           pip install kaggle --quiet
 
-      - name: 🎵 Run Weekly Romantic Song Pipeline
+      - name: 🎵 Run Weekly English Song Pipeline
         env:
           HF_TOKEN:            ${{ secrets.HF_TOKEN }}
           YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
           KAGGLE_USERNAME:     ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY:          ${{ secrets.KAGGLE_KEY }}
+          YOUTUBE_CHANNEL_ID:  "UCjmzJ3k25GZ9C3zg-jdci7Q"
         run: python suno_pipeline.py
 
       - name: 📋 Upload logs on failure
