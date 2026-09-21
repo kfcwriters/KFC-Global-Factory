@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-suno_pipeline.py — Weekly Romantic Song Video + Short
-Music priority:
-  1. Kaggle GPU (free T4 16GB) → ACE-Step real AI vocals ★★★★★
-  2. songs/ folder (manual Suno uploads) ★★★★★
-  3. music_gen.py (working instrumental, no vocals) ★★★
+suno_pipeline.py — Weekly English Romantic Song → Heartfull Songs Channel
+Uploads to UCjmzJ3k25GZ9C3zg-jdci7Q (Heartfull Songs)
 """
 import os, random, subprocess, sys, tempfile
 from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-from image_gen         import generate_images
-from lyrics_overlay    import add_lyrics
-from lyrics_writer     import generate_weekly_lyrics
-from seo_gen           import generate_seo
-from shorts_maker      import make_short_from_video, make_shorts_metadata
-from music_gen         import generate_music
-from kaggle_music_gen  import generate_song_kaggle
-from video_assembly    import create_video
-from thumbnail_gen     import create_thumbnail
-from youtube_upload    import upload_to_youtube
+from image_gen       import generate_images
+from lyrics_overlay  import add_lyrics
+from lyrics_writer   import generate_weekly_lyrics
+from seo_gen         import generate_seo
+from shorts_maker    import make_short_from_video, make_shorts_metadata
+from music_gen       import generate_music
+from kaggle_music_gen import generate_song_kaggle
+from video_assembly  import create_video
+from thumbnail_gen   import create_thumbnail
+from youtube_upload  import upload_to_youtube
 
 SONGS_DIR = Path(__file__).parent / "songs"
-DURATION  = 180   # 3 min (fits Kaggle GPU time budget)
+DURATION  = 180
+
+# Heartfull Songs channel ID
+CHANNEL_ID = os.environ.get("YOUTUBE_CHANNEL_ID", "UCjmzJ3k25GZ9C3zg-jdci7Q")
 
 BG_PROMPTS = [
     "romantic couple holding hands at golden sunset on beach, cinematic warm glow",
@@ -76,11 +76,8 @@ def run():
     if not YOUTUBE_CREDENTIALS: raise EnvironmentError("YOUTUBE_CREDENTIALS not set")
 
     print(f"\n{'='*60}")
-    print(f"  Pipeline : Romantic Song Video + Short (Weekly)")
-    if KAGGLE_USERNAME and KAGGLE_KEY:
-        print(f"  Music    : Kaggle GPU → ACE-Step real vocals ★★★★★")
-    else:
-        print(f"  Music    : music_gen.py instrumental (add KAGGLE creds for vocals)")
+    print(f"  Pipeline : English Romantic Song (Heartfull Songs Channel)")
+    print(f"  Channel  : @HeartfullSongsOfficial")
     print(f"{'='*60}\n")
 
     with tempfile.TemporaryDirectory(prefix="romantic_") as tmp:
@@ -89,57 +86,41 @@ def run():
         song       = generate_weekly_lyrics()
         title      = song["title"]
         style_used = song.get("style", "romantic ballad, piano, emotional female vocals")
-        sections   = song.get("sections") or [
-            {"type":"verse",  "lines": song["prompt"].split("\n")[:4]},
-            {"type":"chorus", "lines": song["prompt"].split("\n")[4:8]},
-        ]
+        lyrics_text = song.get("prompt","")
 
-        # Build lyrics text for ACE-Step
-        lyrics_text = "\n".join(
-            f"[{s.get('type','verse')}]\n" + "\n".join(s.get("lines",[]))
-            for s in sections
-        )
-
-        # ── 1. Kaggle GPU → ACE-Step (real AI vocals) ────────────────────────
-        if KAGGLE_USERNAME and KAGGLE_KEY and not song_mp3:
+        # 1. Kaggle GPU → ACE-Step
+        if KAGGLE_USERNAME and KAGGLE_KEY:
             print("🎵  Generating via Kaggle GPU + ACE-Step ...")
             try:
                 data = generate_song_kaggle(
-                    lyrics       = lyrics_text,
-                    style        = style_used,
-                    title        = title,
-                    kaggle_username = KAGGLE_USERNAME,
-                    kaggle_key   = KAGGLE_KEY,
-                    duration     = DURATION,
+                    lyrics=lyrics_text, style=style_used, title=title,
+                    kaggle_username=KAGGLE_USERNAME, kaggle_key=KAGGLE_KEY,
+                    duration=DURATION,
                 )
                 p = tmp/"kaggle_song.mp3"; p.write_bytes(data)
                 song_mp3 = str(p)
-                print(f"  → Real AI vocals generated via Kaggle GPU ✓")
+                print(f"  → Real AI vocals generated ✓")
             except Exception as e:
-                print(f"  ⚠️  Kaggle failed: {str(e)[:200]}")
+                print(f"  ⚠️  Kaggle failed: {str(e)[:150]}")
 
-        # ── 2. Saved songs folder ─────────────────────────────────────────────
+        # 2. Saved songs
         if not song_mp3:
             saved, saved_title = get_saved_song()
             if saved:
                 song_mp3 = saved; title = saved_title
                 print(f"🎵  Using saved song: {title}")
 
-        # ── 3. music_gen.py (working instrumental) ────────────────────────────
+        # 3. music_gen fallback
         if not song_mp3:
-            print("🎵  Generating music via music_gen.py ...")
-            music_prompt = random.choice(MUSIC_PROMPTS)
-            audio_bytes  = generate_music(music_prompt, HF_TOKEN,
-                                          duration_sec=DURATION)
+            print("🎵  Generating instrumental ...")
+            audio_bytes = generate_music(random.choice(MUSIC_PROMPTS), HF_TOKEN, duration_sec=DURATION)
             raw = tmp/"music_raw.audio"; raw.write_bytes(audio_bytes)
             mp3 = str(tmp/"music.mp3")
-            subprocess.run(["ffmpeg","-y","-i",str(raw),
-                           "-codec:a","libmp3lame","-qscale:a","2",mp3],
+            subprocess.run(["ffmpeg","-y","-i",str(raw),"-codec:a","libmp3lame","-qscale:a","2",mp3],
                           check=True, capture_output=True)
             song_mp3 = mp3
-            print(f"  → Instrumental music generated ✓")
 
-        # ── Loop if needed ───────────────────────────────────────────────────
+        # Loop if needed
         dur = probe_duration(song_mp3)
         if dur < DURATION-10:
             looped = str(tmp/"looped.mp3")
@@ -150,7 +131,7 @@ def run():
         dur = min(dur, DURATION)
         n_images = min(16, max(8, int(dur/15)))
 
-        # ── Images ───────────────────────────────────────────────────────────
+        # Images
         print(f"\n🖼️   Generating {n_images} romantic images ...")
         prompts  = [random.choice(BG_PROMPTS) for _ in range(n_images)]
         raw_imgs = generate_images(prompts, HF_TOKEN, vertical=False)
@@ -161,37 +142,45 @@ def run():
             p = tmp/f"frame_{i:02d}.jpg"; p.write_bytes(frame)
             image_paths.append(str(p))
 
-        # ── SEO metadata ─────────────────────────────────────────────────────
+        # SEO
         print("\n📝  Generating SEO metadata ...")
         meta = generate_seo(title, "romantic songs", style_used)
         print(f"  → {meta['title']}")
 
-        # ── Thumbnail + video ─────────────────────────────────────────────────
+        # Thumbnail + video
         thumb = str(tmp/"thumbnail.jpg")
         create_thumbnail(raw_imgs[0], meta["title"], thumb)
         video = str(tmp/"output.mp4")
         create_video(song_mp3, image_paths, video, vertical=False)
 
-        # ── Short ────────────────────────────────────────────────────────────
+        # Short
         print("\n📱  Creating Short ...")
         short_video = str(tmp/"short.mp4")
         make_short_from_video(video, short_video, duration=55, start_offset=15)
         short_meta  = make_shorts_metadata(meta["title"], meta["tags"])
 
-        # ── Upload ────────────────────────────────────────────────────────────
-        print("\n📤  Uploading main video ...")
-        vid = upload_to_youtube(video_path=video, thumbnail_path=thumb,
+        # Upload to Heartfull Songs channel
+        print(f"\n📤  Uploading to Heartfull Songs (@HeartfullSongsOfficial) ...")
+        vid = upload_to_youtube(
+            video_path=video, thumbnail_path=thumb,
             title=meta["title"], description=meta["description"],
-            tags=meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
+            tags=meta["tags"], credentials_json=YOUTUBE_CREDENTIALS,
+            channel_id=CHANNEL_ID
+        )
         print(f"  → https://youtu.be/{vid}")
 
-        print("\n📱  Uploading Short ...")
-        short_id = upload_to_youtube(video_path=short_video, thumbnail_path=thumb,
+        print(f"\n📱  Uploading Short ...")
+        short_id = upload_to_youtube(
+            video_path=short_video, thumbnail_path=thumb,
             title=short_meta["title"], description=short_meta["description"],
-            tags=short_meta["tags"], credentials_json=YOUTUBE_CREDENTIALS)
+            tags=short_meta["tags"], credentials_json=YOUTUBE_CREDENTIALS,
+            channel_id=CHANNEL_ID
+        )
         print(f"  → https://youtu.be/{short_id}")
 
-        print(f"\n🎉  Both live! Main: https://youtu.be/{vid} | Short: https://youtu.be/{short_id}")
+        print(f"\n🎉  Both live on Heartfull Songs!")
+        print(f"  Main: https://youtu.be/{vid}")
+        print(f"  Short: https://youtu.be/{short_id}")
         return vid
 
 
