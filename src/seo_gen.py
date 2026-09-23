@@ -1,145 +1,156 @@
 """
 seo_gen.py
-High-converting YouTube SEO generator — NO API needed, pure Python.
+Generates SEO-optimized YouTube titles, descriptions and tags.
+
+Uses proven YouTube title formulas that actually rank and get clicks.
+Research shows these patterns consistently outperform generic titles.
 """
 import random
+from datetime import datetime
 
-TITLE_PATTERNS = {
-    "romantic songs": [
-        "{song_title} 🎵 Beautiful Romantic Love Song 2026",
-        "{song_title} | Emotional Love Song With Lyrics 🌹",
-        "{song_title} - Romantic Ballad For Someone Special 💕",
-        "New Romantic Song 2026: {song_title} 🎶",
-        "{song_title} 🎧 Sad + Romantic Love Song",
-        "{song_title} | AI Music Cover | Emotional Ballad",
-        "Best Romantic Song 2026 - {song_title} 🌹",
-        "{song_title} 💖 Love Song That Will Make You Cry",
-    ],
-    "lofi study music": [
-        "3 Hours Lofi Study Music 🎧 Deep Focus Beats",
-        "Lofi Hip Hop Radio 🎵 Chill Beats To Study/Relax To",
-        "Study Music For Concentration 📚 Lofi Focus Beats",
-        "1 Hour Lofi Music For Studying 🌙 Calm Study Beats",
-    ],
-    "meditation music": [
-        "10 Minute Meditation Music 🧘 Deep Relaxation",
-        "Healing Meditation Music 🌿 Stress Relief & Anxiety",
-        "Peaceful Meditation Music For Sleep & Yoga 🙏",
-    ],
-    "sleep music": [
-        "8 Hours Deep Sleep Music 😴 Relaxing Sleep Sounds",
-        "Fall Asleep Fast 🌙 Calming Sleep Music",
-        "Sleep Music For Insomnia 💤 Peaceful Night Sounds",
-    ],
-    "focus work music": [
-        "2 Hours Deep Focus Music 🎯 Study & Work Concentration",
-        "Productivity Music For Work 💼 Focus & Concentration",
-    ],
-    "healing music": [
-        "432Hz Healing Frequency 🎵 Full Body Cell Regeneration",
-        "528Hz Miracle Tone 💚 DNA Repair & Healing Music",
-    ],
-    "wellness music": [
-        "Morning Wellness Music 🌅 Positive Energy Start",
-        "Yoga Music For Wellness & Mindfulness 🧘‍♀️",
-    ],
-}
+YEAR = datetime.utcnow().year
 
-DEFAULT_PATTERNS = [
-    "{song_title} 🎵 Relaxing Music 2026",
-    "New Music 2026: {song_title} 🎶",
+# ── Proven English romantic song title formulas ────────────────────────────────
+ENGLISH_TITLE_FORMULAS = [
+    "{title} 💔 Sad Romantic Song That Will Make You Cry {year}",
+    "{title} ❤️ Best Romantic Love Song {year} | Heart Touching",
+    "{title} 😢 Most Emotional Love Song {year} | Miss You Song",
+    "{title} 🌹 Beautiful Romantic Song {year} | True Love",
+    "{title} 💕 Soft Romantic Song {year} | Love Song for Her",
+    "Heart Touching Love Song 💔 {title} | Sad Song {year}",
+    "{title} | Romantic Ballad {year} 🎵 Emotional Love Song",
+    "Miss You Song 😢 {title} | Heart Broken Song {year}",
+    "{title} 💖 Sweet Romantic Song | Best Love Song {year}",
+    "Emotional Love Song 🥺 {title} | Romantic Song {year}",
 ]
 
-EMOJI_SETS = {
-    "romantic songs"    : ["🌹","💕","💖","🎵","💝","🥀","💗"],
-    "lofi study music"  : ["🎧","📚","🌙","☕","💻"],
-    "meditation music"  : ["🧘","🙏","🌿","✨","☮️"],
-    "sleep music"       : ["😴","🌙","💤","⭐","🌌"],
-    "focus work music"  : ["🎯","💼","🧠","📖","💻"],
-    "healing music"     : ["💚","🌿","✨","🔮","🧘"],
-    "wellness music"    : ["🌸","💚","🌿","🌅","🧘‍♀️"],
-}
+# ── Proven Hindi song title formulas ──────────────────────────────────────────
+HINDI_TITLE_FORMULAS = [
+    "{title} 💔 Dard Bhara Song {year} | Hindi Sad Song",
+    "{title} ❤️ Best Hindi Romantic Song {year} | Dil Se",
+    "{title} 😢 Emotional Hindi Song {year} | Miss You",
+    "{title} 🌹 Pyaar Ka Song {year} | Hindi Love Song",
+    "Dil Tuta Song 💔 {title} | Hindi Sad Song {year}",
+    "{title} | Hindi Romantic Song {year} 🎵 Feeling",
+    "{title} 💕 Mohabbat Song {year} | Dil Ki Baat",
+    "Hindi Sad Song 😢 {title} | Judai Song {year}",
+    "{title} 💖 Pyar Wala Song | Best Hindi Song {year}",
+    "Emotional Hindi Song 🥺 {title} | Romantic {year}",
+]
 
-HASHTAG_BANKS = {
-    "romantic songs": ["#romanticsongs","#lovesongs","#romanticmusic","#lovesong2026",
-                       "#emotionalsong","#sadlovesongs","#heartbrokensongs","#aimusic"],
-    "lofi study music": ["#lofi","#lofihiphop","#studymusic","#chillbeats","#lofibeats"],
-    "meditation music": ["#meditation","#meditationmusic","#mindfulness","#healingmusic"],
-    "sleep music": ["#sleepmusic","#deepsleep","#relaxingmusic","#insomnia"],
-    "focus work music": ["#focusmusic","#deepwork","#productivity","#studymusic"],
-    "healing music": ["#healingfrequency","#432hz","#528hz","#soundhealing"],
-    "wellness music": ["#wellnessmusic","#selfcare","#mindfulness","#wellness"],
-}
+# ── Tag sets ──────────────────────────────────────────────────────────────────
+ENGLISH_TAGS = [
+    "romantic love song", "sad love song", "emotional song",
+    "heart touching song", "best love song 2026", "miss you song",
+    "romantic music", "love song 2026", "beautiful love song",
+    "soft romantic song", "true love song", "english love song",
+    "new romantic song", "romantic ballad", "heart broken song",
+]
 
+HINDI_TAGS = [
+    "hindi sad song", "hindi romantic song", "dard bhara song",
+    "hindi love song 2026", "pyar ka song", "emotional hindi song",
+    "dil tuta song", "hindi new song", "mohabbat song",
+    "best hindi song 2026", "judai song", "hindi feeling song",
+    "new hindi song", "romantic hindi song", "dil se song",
+]
 
-def make_title(song_title: str, niche: str) -> str:
-    patterns = TITLE_PATTERNS.get(niche, DEFAULT_PATTERNS)
-    pattern  = random.choice(patterns)
-    return pattern.format(song_title=song_title)[:100]
+# ── Description templates ─────────────────────────────────────────────────────
+ENGLISH_DESC = """🎵 {title} — A beautiful romantic love song that touches your heart.
 
+❤️ If you love romantic songs, this one is for you. Share this song with someone special.
 
-def make_description(song_title: str, niche: str, music_style: str = "") -> str:
-    emoji_set   = EMOJI_SETS.get(niche, ["🎵","🎶","✨"])
-    e1, e2, e3  = random.sample(emoji_set, min(3, len(emoji_set)))
-    niche_read  = niche.replace("_"," ").title()
-    hashtags    = HASHTAG_BANKS.get(niche, ["#music","#aimusic"])
-    tag_line    = " ".join(hashtags[:8])
+🔔 Subscribe for new romantic songs every week!
+👍 Like if this song touched your heart
+💬 Comment the name of your special someone below
 
-    opening = (f"{e1} {song_title} — {niche_read} to help you relax, "
-              f"unwind and feel better. Perfect background music for any moment.\n\n")
-    body = (f"{e2} About This Track:\n{song_title} is a beautiful "
-           f"{niche_read.lower()} track designed to bring you peace, "
-           f"comfort and emotional connection.\n\n"
-           f"{e3} Perfect For:\n✔️ Relaxation and stress relief\n"
-           f"✔️ Studying and deep focus\n✔️ Sleep and meditation\n"
-           f"✔️ Background music while working\n"
-           f"✔️ Emotional moments and reflection\n\n")
-    if music_style:
-        body += f"🎼 Style: {music_style}\n\n"
-    timestamps = ("⏱️ Timestamps:\n00:00 Intro\n00:30 Main Theme\n"
-                 "02:00 Emotional Build\n03:00 Outro\n\n")
-    cta = (f"🔔 SUBSCRIBE for new {niche_read.lower()} every week!\n"
-          f"👍 LIKE if this touched your heart\n💬 COMMENT your thoughts below\n\n")
-    disclaimer = "🎹 This track was composed using AI music technology.\n\n"
+━━━━━━━━━━━━━━━━━━━━━━━
+🎵 More Romantic Songs → @HeartfullSongsOfficial
+━━━━━━━━━━━━━━━━━━━━━━━
 
-    return (opening+body+timestamps+cta+disclaimer+tag_line)[:5000]
+#RomanticSong #LoveSong #HeartTouchingSong #SadSong #EmotionalSong
+#RomanticMusic #LoveSongs2026 #BestLoveSong #MissYouSong #NewSong2026
+"""
 
+HINDI_DESC = """🎵 {title} — Ek dil ko chhu lene wala romantic Hindi song.
 
-def make_tags(song_title: str, niche: str) -> list:
-    song_words = [w.lower() for w in song_title.split() if len(w)>3][:3]
+❤️ Agar aapko Hindi romantic songs pasand hain, toh ye song zaroor sunein.
+Apne kisi khas insaan ke saath share karein! 💕
 
-    broad = {
-        "romantic songs": ["romantic songs","love songs","romantic music",
-                           "love song 2026","emotional songs","sad love songs"],
-        "lofi study music": ["lofi","lofi hip hop","study music","chill beats"],
-        "meditation music": ["meditation music","meditation","mindfulness","healing music"],
-        "sleep music": ["sleep music","deep sleep","relaxing music","sleep sounds"],
-        "focus work music": ["focus music","study music","productivity music"],
-        "healing music": ["healing music","432hz","528hz","sound healing"],
-        "wellness music": ["wellness music","self care music","yoga music"],
-    }.get(niche, ["music","relaxing music"])
+🔔 Subscribe karein nayi romantic songs ke liye!
+👍 Like karein agar ye song aapke dil ko chhu gaya
+💬 Comment mein apne special someone ka naam likhein
 
-    long_tail = {
-        "romantic songs": ["best romantic song 2026","new love song","sad romantic song"],
-        "lofi study music": ["lofi radio 24/7","study with me music"],
-        "meditation music": ["10 minute meditation","stress relief music"],
-        "sleep music": ["8 hour sleep music","fall asleep fast"],
-        "focus work music": ["binaural beats focus"],
-        "healing music": ["432hz frequency music"],
-        "wellness music": ["morning wellness music"],
-    }.get(niche, [])
+━━━━━━━━━━━━━━━━━━━━━━━
+🎵 Aur Hindi Songs → @Bestmixsoulfullmusic
+━━━━━━━━━━━━━━━━━━━━━━━
 
-    tags = broad + long_tail + song_words + ["ai music","no copyright music"]
-    seen, result = set(), []
-    for t in tags:
-        if t.lower() not in seen:
-            seen.add(t.lower()); result.append(t)
-    return result[:15]
+#HindiSong #HindiRomanticSong #SadHindiSong #DilKaSong #LoveSongHindi
+#HindiNewSong2026 #PyarKaSong #EmotionalHindiSong #BestHindiSong #DardBharaSong
+"""
 
 
-def generate_seo(song_title: str, niche: str, music_style: str = "") -> dict:
+def generate_seo(title: str, content_type: str = "romantic songs",
+                 style: str = "") -> dict:
+    """
+    Generate SEO-optimized metadata for YouTube.
+
+    Args:
+        title        : Song title
+        content_type : "romantic songs" or "hindi songs"
+        style        : Music style string
+
+    Returns:
+        dict with title, description, tags
+    """
+    is_hindi = "hindi" in content_type.lower() or "hindi" in style.lower()
+
+    # Clean title — remove generic suffixes our pipeline adds
+    clean = title
+    for remove in ["Beautiful Love Song", "Best Romantic Song 2026 -",
+                   "| AI Music Cover | Emotional Ballad",
+                   "🌹 Hindi Romantic Song 🌹", "🎵 Beautiful Romantic Love Song 2026"]:
+        clean = clean.replace(remove, "").strip(" -|")
+    clean = clean.strip()
+    if not clean or len(clean) < 3:
+        clean = title
+
+    # Pick title formula
+    if is_hindi:
+        formula = random.choice(HINDI_TITLE_FORMULAS)
+        tags = HINDI_TAGS[:13]
+        description = HINDI_DESC.format(title=clean)
+    else:
+        formula = random.choice(ENGLISH_TITLE_FORMULAS)
+        tags = ENGLISH_TAGS[:13]
+        description = ENGLISH_DESC.format(title=clean)
+
+    yt_title = formula.format(title=clean, year=YEAR)[:100]
+
+    print(f"  [seo] Title: {yt_title}")
+
     return {
-        "title"      : make_title(song_title, niche),
-        "description": make_description(song_title, niche, music_style),
-        "tags"       : make_tags(song_title, niche),
+        "title"      : yt_title,
+        "description": description,
+        "tags"       : tags,
     }
+
+
+def make_shorts_seo(title: str, is_hindi: bool = False) -> dict:
+    """Generate SEO for YouTube Shorts."""
+    clean = title.strip()
+
+    if is_hindi:
+        shorts_title = f"#Shorts 😢 {clean} | Hindi Sad Song | #HindiSong #Romantic"[:100]
+        tags = ["shorts", "hindi shorts", "hindi sad song shorts",
+                "romantic hindi shorts", "love song shorts",
+                "hindi song shorts", "emotional shorts"]
+        desc = f"#Shorts #HindiSong #RomanticSong\n{clean} 💔\n\n🔔 Subscribe for more!"
+    else:
+        shorts_title = f"#Shorts 💔 {clean} | Sad Romantic Song | #LoveSong #Romantic"[:100]
+        tags = ["shorts", "romantic shorts", "sad song shorts",
+                "love song shorts", "emotional shorts",
+                "romantic song shorts", "heart touching shorts"]
+        desc = f"#Shorts #LoveSong #RomanticSong\n{clean} 💔\n\n🔔 Subscribe for more!"
+
+    return {"title": shorts_title, "description": desc, "tags": tags}
