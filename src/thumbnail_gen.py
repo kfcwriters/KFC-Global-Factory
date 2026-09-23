@@ -1,128 +1,155 @@
 """
 thumbnail_gen.py
-Creates a YouTube-optimised 1280×720 thumbnail from the first AI image.
-Uses Pillow only — no extra deps.
+Generates eye-catching YouTube thumbnails that actually get clicks.
+
+Proven thumbnail formula for music channels:
+- Bold emotional text (60% of thumbnail)
+- High contrast colors (red/yellow/white on dark)
+- Large readable font even on mobile
+- Emotional trigger words that make people click
 """
-
-import io
-import re
-import textwrap
-from pathlib import Path
-
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+import io, os, random
 
 
-THUMB_W, THUMB_H = 1280, 720
+# Emotional trigger words that drive clicks on music channels
+EMOTION_TAGS = [
+    "💔 SAD", "❤️ LOVE", "😢 MISS YOU", "🥺 EMOTIONAL",
+    "💕 ROMANTIC", "😍 BEAUTIFUL", "🌹 HEART", "✨ FEELING",
+]
 
-# Font paths available on ubuntu-latest
-FONT_PATHS = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    "/usr/share/fonts/truetype/ubuntu/Ubuntu-Bold.ttf",
+# High-contrast color schemes proven to get clicks
+COLOR_SCHEMES = [
+    {"bg": (20, 20, 40),    "accent": (255, 50, 50),   "text": (255, 255, 255)},   # Dark blue + Red
+    {"bg": (30, 10, 10),    "accent": (255, 180, 0),   "text": (255, 255, 255)},   # Dark + Gold
+    {"bg": (10, 30, 10),    "accent": (255, 80, 80),   "text": (255, 255, 255)},   # Dark green + Red
+    {"bg": (20, 10, 40),    "accent": (255, 100, 200), "text": (255, 255, 255)},   # Purple + Pink
+    {"bg": (40, 10, 10),    "accent": (255, 200, 50),  "text": (255, 255, 255)},   # Dark red + Yellow
 ]
 
 
-def create_thumbnail(image_bytes: bytes, title: str, output_path: str) -> str:
+def _get_font(size: int):
+    """Get the best available bold font."""
+    font_paths = [
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-Bold.ttf",
+    ]
+    for fp in font_paths:
+        if os.path.exists(fp):
+            try:
+                return ImageFont.truetype(fp, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+def _wrap_text(text: str, max_chars: int = 18) -> list:
+    """Wrap text to fit on thumbnail."""
+    words = text.split()
+    lines = []
+    current = ""
+    for word in words:
+        if len(current) + len(word) + 1 <= max_chars:
+            current = (current + " " + word).strip()
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines[:3]  # Max 3 lines
+
+
+def create_thumbnail(
+    image_bytes: bytes,
+    title: str,
+    output_path: str,
+    is_hindi: bool = False,
+) -> str:
     """
-    Build a thumbnail and save it as JPEG.
+    Generate a high-CTR YouTube thumbnail.
 
-    Args:
-        image_bytes : Raw bytes of the base image.
-        title       : Video title (used as overlay text).
-        output_path : Destination file path (should end in .jpg).
-
-    Returns:
-        output_path on success.
+    Layout:
+    - Background: source image (darkened + blurred slightly)
+    - Bottom gradient: dark overlay for text readability
+    - Large bold title text
+    - Colored accent bar
+    - Emotion tag (top left)
     """
-    # ── 1. Load & resize base image ──────────────────────────────────────────
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    img = _fill_crop(img, THUMB_W, THUMB_H)
+    # ── Base image ────────────────────────────────────────────────────────────
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception:
+        img = Image.new("RGB", (1280, 720), (20, 20, 40))
 
-    # ── 2. Slight blur + darken for text legibility ───────────────────────────
-    blurred = img.filter(ImageFilter.GaussianBlur(radius=1))
-    img     = Image.blend(img, blurred, alpha=0.3)
+    img = img.resize((1280, 720), Image.LANCZOS)
 
-    # ── 3. Dark gradient overlay at bottom half ───────────────────────────────
-    overlay = Image.new("RGBA", (THUMB_W, THUMB_H), (0, 0, 0, 0))
-    draw_ov = ImageDraw.Draw(overlay)
-    grad_start = int(THUMB_H * 0.45)
-    for y in range(grad_start, THUMB_H):
-        progress = (y - grad_start) / (THUMB_H - grad_start)
-        alpha    = int(200 * progress ** 1.5)
-        draw_ov.line([(0, y), (THUMB_W, y)], fill=(0, 0, 0, alpha))
+    # Darken and slightly blur for text readability
+    img = ImageEnhance.Brightness(img).enhance(0.55)
+    img = img.filter(ImageFilter.GaussianBlur(radius=1.5))
 
-    img = img.convert("RGBA")
-    img = Image.alpha_composite(img, overlay).convert("RGB")
+    draw = ImageDraw.Draw(img)
 
-    # ── 4. Prepare text ───────────────────────────────────────────────────────
-    clean_title = _strip_emoji(title).strip()
-    font_lg     = _load_font(60)
-    font_sm     = _load_font(28)
-    draw        = ImageDraw.Draw(img)
+    # ── Pick color scheme ─────────────────────────────────────────────────────
+    scheme = random.choice(COLOR_SCHEMES)
+    accent = scheme["accent"]
+    text_color = scheme["text"]
 
-    # Wrap title to max 2 lines, ~30 chars each
-    lines = textwrap.wrap(clean_title, width=32)[:2]
+    # ── Bottom gradient overlay ────────────────────────────────────────────────
+    for y in range(300, 720):
+        alpha = int(200 * (y - 300) / 420)
+        for x in range(1280):
+            r, g, b = img.getpixel((x, y))
+            nr = int(r * (1 - alpha/255) + scheme["bg"][0] * (alpha/255))
+            ng = int(g * (1 - alpha/255) + scheme["bg"][1] * (alpha/255))
+            nb = int(b * (1 - alpha/255) + scheme["bg"][2] * (alpha/255))
+            draw.point((x, y), (nr, ng, nb))
 
-    # ── 5. Draw title text (shadow + white) ───────────────────────────────────
-    line_h   = 70
-    total_h  = len(lines) * line_h
-    y_start  = THUMB_H - total_h - 55
+    # ── Accent bar (left side) ────────────────────────────────────────────────
+    draw.rectangle([0, 0, 12, 720], fill=accent)
 
-    for line in lines:
-        bbox = draw.textbbox((0, 0), line, font=font_lg)
-        tw   = bbox[2] - bbox[0]
-        x    = (THUMB_W - tw) // 2
-        # Shadow
-        draw.text((x + 3, y_start + 3), line, font=font_lg, fill=(0, 0, 0, 180))
-        # Text
-        draw.text((x, y_start), line, font=font_lg, fill=(255, 255, 255))
-        y_start += line_h
+    # ── Emotion tag (top left) ────────────────────────────────────────────────
+    emotion = random.choice(EMOTION_TAGS)
+    tag_font = _get_font(36)
+    draw.rectangle([20, 20, 280, 72], fill=accent)
+    draw.text((30, 26), emotion, font=tag_font, fill=(255, 255, 255))
 
-    # ── 6. "AI GENERATED" badge top-left ─────────────────────────────────────
-    badge_text = "AI GENERATED"
-    bx, by     = 18, 18
-    bbox       = draw.textbbox((bx, by), badge_text, font=font_sm)
-    padding    = 8
-    draw.rounded_rectangle(
-        [bbox[0] - padding, bbox[1] - padding,
-         bbox[2] + padding, bbox[3] + padding],
-        radius=6,
-        fill=(255, 180, 0)
-    )
-    draw.text((bx, by), badge_text, font=font_sm, fill=(0, 0, 0))
+    # ── Main title text ───────────────────────────────────────────────────────
+    # Clean title for display
+    clean_title = title
+    for emoji in ["🌹","💖","💕","❤️","🎵","✨","💔","😍","🥺","😢","🎶","🎤"]:
+        clean_title = clean_title.replace(emoji, "")
+    clean_title = clean_title.strip()
 
-    # ── 7. Save ───────────────────────────────────────────────────────────────
-    img.save(output_path, "JPEG", quality=95, optimize=True)
+    # Remove SEO suffixes for cleaner thumbnail
+    for suffix in [" | Romantic Ballad", " | Love Song", "Best Romantic Song 2026 -",
+                   "- Romantic Ballad For Someone Special", "Beautiful Romantic Love Song 2026"]:
+        clean_title = clean_title.replace(suffix, "").strip()
+
+    lines = _wrap_text(clean_title.upper(), max_chars=16)
+
+    # Large font for title
+    title_font = _get_font(110)
+    small_font = _get_font(80)
+
+    y_start = 720 - (len(lines) * 120) - 60
+
+    for i, line in enumerate(lines):
+        font = title_font if i == 0 else small_font
+        # Shadow for readability
+        draw.text((32, y_start + i*115 + 2), line, font=font, fill=(0,0,0))
+        draw.text((30, y_start + i*115), line, font=font, fill=text_color)
+
+    # ── Accent underline ──────────────────────────────────────────────────────
+    draw.rectangle([30, y_start - 8, 300, y_start - 2], fill=accent)
+
+    # ── "New Song" badge (top right) ─────────────────────────────────────────
+    badge_font = _get_font(32)
+    draw.rectangle([1100, 20, 1270, 70], fill=accent)
+    draw.text((1112, 28), "NEW SONG", font=badge_font, fill=(255,255,255))
+
+    img.save(output_path, "JPEG", quality=95)
     print(f"  [thumb] saved {output_path}")
     return output_path
-
-
-# ─────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────
-
-def _fill_crop(img: Image.Image, w: int, h: int) -> Image.Image:
-    """Scale image to fill w×h then center-crop."""
-    orig_w, orig_h = img.size
-    scale = max(w / orig_w, h / orig_h)
-    new_w = int(orig_w * scale)
-    new_h = int(orig_h * scale)
-    img   = img.resize((new_w, new_h), Image.LANCZOS)
-    left  = (new_w - w) // 2
-    top   = (new_h - h) // 2
-    return img.crop((left, top, left + w, top + h))
-
-
-def _strip_emoji(text: str) -> str:
-    """Remove emoji / non-latin characters for font compatibility."""
-    return re.sub(r"[^\x00-\x7F]+", "", text)
-
-
-def _load_font(size: int) -> ImageFont.FreeTypeFont:
-    for path in FONT_PATHS:
-        if Path(path).exists():
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                pass
-    return ImageFont.load_default()
